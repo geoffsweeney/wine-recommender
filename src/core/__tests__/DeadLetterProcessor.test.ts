@@ -1,6 +1,7 @@
+import 'reflect-metadata';
 import { DeadLetterProcessor, DeadLetterHandler } from '../DeadLetterProcessor';
 import { RetryManager } from '../RetryManager';
-import { TestCircuitBreaker } from './CircuitBreaker.test';
+import { MockCircuitBreaker } from './RetryManager.test';
 
 class MockDeadLetterHandler implements DeadLetterHandler {
   async handle(message: unknown, error: Error): Promise<void> {
@@ -12,8 +13,9 @@ class MockDeadLetterHandler implements DeadLetterHandler {
 
 class MockRetryManager extends RetryManager {
   constructor() {
+    const mockBreaker = new MockCircuitBreaker();
     super(
-      { maxAttempts: 3, circuitBreaker: new TestCircuitBreaker({ failureThreshold: 1, resetTimeout: 1000, successThreshold: 1 }) },
+      { maxAttempts: 3, circuitBreaker: mockBreaker },
       []
     );
   }

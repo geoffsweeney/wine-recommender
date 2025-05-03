@@ -1,4 +1,4 @@
-import { CircuitBreaker } from './CircuitBreaker';
+import { Neo4jCircuitWrapper } from '../services/Neo4jCircuitWrapper';
 
 /**
  * Defines the contract for retry policies
@@ -25,7 +25,10 @@ export interface RetryManagerOptions {
    * @default 3
    */
   maxAttempts: number;
-  circuitBreaker: CircuitBreaker;
+  circuitBreaker: {
+    execute<T>(fn: () => Promise<T>): Promise<T>;
+    protect?: <T>(fn: () => Promise<T>) => Promise<T>;
+  };
 }
 
 /**
@@ -61,7 +64,7 @@ export abstract class RetryManager {
       attempt++;
       
       try {
-        return await this.options.circuitBreaker.protect(fn);
+        return await this.options.circuitBreaker.execute(async () => fn());
       } catch (error) {
         lastError = error as Error;
         

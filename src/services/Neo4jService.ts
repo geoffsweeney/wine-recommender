@@ -1,9 +1,11 @@
 import neo4j, { Driver, Session } from 'neo4j-driver';
 import { injectable } from 'tsyringe';
+import { Neo4jCircuitWrapper } from './Neo4jCircuitWrapper';
 
 @injectable()
 export class Neo4jService {
-  private driver: Driver;
+  private readonly driver: Driver;
+  private readonly circuit: Neo4jCircuitWrapper;
 
   constructor() {
     this.driver = neo4j.driver(
@@ -13,27 +15,34 @@ export class Neo4jService {
         process.env.NEO4J_PASSWORD || 'password'
       )
     );
+    this.circuit = new Neo4jCircuitWrapper(this.driver);
   }
 
-  async executeQuery<T>(query: string, params?: Record<string, any>): Promise<T[]> {
-    const session: Session = this.driver.session();
-    try {
-      const result = await session.run(query, params);
-      return result.records.map(record => record.toObject() as T);
-    } finally {
-      await session.close();
-    }
+  async executeQuery<T = any>(query: string, params?: Record<string, any>): Promise<T[]> {
+    return this.circuit.execute(async (driver) => {
+      const session = driver.session();
+      try {
+        const result = await session.run(query, params);
+        return result.records.map(record => record.toObject() as T);
+      } finally {
+        await session.close();
+      }
+    });
   }
 
   async verifyConnection(): Promise<boolean> {
-    const session = this.driver.session();
     try {
-      await session.run('RETURN 1');
+      await this.circuit.execute(async (driver) => {
+        const session = driver.session();
+        try {
+          await session.run('RETURN 1');
+        } finally {
+          await session.close();
+        }
+      });
       return true;
-    } catch (error) {
+    } catch {
       return false;
-    } finally {
-      await session.close();
     }
   }
 

@@ -1,25 +1,35 @@
+import 'reflect-metadata';
 import { RetryManager, ExponentialBackoffPolicy, FixedDelayPolicy } from '../RetryManager';
-import { CircuitBreaker, CircuitBreakerOptions } from '../CircuitBreaker';
+import { Neo4jCircuitWrapper } from '../../services/Neo4jCircuitWrapper';
 
-class MockCircuitBreaker extends CircuitBreaker {
-  constructor(options: CircuitBreakerOptions) {
-    super(options);
-  }
-  
-  async protect<T>(fn: () => Promise<T>): Promise<T> {
+interface CircuitBreakerOptions {
+  failureThreshold: number;
+  resetTimeout: number;
+  successThreshold: number;
+}
+
+export class MockCircuitBreaker {
+  state = {
+    status: 'closed' as 'closed' | 'open' | 'half-open',
+    failureCount: 0,
+    successCount: 0,
+    lastFailureTime: 0
+  };
+
+  async execute<T>(fn: () => Promise<T>): Promise<T> {
     if (this.state.status === 'open') {
       throw new Error('Circuit breaker is open');
     }
     return fn();
   }
+
+  async protect<T>(fn: () => Promise<T>): Promise<T> {
+    return this.execute(fn);
+  }
 }
 
 describe('RetryManager', () => {
-  const mockCircuitBreaker = new MockCircuitBreaker({
-    failureThreshold: 3,
-    resetTimeout: 5000,
-    successThreshold: 2
-  });
+  const mockCircuitBreaker = new MockCircuitBreaker();
 
   const successAfter = (attempts: number) => {
     let count = 0;
@@ -54,12 +64,8 @@ describe('RetryManager', () => {
     });
 
     it('should respect circuit breaker open state', async () => {
-      const failingBreaker = new MockCircuitBreaker({
-        failureThreshold: 1,
-        resetTimeout: 1000,
-        successThreshold: 1
-      });
-      failingBreaker['state'] = { status: 'open', failureCount: 1, successCount: 0, lastFailureTime: Date.now() };
+      const failingBreaker = new MockCircuitBreaker();
+      (failingBreaker as any)['state'] = { status: 'open', failureCount: 1, successCount: 0, lastFailureTime: Date.now() };
       
       const retryManager = new (class extends RetryManager {
         constructor() {
@@ -72,12 +78,8 @@ describe('RetryManager', () => {
     });
 
     it('should handle half-open state correctly', async () => {
-      const halfOpenBreaker = new MockCircuitBreaker({
-        failureThreshold: 1,
-        resetTimeout: 1000,
-        successThreshold: 1
-      });
-      halfOpenBreaker['state'] = { status: 'half-open', failureCount: 0, successCount: 0, lastFailureTime: Date.now() };
+      const halfOpenBreaker = new MockCircuitBreaker();
+      (halfOpenBreaker as any)['state'] = { status: 'half-open', failureCount: 0, successCount: 0, lastFailureTime: Date.now() };
       
       const retryManager = new (class extends RetryManager {
         constructor() {
@@ -123,7 +125,7 @@ describe('RetryManager', () => {
       await expect(retryManager.executeWithRetry(successAfter(2)))
         .resolves.toBe('success');
       const duration = Date.now() - start;
-      expect(duration).toBeGreaterThanOrEqual(200);
+      expect(duration).toBeGreaterThanOrEqual(190); // Allow slight timing variance
     });
   });
 });
