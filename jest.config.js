@@ -37,8 +37,12 @@ const config = {
   rootDir: "./",
 
   preset: 'ts-jest',
-  testMatch: ['**/__tests__/**/*.test.ts', '**/?(*.)+(spec|test).ts'],
+  testMatch: ['<rootDir>/src/**/__tests__/**/*.test.ts'],
   moduleFileExtensions: ['ts', 'js', 'json', 'node'],
+  roots: ['<rootDir>/src'],
+  transform: {
+    '^.+\\.ts$': 'ts-jest',
+  },
   // coverageReporters: [
   //   "json",
   //   "text",
