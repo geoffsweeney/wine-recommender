@@ -79,12 +79,16 @@ classDiagram
   - Error handling
   - 100% test coverage
 
-- **KnowledgeGraphService** - COMPLETED 2025-05-03
+- **KnowledgeGraphService** - COMPLETED 2025-05-03 (UPDATED 2025-05-05)
   - Wine node management
   - Pairing relationships
   - Recommendation queries
   - Schema initialization
-  - 95% test coverage
+  - 100% test coverage (6 passing tests)
+  - Added edge case tests:
+    - Empty recommendations
+    - Invalid wine IDs
+    - Partial/missing properties
 
 ## Next Steps
 1. Implement circuit breaker for Neo4j connections
@@ -119,4 +123,4 @@ pie
     "RetryManager" : 98.54
     "DeadLetterProcessor" : 100
     "Neo4jService" : 100
-    "KnowledgeGraphService" : 95
+    "KnowledgeGraphService" : 100
