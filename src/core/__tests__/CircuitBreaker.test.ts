@@ -2,7 +2,7 @@ import { CircuitBreaker } from '../CircuitBreaker';
 import { EventEmitter } from 'events';
 import { jest } from '@jest/globals';
 
-class TestCircuitBreaker extends CircuitBreaker {
+export class TestCircuitBreaker extends CircuitBreaker {
   async protect<T>(fn: () => Promise<T>): Promise<T> {
     if (!this.shouldTry()) {
       throw new Error('Circuit breaker is open');
