@@ -201,4 +201,94 @@ describe('CircuitBreaker', () => {
 
     expect(cb['state'].status).toBe('closed');
   });
+
+  test('reopens after failure in half-open state', async () => {
+    const failingFn = () => Promise.reject(new Error('test'));
+    
+    // Force half-open state
+    cb['state'].status = 'half-open';
+    
+    await expect(cb.protect(failingFn)).rejects.toThrow('test');
+    expect(cb['state'].status).toBe('open');
+  });
+
+  test('maintains open state until full reset timeout', async () => {
+    const failingFn = () => Promise.reject(new Error('test'));
+    
+    // Trigger open state
+    for (let i = 0; i < options.failureThreshold; i++) {
+      await expect(cb.protect(failingFn)).rejects.toThrow('test');
+    }
+    
+    // Advance time just before reset timeout
+    jest.advanceTimersByTime(options.resetTimeout - 1);
+    
+    // State should still be open
+    expect(cb['state'].status).toBe('open');
+    
+    // Attempt should fail
+    await expect(cb.protect(() => Promise.resolve('test')))
+      .rejects.toThrow('Circuit breaker is open');
+  });
+
+  test('handles concurrent calls in half-open state', async () => {
+    const slowFn = () => new Promise(resolve =>
+      setTimeout(() => resolve('success'), 100));
+    
+    // Force half-open state with no successes yet
+    cb['state'] = {
+      status: 'half-open',
+      failureCount: 0,
+      successCount: 0,
+      lastFailureTime: Date.now()
+    };
+    
+    // Start multiple concurrent calls (less than success threshold)
+    const callCount = Math.max(1, options.successThreshold - 1);
+    const promises = Array(callCount).fill(0).map(() => cb.protect(slowFn));
+    
+    // All should resolve successfully
+    await expect(Promise.all(promises)).resolves.toEqual(
+      Array(callCount).fill('success')
+    );
+    
+    // State should remain half-open since we haven't hit success threshold
+    expect(cb['state'].status).toBe('half-open');
+  });
+
+  test('emits metrics events', async () => {
+    const metricsListener = jest.fn();
+    cb.events.on('metrics', metricsListener);
+    
+    await cb.protect(() => Promise.resolve('success'));
+    await expect(cb.protect(() => Promise.reject(new Error('test'))))
+      .rejects.toThrow('test');
+    
+    expect(metricsListener).toHaveBeenCalledTimes(2);
+    expect(metricsListener.mock.calls[0][0]).toHaveProperty('success', true);
+    expect(metricsListener.mock.calls[1][0]).toHaveProperty('success', false);
+  });
+
+  test('handles errors in protect() method', async () => {
+    // Store initial state
+    const initialState = {...cb['state']};
+    
+    // Force error by passing null instead of function
+    await expect(cb.protect(null as any))
+      .rejects.toThrow('fn is not a function');
+    
+    // Verify failure was recorded but circuit remains closed
+    expect(cb['state'].status).toBe('closed');
+    expect(cb['state'].failureCount).toBeGreaterThan(initialState.failureCount);
+    expect(cb['state'].lastFailureTime).toBeGreaterThan(initialState.lastFailureTime);
+  });
+
+  test('throws when circuit is open', async () => {
+    // Force open state
+    cb['state'].status = 'open';
+    cb['state'].lastFailureTime = Date.now();
+    
+    await expect(cb.protect(() => Promise.resolve('test')))
+      .rejects.toThrow('Circuit breaker is open');
+  });
 });

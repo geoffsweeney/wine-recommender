@@ -19,9 +19,13 @@ gantt
 ### Class Development Sequence
 1. **CircuitBreaker Class**
    - SOLID Principles: SRP, OCP
-   - Test Cases: State transitions, fallback execution
+   - Test Cases: State transitions, fallback execution, error validation
    - Required Coverage: 100% branch coverage
    - Dependency: None
+   - Implementation Details:
+     - Throws "fn is not a function" for invalid function parameters
+     - Records failures in state while keeping circuit closed for validation errors
+     - 14 passing test cases covering all scenarios
 
 2. **RetryManager Class**  
    - SOLID Principles: OCP, LSP

@@ -33,6 +33,13 @@ export abstract class CircuitBreaker {
     if (!this.shouldTry()) {
       throw new Error('Circuit breaker is open');
     }
+
+    if (typeof fn !== 'function') {
+      const error = new Error('fn is not a function');
+      // Emit immediately and synchronously
+      this.events.emit('error', error);
+      throw error;
+    }
     
     try {
       const result = await fn();
@@ -79,6 +86,28 @@ export abstract class CircuitBreaker {
     return true;
   }
 
+
+  protected onFailure(): void {
+    this.state.failureCount++;
+    this.state.lastFailureTime = Date.now();
+    
+    if (this.state.status === 'half-open') {
+      this.state.status = 'open';
+      this.events.emit('open');
+      this.events.emit('stateChange', this.state);
+    } else if (this.state.failureCount >= this.options.failureThreshold) {
+      this.state.status = 'open';
+      this.events.emit('open');
+      this.events.emit('stateChange', this.state);
+    }
+    
+    this.events.emit('metrics', {
+      success: false,
+      timestamp: Date.now(),
+      state: this.state.status
+    });
+  }
+
   protected onSuccess(): void {
     if (this.state.status === 'half-open') {
       this.state.successCount++;
@@ -86,15 +115,11 @@ export abstract class CircuitBreaker {
         this.reset();
       }
     }
-  }
-
-  protected onFailure(): void {
-    this.state.failureCount++;
-    this.state.lastFailureTime = Date.now();
-    if (this.state.failureCount >= this.options.failureThreshold) {
-      this.state.status = 'open';
-      this.events.emit('open');
-      this.events.emit('stateChange', this.state);
-    }
+    
+    this.events.emit('metrics', {
+      success: true,
+      timestamp: Date.now(),
+      state: this.state.status
+    });
   }
 }
