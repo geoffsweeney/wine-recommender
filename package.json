@@ -1,0 +1,24 @@
+{
+  "name": "wine-recommendation",
+  "version": "1.0.0",
+  "scripts": {
+    "test": "jest",
+    "test:changed": "jest --onlyChanged --coverage",
+    "test:all": "jest --coverage",
+    "lint": "eslint . --ext .ts"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "npm run test:changed && npm run lint",
+      "pre-push": "npm run test:all"
+    }
+  },
+  "devDependencies": {
+    "@types/jest": "^29.0.0",
+    "@types/node": "^22.15.3",
+    "eslint": "^8.0.0",
+    "husky": "^9.0.0",
+    "jest": "^29.0.0",
+    "ts-jest": "^29.3.2"
+  }
+}
