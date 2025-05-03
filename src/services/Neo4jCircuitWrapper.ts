@@ -1,84 +1,51 @@
-import neo4j, { Driver } from 'neo4j-driver';
-import { injectable } from 'tsyringe';
+import { CircuitBreaker, CircuitOptions } from '../core/CircuitBreaker';
+import { logger } from '../utils/logger';
+import type { Driver, Record } from 'neo4j-driver';
 
-interface CircuitState {
-  status: 'closed' | 'open' | 'half-open';
-  failureCount: number;
-  successCount: number;
-  lastFailureTime: number;
+export interface INeo4jCircuitWrapper<T = Driver> {
+  execute(fn: (driver: T) => Promise<any>): Promise<any>;
+  executeQuery?(query: string, params?: object): Promise<any[]>;
 }
 
-@injectable()
-export class Neo4jCircuitWrapper {
-  private readonly driver: Driver;
-  private state: CircuitState;
-  private readonly options = {
+export class Neo4jCircuitWrapper implements INeo4jCircuitWrapper<Driver> {
+  private circuit: CircuitBreaker;
+  private driver: Driver;
+
+  constructor(driver: Driver, options: CircuitOptions = {
     failureThreshold: 3,
-    resetTimeout: 10000,
-    successThreshold: 2
-  };
-
-  constructor(driver: Driver) {
+    successThreshold: 2,
+    timeoutMs: 5000,
+    fallback: () => {
+      logger.warn('Circuit open - using fallback');
+      return [];
+    }
+  }) {
     this.driver = driver;
-    this.state = {
-      status: 'closed',
-      failureCount: 0,
-      successCount: 0,
-      lastFailureTime: 0
-    };
+    this.circuit = new CircuitBreaker(options);
   }
 
-  private shouldTry(): boolean {
-    if (this.state.status === 'closed') return true;
-    if (this.state.status === 'open') {
-      const shouldTry = Date.now() - this.state.lastFailureTime >= this.options.resetTimeout;
-      if (shouldTry) {
-        this.state.status = 'half-open';
+  async execute(fn: (driver: Driver) => Promise<any>): Promise<any> {
+    return this.circuit.execute(() => fn(this.driver));
+  }
+
+  async executeQuery<T = Record>(query: string, params?: object): Promise<T[]> {
+    const operation = async () => {
+      const session = this.driver.session();
+      try {
+        const result = await session.run(query, params);
+        return result.records.map(record => record.toObject() as T);
+      } catch (error) {
+        logger.error('Neo4j query failed', { query, error });
+        throw error;
+      } finally {
+        await session.close();
       }
-      return shouldTry;
-    }
-    return true;
-  }
-
-  private onSuccess(): void {
-    if (this.state.status === 'half-open') {
-      this.state.successCount++;
-      if (this.state.successCount >= this.options.successThreshold) {
-        this.reset();
-      }
-    }
-  }
-
-  private onFailure(): void {
-    this.state.failureCount++;
-    this.state.lastFailureTime = Date.now();
-    
-    if (this.state.failureCount >= this.options.failureThreshold) {
-      this.state.status = 'open';
-    }
-  }
-
-  private reset(): void {
-    this.state = {
-      status: 'closed',
-      failureCount: 0,
-      successCount: 0,
-      lastFailureTime: 0
     };
+
+    return this.circuit.execute(operation);
   }
 
-  async execute<T>(operation: (driver: Driver) => Promise<T>): Promise<T> {
-    if (!this.shouldTry()) {
-      throw new Error('Neo4j circuit breaker is open');
-    }
-
-    try {
-      const result = await operation(this.driver);
-      this.onSuccess();
-      return result;
-    } catch (error) {
-      this.onFailure();
-      throw error;
-    }
+  getCircuitState() {
+    return this.circuit.getState();
   }
 }

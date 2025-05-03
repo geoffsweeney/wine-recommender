@@ -1,84 +1,74 @@
-import 'reflect-metadata';
-import { Neo4jCircuitWrapper } from '../../services/Neo4jCircuitWrapper';
+import { CircuitBreaker } from '../CircuitBreaker';
 import { jest } from '@jest/globals';
-import neo4j from 'neo4j-driver';
 
-describe('Neo4jCircuitWrapper', () => {
-  let wrapper: Neo4jCircuitWrapper;
-  let mockDriver: { session: jest.Mock };
+describe('CircuitBreaker', () => {
+  let circuit: CircuitBreaker;
+  const options = {
+    failureThreshold: 3,
+    successThreshold: 2,
+    timeoutMs: 5000,
+    fallback: jest.fn(() => 'fallback')
+  };
 
   beforeEach(() => {
-    mockDriver = {
-      session: jest.fn(() => ({
-        run: jest.fn(),
-        close: jest.fn()
-      }))
-    };
-
-    wrapper = new Neo4jCircuitWrapper(mockDriver as any);
     jest.useFakeTimers();
+    circuit = new CircuitBreaker(options);
   });
 
   afterEach(() => {
     jest.useRealTimers();
   });
 
-  test('initial state should be closed', () => {
-    expect(wrapper['state'].status).toBe('closed');
+  test('initial state should be CLOSED', () => {
+    expect(circuit.getState()).toBe('CLOSED');
   });
 
   test('should open circuit after failure threshold', async () => {
     const failingOperation = jest.fn(async () => {
-      throw new Error('DB error');
+      throw new Error('Operation failed');
     });
     
     // First failure
-    await expect(wrapper.execute(failingOperation))
-      .rejects.toThrow('DB error');
-    expect(wrapper['state'].status).toBe('closed');
-    expect(wrapper['state'].failureCount).toBe(1);
+    await expect(circuit.execute(failingOperation))
+      .rejects.toThrow('Operation failed');
+    expect(circuit.getState()).toBe('CLOSED');
 
-    // Second failure
-    await expect(wrapper.execute(failingOperation))
-      .rejects.toThrow('DB error');
-    expect(wrapper['state'].status).toBe('closed');
-    expect(wrapper['state'].failureCount).toBe(2);
+    // Second failure  
+    await expect(circuit.execute(failingOperation))
+      .rejects.toThrow('Operation failed');
+    expect(circuit.getState()).toBe('CLOSED');
 
     // Third failure - should open circuit
-    await expect(wrapper.execute(failingOperation))
-      .rejects.toThrow('DB error');
-    expect(wrapper['state'].status).toBe('open');
+    await expect(circuit.execute(failingOperation))
+      .rejects.toThrow('Operation failed');
+    expect(circuit.getState()).toBe('OPEN');
   });
 
-  test('should reject when circuit is open', async () => {
-    wrapper['state'].status = 'open';
-    wrapper['state'].lastFailureTime = Date.now();
+  test('should use fallback when circuit is open', async () => {
+    circuit._setStateForTesting('OPEN');
+    const result = await circuit.execute(jest.fn(async () => 'success'));
+    expect(result).toBe('fallback');
+    expect(options.fallback).toHaveBeenCalled();
+  });
+
+  test('should transition to HALF_OPEN after timeout', async () => {
+    const now = Date.now();
+    circuit._setStateForTesting('OPEN', now - options.timeoutMs - 1000);
     
-    await expect(wrapper.execute(jest.fn(async () => ({}))))
-      .rejects.toThrow('Neo4j circuit breaker is open');
+    const result = await circuit.execute(jest.fn(async () => 'success'));
+    expect(circuit.getState()).toBe('HALF_OPEN');
+    expect(result).toBe('success');
   });
 
-  test('should transition to half-open after reset timeout', async () => {
-    wrapper['state'].status = 'open';
-    wrapper['state'].lastFailureTime = Date.now() - 10000; // Past timeout
-    
-    const successOperation = jest.fn(async () => ({}));
-    await expect(wrapper.execute(successOperation)).resolves.toEqual({});
-    expect(wrapper['state'].status).toBe('half-open');
-  });
-
-  test('should reset after success threshold in half-open', async () => {
-    wrapper['state'].status = 'half-open';
-    const successOperation = jest.fn(async () => ({}));
+  test('should reset to CLOSED after success threshold', async () => {
+    circuit._setStateForTesting('HALF_OPEN');
     
     // First success
-    await wrapper.execute(successOperation);
-    expect(wrapper['state'].status).toBe('half-open');
-    expect(wrapper['state'].successCount).toBe(1);
+    await circuit.execute(jest.fn(async () => 'success'));
+    expect(circuit.getState()).toBe('HALF_OPEN');
 
     // Second success - should reset
-    await wrapper.execute(successOperation);
-    expect(wrapper['state'].status).toBe('closed');
-    expect(wrapper['state'].successCount).toBe(0);
+    await circuit.execute(jest.fn(async () => 'success'));
+    expect(circuit.getState()).toBe('CLOSED');
   });
 });
