@@ -19,9 +19,15 @@ describe('RecommendationService', () => {
   describe('getRecommendations', () => {
     it('should combine results from all strategies', async () => {
       const mockResults = [
-        [{ id: '1', name: 'Wine 1' }],
-        [{ id: '2', name: 'Wine 2' }],
-        [{ id: '1', name: 'Wine 1' }, { id: '3', name: 'Wine 3' }]
+        [{ w: { id: '1', name: 'Wine 1' }, tastingNotes: [] }],
+        [
+          { rec: { id: '1', name: 'Wine 1' }, score: 2, confidence: 1 },
+          { rec: { id: '2', name: 'Wine 2' }, score: 1, confidence: 1 }
+        ],
+        [
+          { w: { id: '1', name: 'Wine 1' }, popularity: 3, recentPopularity: 2 },
+          { w: { id: '3', name: 'Wine 3' }, popularity: 1, recentPopularity: 1 }
+        ]
       ];
       mockNeo4j.executeQuery.mockImplementation(async () => mockResults.pop() || []);
 
@@ -42,9 +48,15 @@ describe('RecommendationService', () => {
 
     it('should rank recommendations by frequency', async () => {
       const mockResults = [
-        [{ id: '1', name: 'Wine 1' }],
-        [{ id: '1', name: 'Wine 1' }, { id: '2', name: 'Wine 2' }],
-        [{ id: '1', name: 'Wine 1' }, { id: '3', name: 'Wine 3' }]
+        [{ w: { id: '1', name: 'Wine 1' }, tastingNotes: [] }],
+        [
+          { rec: { id: '1', name: 'Wine 1' }, score: 2, confidence: 1 },
+          { rec: { id: '2', name: 'Wine 2' }, score: 1, confidence: 1 }
+        ],
+        [
+          { w: { id: '1', name: 'Wine 1' }, popularity: 3, recentPopularity: 2 },
+          { w: { id: '3', name: 'Wine 3' }, popularity: 1, recentPopularity: 1 }
+        ]
       ];
       mockNeo4j.executeQuery.mockImplementation(async () => mockResults.pop() || []);
 
@@ -58,6 +70,7 @@ describe('RecommendationService', () => {
       };
       const results = await service.getRecommendations(request);
 
+      // Check wine ID from first strategy's format
       expect(results[0].id).toBe('1');
       // Both '2' and '3' have same score so order isn't guaranteed
       expect(['2', '3']).toContain(results[1].id);
