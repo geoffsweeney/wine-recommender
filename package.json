@@ -5,7 +5,10 @@
     "test": "jest",
     "test:changed": "jest --onlyChanged --coverage",
     "test:all": "jest --coverage",
-    "lint": "eslint . --ext .ts"
+    "lint": "eslint . --ext .ts",
+    "dev": "ts-node src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js"
   },
   "husky": {
     "hooks": {
@@ -14,6 +17,8 @@
     }
   },
   "devDependencies": {
+    "@types/express": "^5.0.1",
+    "ts-node": "^10.9.2",
     "@types/jest": "^29.5.14",
     "@types/node": "^22.15.3",
     "eslint": "^9.26.0",
