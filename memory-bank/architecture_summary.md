@@ -13,6 +13,8 @@ graph TD
         AgentSys[LLMDrivenAgentSystem]
         Orchestrator(LLM Orchestrator)
         AgentReg[Agent Registry]
+        AgentBus[Agent Communication Bus]
+        Context[Shared Context Memory]
         DB[(Database)]
         DI[DI Container (tsyringe)]
         Services[Services (Ollama, Cache, etc.)]
@@ -33,6 +35,8 @@ graph TD
     AgentSys -->|ContextModel| Orchestrator
     Orchestrator -->|Decision| Services
     Orchestrator -->|Tool| AgentReg --> SA & MCPA
+    AgentReg -->|Register| AgentBus
+    AgentBus -->|Subscribe| Context
     MCPA -->|MCP| BuyerMCP
     API -->|Save| DB
     
@@ -74,6 +78,22 @@ graph TD
    - `McpClientService`: MCP communication
    - `OllamaService`: LLM integration
    - `CacheService`: Performance optimization
+
+## Enhanced Agentic Patterns
+1. **Agent Communication Bus**:
+   - Pub/sub model for agent coordination
+   - Supports direct and broadcast messaging
+   - Message persistence for audit trails
+
+2. **Shared Context Memory**:
+   - Short-term: Redis-based working memory
+   - Long-term: Vector database for knowledge retention
+   - Context versioning and snapshotting
+
+3. **LLM Reasoning Protocols**:
+   - Chain-of-thought prompting
+   - Reflection and self-critique steps
+   - Confidence scoring for decisions
 
 ## Communication Patterns
 - **Agent Messaging**:
