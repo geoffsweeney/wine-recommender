@@ -44,16 +44,101 @@ describe('WineRecommendationController', () => {
       expect(mockResponse.status).toHaveBeenCalledWith(200);
       expect(mockResponse.json).toHaveBeenCalledWith(testData);
     });
+  });
 
-    it('should handle missing userId', async () => {
-      mockRequest.body = { preferences: {} };
+  describe('searchWines', () => {
+    it('should return search results with pagination', async () => {
+      const testData = [{ wine: 'Test Wine' }];
+      mockNeo4j.executeQuery.mockResolvedValue(testData);
+      mockRequest.query = {
+        query: 'test',
+        page: '1',
+        limit: '10'
+      };
 
-      await controller.execute(
+      await controller.searchWines(
         mockRequest as Request,
         mockResponse as Response
       );
 
-      expect(mockResponse.status).toHaveBeenCalledWith(400);
+      expect(mockResponse.status).toHaveBeenCalledWith(200);
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        data: testData,
+        pagination: expect.any(Object)
+      });
+    });
+
+    it('should handle region filter', async () => {
+      const testData = [{ wine: 'Region Wine' }];
+      mockNeo4j.executeQuery.mockResolvedValue(testData);
+      mockRequest.query = {
+        region: 'Bordeaux',
+        page: '1',
+        limit: '10'
+      };
+
+      await controller.searchWines(
+        mockRequest as Request,
+        mockResponse as Response
+      );
+
+      expect(mockNeo4j.executeQuery).toHaveBeenCalledWith(
+        expect.stringContaining('w.region = $region'),
+        expect.objectContaining({ region: 'Bordeaux' })
+      );
+    });
+
+    it('should handle price range filter', async () => {
+      const testData = [{ wine: 'Premium Wine' }];
+      mockNeo4j.executeQuery.mockResolvedValue(testData);
+      mockRequest.query = {
+        minPrice: '50',
+        maxPrice: '100',
+        page: '1',
+        limit: '10'
+      };
+
+      await controller.searchWines(
+        mockRequest as Request,
+        mockResponse as Response
+      );
+
+      expect(mockNeo4j.executeQuery).toHaveBeenCalledWith(
+        expect.stringContaining('w.price >= $minPrice AND w.price <= $maxPrice'),
+        expect.objectContaining({ minPrice: '50', maxPrice: '100' })
+      );
+    });
+
+    it('should handle pagination limits', async () => {
+      const testData = Array(50).fill({ wine: 'Test Wine' });
+      mockNeo4j.executeQuery.mockResolvedValue(testData);
+      mockRequest.query = {
+        page: '2',
+        limit: '100' // Should be capped at 50
+      };
+
+      await controller.searchWines(
+        mockRequest as Request,
+        mockResponse as Response
+      );
+
+      expect(mockResponse.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pagination: expect.objectContaining({ limit: 50 })
+        })
+      );
+    });
+
+    it('should handle database errors', async () => {
+      mockNeo4j.executeQuery.mockRejectedValue(new Error('DB Error'));
+      mockRequest.query = { query: 'test' };
+
+      await controller.searchWines(
+        mockRequest as Request,
+        mockResponse as Response
+      );
+
+      expect(mockResponse.status).toHaveBeenCalledWith(500);
     });
   });
 });
