@@ -1,23 +1,13 @@
-import { IsString, IsObject, ValidateNested } from 'class-validator';
-import { Type } from 'class-transformer';
+import { z } from 'zod';
 
-class Preferences {
-  @IsString({ each: true })
-  wineTypes?: string[];
+export const RecommendationRequest = z.object({
+  userId: z.string().min(1, 'User ID is required'),
+  preferences: z.object({
+    wineType: z.enum(['red', 'white', 'sparkling', 'rose']).optional().default('red'),
+    priceRange: z.tuple([z.number().min(0), z.number().min(0)]).optional(),
+    foodPairing: z.string().optional(),
+    excludeAllergens: z.array(z.string()).optional()
+  }).strict()
+});
 
-  @IsString({ each: true })
-  regions?: string[];
-
-  @IsString({ each: true })
-  grapes?: string[];
-}
-
-export class RecommendationRequest {
-  @IsString()
-  userId!: string;
-
-  @IsObject()
-  @ValidateNested()
-  @Type(() => Preferences)
-  preferences!: Preferences;
-}
+export type RecommendationRequest = z.infer<typeof RecommendationRequest>;

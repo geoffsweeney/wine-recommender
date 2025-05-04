@@ -1,28 +1,35 @@
 import { Request, Response, NextFunction } from 'express';
-import { ClassConstructor, plainToInstance } from 'class-transformer';
-import { validate } from 'class-validator';
+import '../../types/express.d.ts';
+import { ZodSchema } from 'zod';
 
-export function validateRequest<T extends object>(type: ClassConstructor<T>, source: 'body' | 'query') {
-  return async (req: Request, res: Response, next: NextFunction) => {
+export function validateRequest<T>(schema: ZodSchema<T>, source: 'body' | 'query') {
+  return (req: Request, res: Response, next: NextFunction) => {
     try {
-      const input = plainToInstance(type, req[source]);
-      const errors = await validate(input);
-
-      if (errors.length > 0) {
-        const errorMessages = errors.flatMap(error =>
-          Object.values(error.constraints || {})
-        );
+      console.log('Validating:', source, req[source]);
+      const result = schema.safeParse(req[source]);
+      
+      if (!result.success) {
+        console.log('Validation failed:', result.error);
         res.status(400).json({
           status: 400,
           message: 'Validation failed',
-          errors: errorMessages
+          errors: result.error.issues.map(issue => ({
+            path: issue.path.join('.'),
+            message: issue.message
+          }))
         });
         return;
       }
 
-      req[source] = input;
+      if (source === 'query') {
+        // Store parsed query params in a new property to avoid modifying immutable query object
+        req.parsedQuery = result.data;
+      } else {
+        req[source] = result.data;
+      }
       next();
     } catch (err) {
+      console.error('Validation error:', err);
       res.status(500).json({
         status: 500,
         message: 'Internal server error during validation'

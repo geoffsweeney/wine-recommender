@@ -15,7 +15,7 @@ export class WineRecommendationController extends BaseController {
 
   protected async executeImpl(req: Request, res: Response): Promise<void> {
     try {
-      const request = req.body as RecommendationRequest;
+      const request = req.body as unknown as RecommendationRequest;
       const results = await this.recommendationService.getRecommendations(request);
       this.ok(res, results);
     } catch (err) {
@@ -25,7 +25,7 @@ export class WineRecommendationController extends BaseController {
 
   async searchWines(req: Request, res: Response): Promise<void> {
     try {
-      const searchParams = req.query as SearchRequest;
+      const searchParams = req.query as unknown as SearchRequest;
       const results = await this.recommendationService.searchWines(searchParams);
       this.ok(res, results);
     } catch (err) {

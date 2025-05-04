@@ -1,3 +1,4 @@
+import 'reflect-metadata';
 import express from 'express';
 import { container } from 'tsyringe';
 import { WineRecommendationController } from './controllers/WineRecommendationController';

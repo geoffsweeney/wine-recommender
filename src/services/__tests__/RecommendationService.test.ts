@@ -42,9 +42,7 @@ describe('RecommendationService', () => {
       const request: RecommendationRequest = {
         userId: 'user1',
         preferences: {
-          wineTypes: [],
-          regions: [],
-          grapes: []
+          wineType: 'red',
         }
       };
       const results = await service.getRecommendations(request);
@@ -73,9 +71,8 @@ describe('RecommendationService', () => {
       const request: RecommendationRequest = {
         userId: 'user1',
         preferences: {
-          wineTypes: [],
-          regions: [],
-          grapes: []
+          wineType: 'red',
+          // grapes property removed as it is not valid
         }
       };
 
@@ -106,9 +103,9 @@ describe('RecommendationService', () => {
       const request: RecommendationRequest = {
         userId: 'user1',
         preferences: {
-          wineTypes: [],
-          regions: [],
-          grapes: []
+          wineType: 'red',
+          // regions property removed as it is not valid
+          // grapes property removed as it is not valid
         }
       };
       const results = await service.getRecommendations(request);
@@ -121,7 +118,7 @@ describe('RecommendationService', () => {
       const mockWines = [{ id: '1', name: 'Test Wine' }];
       mockNeo4j.executeQuery.mockResolvedValue(mockWines);
 
-      const request: SearchRequest = { query: 'Test' };
+      const request: SearchRequest = { query: 'Test', limit: 10, offset: 0, page: 1 };
       const result = await service.searchWines(request);
 
       expect(result.data).toEqual(mockWines);
@@ -141,7 +138,8 @@ describe('RecommendationService', () => {
         minPrice: 20,
         maxPrice: 100,
         page: 2,
-        limit: 5
+        limit: 5,
+        offset: (2 - 1) * 5 // Calculate offset based on page and limit
       };
       const result = await service.searchWines(request);
 
@@ -165,11 +163,11 @@ describe('RecommendationService', () => {
       mockNeo4j.executeQuery.mockResolvedValue([]);
 
       // Test page < 1
-      await service.searchWines({ page: 0, limit: 5 });
+      await service.searchWines({ query: '', page: 0, limit: 5, offset: 0 });
       expect(mockNeo4j.executeQuery).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ skip: 0, limit: 5 }));
 
       // Test limit > 50
-      await service.searchWines({ page: 1, limit: 100 });
+      await service.searchWines({ query: '', page: 1, limit: 100, offset: 0 });
       expect(mockNeo4j.executeQuery).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ skip: 0, limit: 50 }));
     });
 
@@ -177,7 +175,7 @@ describe('RecommendationService', () => {
       const mockWines = [{ id: '1', name: 'Test Wine' }];
       mockNeo4j.executeQuery.mockResolvedValue(mockWines);
 
-      const result = await service.searchWines({});
+      const result = await service.searchWines({ query: '', limit: 10, offset: 0, page: 1 });
       expect(result.data).toEqual(mockWines);
       expect(mockNeo4j.executeQuery).toHaveBeenCalledWith(
         'MATCH (w:Wine) WHERE RETURN w SKIP $skip LIMIT $limit',
