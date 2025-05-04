@@ -34,4 +34,80 @@ export class WineRecommendationController extends BaseController {
       this.fail(res, err as Error);
     }
   }
+
+  async searchWines(req: Request, res: Response): Promise<void> {
+    try {
+      const { query, region, minPrice, maxPrice, page = '1', limit = '10' } = req.query as {
+        query?: string;
+        region?: string;
+        minPrice?: string;
+        maxPrice?: string;
+        page?: string;
+        limit?: string;
+      };
+
+      // Validate input
+      if (minPrice && isNaN(Number(minPrice))) {
+        this.clientError(res, 'minPrice must be a number');
+        return;
+      }
+      if (maxPrice && isNaN(Number(maxPrice))) {
+        this.clientError(res, 'maxPrice must be a number');
+        return;
+      }
+      if (minPrice && maxPrice && Number(minPrice) > Number(maxPrice)) {
+        this.clientError(res, 'minPrice cannot be greater than maxPrice');
+        return;
+      }
+      if (query && query.length > 100) {
+        this.clientError(res, 'Query too long (max 100 chars)');
+        return;
+      }
+      if (region && region.length > 50) {
+        this.clientError(res, 'Region name too long (max 50 chars)');
+        return;
+      }
+      
+      // Build search query dynamically
+      let cypher = 'MATCH (w:Wine) WHERE ';
+      const params: Record<string, any> = {};
+      
+      if (query) {
+        cypher += 'w.name CONTAINS $query ';
+        params.query = query;
+      }
+      
+      if (region) {
+        cypher += (query ? 'AND ' : '') + 'w.region = $region ';
+        params.region = region;
+      }
+      
+      if (minPrice || maxPrice) {
+        cypher += (query || region ? 'AND ' : '') + 'w.price >= $minPrice AND w.price <= $maxPrice ';
+        params.minPrice = minPrice || 0;
+        params.maxPrice = maxPrice || 1000;
+      }
+      
+      // Validate pagination params
+      const pageNum = Math.max(1, parseInt(page));
+      const limitNum = Math.min(50, Math.max(1, parseInt(limit)));
+      const skip = (pageNum - 1) * limitNum;
+
+      cypher += 'RETURN w SKIP $skip LIMIT $limit';
+      params.skip = skip;
+      params.limit = limitNum;
+      
+      const results = await this.neo4jService.executeQuery(cypher, params);
+      this.ok(res, {
+        data: results,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total: results.length === limitNum ? limitNum + 1 : results.length
+        }
+      });
+    } catch (err) {
+      this.fail(res, err as Error);
+    }
+  }
 }

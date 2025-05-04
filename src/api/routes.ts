@@ -9,6 +9,7 @@ export const createRouter = () => {
 
   // Recommendation endpoints
   router.post('/recommendations', (req, res) => wineController.execute(req, res));
+  router.get('/search', (req, res) => wineController.searchWines(req, res));
   
   // Health check endpoint
   router.get('/health', (req, res) => {
