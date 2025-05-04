@@ -9,6 +9,7 @@ graph TD
 
     subgraph Backend (Node.js)
         API[API Route (/api/chat)]
+        RateLimit[Rate Limiter]
         AgentSys[LLMDrivenAgentSystem]
         Orchestrator(LLM Orchestrator)
         AgentReg[Agent Registry]
@@ -27,6 +28,7 @@ graph TD
     end
 
     FE -->|HTTP| API
+    API -->|Rate Limited| RateLimit
     API -->|AgentMessage| AgentSys
     AgentSys -->|ContextModel| Orchestrator
     Orchestrator -->|Decision| Services
@@ -58,6 +60,10 @@ graph TD
    - `SommelierCoordinator`: Lightweight orchestration
    - `MCPAdapterAgent`: Bridges to MCP servers
 3. **Resilience**:
+   - `RateLimiter`: API request throttling
+     - 100 requests/15 minutes per endpoint per IP
+     - Standard headers (RateLimit-*)
+     - Custom 429 responses
    - `CircuitBreaker`: Protects external services
      - States: Closed (initial), Open, Half-Open
      - Events: Emits state changes (open, half-open, closed)
