@@ -8,9 +8,15 @@ describe('Rate Limiting', () => {
   let app: Express;
 
   beforeAll(() => {
-    // Force mock service for tests
+    // Force mock services for tests
     container.register('Neo4jService', {
       useClass: MockNeo4jService
+    });
+    container.register('RecommendationService', {
+      useValue: {
+        getRecommendations: jest.fn(),
+        searchWines: jest.fn()
+      }
     });
     app = createServer();
     
