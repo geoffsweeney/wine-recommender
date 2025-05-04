@@ -1,5 +1,6 @@
 import { inject, injectable } from 'tsyringe';
 import { Neo4jService } from './Neo4jService';
+import { KnowledgeGraphService } from './KnowledgeGraphService';
 import { RecommendationRequest } from '../api/dtos/RecommendationRequest.dto';
 import { SearchRequest } from '../api/dtos/SearchRequest.dto';
 
@@ -12,13 +13,14 @@ export class RecommendationService {
   private strategies: IRecommendationStrategy[] = [];
 
   constructor(
-    @inject('Neo4jService') private neo4jService: Neo4jService
+    @inject('Neo4jService') private neo4jService: Neo4jService,
+    @inject('KnowledgeGraphService') private knowledgeGraph: KnowledgeGraphService
   ) {
     // Initialize strategies
     this.strategies = [
-      new UserPreferencesStrategy(neo4jService),
-      new CollaborativeFilteringStrategy(neo4jService),
-      new PopularWinesStrategy(neo4jService)
+      new UserPreferencesStrategy(neo4jService, knowledgeGraph),
+      new CollaborativeFilteringStrategy(neo4jService, knowledgeGraph),
+      new PopularWinesStrategy(neo4jService, knowledgeGraph)
     ];
   }
 
@@ -26,7 +28,7 @@ export class RecommendationService {
     const allResults = await Promise.all(
       this.strategies.map(strategy => strategy.getRecommendations(request))
     );
-    return this.rankRecommendations(allResults.flat());
+    return await this.rankRecommendations(allResults.flat());
   }
 
   async searchWines(params: SearchRequest): Promise<any> {
@@ -82,9 +84,10 @@ export class RecommendationService {
    * - { rec: {id, name, ...} } format
    * - Direct {id, name, ...} format
    */
-  private rankRecommendations(wines: any[]): any[] {
+  private async rankRecommendations(wines: any[]): Promise<any[]> {
     const wineScores = new Map<string, { wine: any, score: number }>();
     
+    // First pass - count basic frequency
     wines.forEach(wine => {
       // Extract wine object based on strategy format
       let wineObj = wine;
@@ -103,7 +106,17 @@ export class RecommendationService {
       wineScores.set(wineId, existing);
     });
 
-    return Array.from(wineScores.values())
+    // Second pass - enhance with graph relationships
+    const scoredWines = Array.from(wineScores.values());
+    for (const item of scoredWines) {
+      // Boost score for wines with similar/pairing relationships
+      const similar = await this.knowledgeGraph.findSimilarWines(item.wine.id);
+      const pairings = await this.knowledgeGraph.getWinePairings(item.wine.id);
+      item.score += similar.length * 0.5;
+      item.score += pairings.length * 0.3;
+    }
+
+    return scoredWines
       .sort((a, b) => b.score - a.score)
       .map(item => item.wine);
   }
@@ -111,7 +124,10 @@ export class RecommendationService {
 
 // Strategy Implementations
 class UserPreferencesStrategy implements IRecommendationStrategy {
-  constructor(private neo4jService: Neo4jService) {}
+  constructor(
+    private neo4jService: Neo4jService,
+    private knowledgeGraph: KnowledgeGraphService
+  ) {}
 
   async getRecommendations(request: RecommendationRequest): Promise<any[]> {
     const query = `
@@ -131,7 +147,10 @@ class UserPreferencesStrategy implements IRecommendationStrategy {
 }
 
 class CollaborativeFilteringStrategy implements IRecommendationStrategy {
-  constructor(private neo4jService: Neo4jService) {}
+  constructor(
+    private neo4jService: Neo4jService,
+    private knowledgeGraph: KnowledgeGraphService
+  ) {}
 
   async getRecommendations(request: RecommendationRequest): Promise<any[]> {
     const query = `
@@ -158,7 +177,10 @@ class CollaborativeFilteringStrategy implements IRecommendationStrategy {
 }
 
 class PopularWinesStrategy implements IRecommendationStrategy {
-  constructor(private neo4jService: Neo4jService) {}
+  constructor(
+    private neo4jService: Neo4jService,
+    private knowledgeGraph: KnowledgeGraphService
+  ) {}
 
   async getRecommendations(request: RecommendationRequest): Promise<any[]> {
     const query = `

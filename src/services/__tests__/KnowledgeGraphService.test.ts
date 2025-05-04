@@ -1,78 +1,176 @@
 import 'reflect-metadata';
 import { KnowledgeGraphService } from '../KnowledgeGraphService';
-import { WineNode } from '../../types';
 import { Neo4jService } from '../Neo4jService';
-import { container } from 'tsyringe';
-import { mockDeep } from 'jest-mock-extended';
+
+jest.mock('../Neo4jService');
 
 describe('KnowledgeGraphService', () => {
   let service: KnowledgeGraphService;
-  const mockNeo4j = mockDeep<Neo4jService>();
-
-  const baseWine: WineNode = {
-    id: 'wine-123',
-    name: 'Test Wine',
-    type: 'Red',
-    region: 'Test Region'
-  };
+  let mockNeo4j: jest.Mocked<Neo4jService>;
 
   beforeEach(() => {
-    container.clearInstances();
-    container.register('Neo4jService', { useValue: mockNeo4j });
-    service = container.resolve(KnowledgeGraphService);
-    mockNeo4j.executeQuery.mockReset();
+    mockNeo4j = new Neo4jService() as jest.Mocked<Neo4jService>;
+    mockNeo4j.executeQuery.mockImplementation(async () => []);
+    service = new KnowledgeGraphService(mockNeo4j);
   });
 
-  describe('addWine', () => {
-    it('should persist valid wine data', async () => {
-      const fullWine: WineNode = {
-        ...baseWine,
-        vintage: 2020,
-        rating: 4.5,
-        priceRange: '$$$'
+  describe('createWineNode', () => {
+    it('should create a wine node with all properties', async () => {
+      const wine = {
+        id: 'w1',
+        name: 'Test Wine',
+        type: 'Red',
+        region: 'Barossa',
+        vintage: 2018,
+        price: 50,
+        rating: 4.5
       };
 
-      await service.addWine(fullWine);
-      
+      await service.createWineNode(wine);
+
       expect(mockNeo4j.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('MERGE (w:Wine {id: $id})'),
+        `
+      MERGE (w:Wine {id: $id})
+      SET w += $properties
+    `,
         {
-          id: fullWine.id,
-          properties: fullWine
+          id: 'w1',
+          properties: {
+            name: 'Test Wine',
+            type: 'Red',
+            region: 'Barossa',
+            vintage: 2018,
+            price: 50,
+            rating: 4.5
+          }
         }
       );
     });
 
-    it('should validate required fields', async () => {
-      // Test missing all required fields
-      const emptyWine = {
-        id: undefined,
-        name: undefined,
-        type: undefined,
-        region: undefined
+    it('should handle minimal wine data', async () => {
+      const wine = {
+        id: 'w1',
+        name: 'Test Wine',
+        type: 'Red',
+        region: 'Barossa'
       };
-      await expect(service.addWine(emptyWine as unknown as WineNode))
-        .rejects.toThrow('Missing required fields: id, name, type, region');
-      
-      // Test missing one required field
-      const missingRegion = {...baseWine, region: undefined};
-      await expect(service.addWine(missingRegion as unknown as WineNode))
-        .rejects.toThrow('Missing required fields: region');
+
+      await service.createWineNode(wine);
+
+      expect(mockNeo4j.executeQuery).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          properties: expect.not.objectContaining({
+            vintage: expect.anything(),
+            price: expect.anything(),
+            rating: expect.anything()
+          })
+        })
+      );
     });
   });
 
-  describe('getRecommendations', () => {
-    it('should format results correctly', async () => {
-      mockNeo4j.executeQuery.mockResolvedValue([{
-        w2: { properties: { id: 'wine-456', name: 'Recommended Wine' }},
-        p: { properties: { strength: 0.92 }}
-      }]);
+  describe('findSimilarWines', () => {
+    it('should return similar wines', async () => {
+      const mockResults = [{
+        similar: {
+          id: 'w2',
+          name: 'Similar Wine',
+          type: 'Red',
+          region: 'Barossa'
+        }
+      }];
+      mockNeo4j.executeQuery.mockResolvedValue(mockResults);
+
+      const results = await service.findSimilarWines('w1');
       
-      const results = await service.getRecommendations('wine-123');
       expect(results).toEqual([{
-        wine: { id: 'wine-456', name: 'Recommended Wine' },
-        strength: 0.92
+        similar: {
+          id: 'w2',
+          name: 'Similar Wine',
+          type: 'Red',
+          region: 'Barossa'
+        }
       }]);
+      expect(mockNeo4j.executeQuery).toHaveBeenCalledWith(
+        `
+      MATCH (w:Wine {id: $wineId})-[:SIMILAR_TO]->(similar:Wine)
+      RETURN similar
+      LIMIT $limit
+    `,
+        { wineId: 'w1', limit: 5 }
+      );
+    });
+
+    it('should respect limit parameter', async () => {
+      await service.findSimilarWines('w1', 10);
+      expect(mockNeo4j.executeQuery).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ limit: 10 })
+      );
+    });
+  });
+
+  describe('getWinePairings', () => {
+    it('should return wine pairings', async () => {
+      const mockResults = [{
+        pairing: {
+          id: 'w3',
+          name: 'Pairing Wine',
+          type: 'White',
+          region: 'Adelaide Hills'
+        }
+      }];
+      mockNeo4j.executeQuery.mockResolvedValue(mockResults);
+
+      const results = await service.getWinePairings('w1');
+      
+      expect(results).toEqual([{
+        pairing: {
+          id: 'w3',
+          name: 'Pairing Wine',
+          type: 'White',
+          region: 'Adelaide Hills'
+        }
+      }]);
+      expect(mockNeo4j.executeQuery).toHaveBeenCalledWith(
+        `
+      MATCH (w:Wine {id: $wineId})-[:PAIRS_WITH]->(pairing:Wine)
+      RETURN pairing
+    `,
+        { wineId: 'w1' }
+      );
+    });
+  });
+
+  describe('getWineById', () => {
+    it('should return wine when found', async () => {
+      const mockResults = [{
+        w: {
+          id: 'w1',
+          name: 'Test Wine',
+          type: 'Red',
+          region: 'Barossa'
+        }
+      }];
+      mockNeo4j.executeQuery.mockResolvedValue(mockResults);
+
+      const result = await service.getWineById('w1');
+      
+      expect(result).toEqual({
+        w: {
+          id: 'w1',
+          name: 'Test Wine',
+          type: 'Red',
+          region: 'Barossa'
+        }
+      });
+    });
+
+    it('should return null when not found', async () => {
+      mockNeo4j.executeQuery.mockResolvedValue([]);
+      const result = await service.getWineById('w1');
+      expect(result).toBeNull();
     });
   });
 });

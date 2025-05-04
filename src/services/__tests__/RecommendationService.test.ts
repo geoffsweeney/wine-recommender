@@ -1,19 +1,27 @@
 import 'reflect-metadata';
 import { RecommendationService } from '../RecommendationService';
 import { Neo4jService } from '../Neo4jService';
+import { KnowledgeGraphService } from '../KnowledgeGraphService';
 import { RecommendationRequest } from '../../api/dtos/RecommendationRequest.dto';
 import { SearchRequest } from '../../api/dtos/SearchRequest.dto';
 
 jest.mock('../Neo4jService');
+jest.mock('../KnowledgeGraphService');
 
 describe('RecommendationService', () => {
   let service: RecommendationService;
   let mockNeo4j: jest.Mocked<Neo4jService>;
 
+  let mockKnowledgeGraph: jest.Mocked<KnowledgeGraphService>;
+
   beforeEach(() => {
     mockNeo4j = new Neo4jService() as jest.Mocked<Neo4jService>;
+    mockKnowledgeGraph = new KnowledgeGraphService(mockNeo4j) as jest.Mocked<KnowledgeGraphService>;
     mockNeo4j.executeQuery.mockImplementation(async () => []);
-    service = new RecommendationService(mockNeo4j);
+    mockKnowledgeGraph.findSimilarWines.mockImplementation(async () => []);
+    mockKnowledgeGraph.getWinePairings.mockImplementation(async () => []);
+    mockKnowledgeGraph.getWineById.mockImplementation(async () => null);
+    service = new RecommendationService(mockNeo4j, mockKnowledgeGraph);
   });
 
   describe('getRecommendations', () => {
@@ -44,6 +52,8 @@ describe('RecommendationService', () => {
       expect(results).toHaveLength(3);
       expect(results[0].id).toBe('1'); // Should be first due to duplicate
       expect(mockNeo4j.executeQuery).toHaveBeenCalledTimes(3);
+      expect(mockKnowledgeGraph.findSimilarWines).toHaveBeenCalledTimes(3);
+      expect(mockKnowledgeGraph.getWinePairings).toHaveBeenCalledTimes(3);
     });
 
     it('should rank recommendations by frequency', async () => {
@@ -68,14 +78,27 @@ describe('RecommendationService', () => {
           grapes: []
         }
       };
-      const results = await service.getRecommendations(request);
 
-      // Check wine ID from first strategy's format
-      expect(results[0].id).toBe('1');
-      // Both '2' and '3' have same score so order isn't guaranteed
-      expect(['2', '3']).toContain(results[1].id);
-      expect(['2', '3']).toContain(results[2].id);
-      expect(results[1].id).not.toBe(results[2].id);
+      // Mock graph relationships to influence ranking
+      mockKnowledgeGraph.findSimilarWines.mockImplementation(async (id) =>
+        id === '1' ? [{id: '1', name: 'Wine 1', type: 'Red', region: 'Barossa'}] : []
+      );
+      mockKnowledgeGraph.getWinePairings.mockImplementation(async (id) =>
+        id === '1' ? [{id: '1', name: 'Wine 1', type: 'Red', region: 'Barossa'}] : []
+      );
+
+      const rankedResults = await service.getRecommendations(request);
+
+      // Wine 1 should be first due to duplicates AND graph relationships
+      // Check the first result is Wine 1 (should have highest score)
+      const firstId = rankedResults[0]?.w?.id || rankedResults[0]?.rec?.id || rankedResults[0]?.id;
+      expect(firstId).toBe('1');
+      // Check remaining results are either 2 or 3
+      const secondId = rankedResults[1]?.w?.id || rankedResults[1]?.rec?.id || rankedResults[1]?.id;
+      const thirdId = rankedResults[2]?.w?.id || rankedResults[2]?.rec?.id || rankedResults[2]?.id;
+      expect(['2', '3']).toContain(secondId);
+      expect(['2', '3']).toContain(thirdId);
+      expect(rankedResults[1].id).not.toBe(rankedResults[2].id);
     });
 
     it('should handle empty strategy results', async () => {

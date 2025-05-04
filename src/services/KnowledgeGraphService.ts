@@ -1,44 +1,59 @@
-import { injectable, inject } from 'tsyringe';
+import { inject, injectable } from 'tsyringe';
 import { Neo4jService } from './Neo4jService';
-import { WineNode } from '../types';
+
+interface WineNode {
+  id: string;
+  name: string;
+  type: string;
+  region: string;
+  vintage?: number;
+  price?: number;
+  rating?: number;
+}
 
 @injectable()
 export class KnowledgeGraphService {
   constructor(
-    @inject('Neo4jService') private neo4j: Neo4jService
+    @inject(Neo4jService) private readonly neo4j: Neo4jService
   ) {}
 
-  async addWine(wine: WineNode): Promise<void> {
-    const requiredFields = ['id', 'name', 'type', 'region'];
-    const missingFields = requiredFields.filter(field => !wine[field as keyof WineNode]);
-    
-    if (missingFields.length > 0) {
-      throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
-    }
-
-    await this.neo4j.executeQuery(
-      `MERGE (w:Wine {id: $id}) 
-       SET w += $properties`,
-      { id: wine.id, properties: wine }
-    );
+  async createWineNode(wine: WineNode): Promise<void> {
+    await this.neo4j.executeQuery(`
+      MERGE (w:Wine {id: $id})
+      SET w += $properties
+    `, {
+      id: wine.id,
+      properties: {
+        name: wine.name,
+        type: wine.type,
+        region: wine.region,
+        vintage: wine.vintage,
+        price: wine.price,
+        rating: wine.rating
+      }
+    });
   }
 
-  async getRecommendations(wineId: string, limit = 10): Promise<Array<{
-    wine: Pick<WineNode, 'id'|'name'>,
-    strength: number
-  }>> {
-    const result = await this.neo4j.executeQuery(
-      `MATCH (w1:Wine {id: $wineId})-[p:PAIRS_WITH]->(w2:Wine)
-       RETURN w2, p ORDER BY p.strength DESC LIMIT $limit`,
-      { wineId, limit }
-    );
+  async findSimilarWines(wineId: string, limit = 5): Promise<WineNode[]> {
+    return this.neo4j.executeQuery<WineNode>(`
+      MATCH (w:Wine {id: $wineId})-[:SIMILAR_TO]->(similar:Wine)
+      RETURN similar
+      LIMIT $limit
+    `, { wineId, limit });
+  }
 
-    return result.map((record: any) => ({
-      wine: {
-        id: record.w2.properties.id,
-        name: record.w2.properties.name
-      },
-      strength: record.p.properties.strength
-    }));
+  async getWinePairings(wineId: string): Promise<WineNode[]> {
+    return this.neo4j.executeQuery<WineNode>(`
+      MATCH (w:Wine {id: $wineId})-[:PAIRS_WITH]->(pairing:Wine)
+      RETURN pairing
+    `, { wineId });
+  }
+
+  async getWineById(wineId: string): Promise<WineNode | null> {
+    const results = await this.neo4j.executeQuery<WineNode>(`
+      MATCH (w:Wine {id: $wineId})
+      RETURN w
+    `, { wineId });
+    return results[0] || null;
   }
 }
