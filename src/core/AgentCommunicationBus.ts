@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events';
+import { SharedContextMemory, type ContextEntry, type ContextMetadata } from './SharedContextMemory';
 
 interface AgentInfo {
   id: string;
@@ -24,11 +25,13 @@ export class AgentCommunicationBus {
   private emitter: EventEmitter;
   private agents: Map<string, AgentInfo>;
   private subscriptions: Map<string, Set<string>>;
+  private contextMemory: SharedContextMemory;
 
   constructor() {
     this.emitter = new EventEmitter();
     this.agents = new Map();
     this.subscriptions = new Map();
+    this.contextMemory = new SharedContextMemory();
   }
 
   registerAgent(agentId: string, info: Omit<AgentInfo, 'id' | 'lastSeen'>): void {
@@ -79,5 +82,41 @@ export class AgentCommunicationBus {
 
   listAgents(): AgentInfo[] {
     return Array.from(this.agents.values());
+  }
+
+  // Context Memory Integration
+  setContext(agentId: string, key: string, value: unknown, metadata?: ContextMetadata): void {
+    const agent = this.agents.get(agentId);
+    if (agent) {
+      this.contextMemory.setContext(agent, key, value, metadata);
+    }
+  }
+
+  getContext(agentId: string, key: string): unknown {
+    const agent = this.agents.get(agentId);
+    return agent ? this.contextMemory.getContext(agent, key)?.value : undefined;
+  }
+
+  getContextWithMetadata(agentId: string, key: string): ContextEntry | undefined {
+    const agent = this.agents.get(agentId);
+    return agent ? this.contextMemory.getContext(agent, key) : undefined;
+  }
+
+  shareContext(sourceAgentId: string, targetAgentId: string, key: string): void {
+    const context = this.getContextWithMetadata(sourceAgentId, key);
+    if (context) {
+      this.setContext(targetAgentId, key, context.value, { ...context.metadata });
+    }
+  }
+
+  broadcastContext(agentId: string, key: string): void {
+    const context = this.getContextWithMetadata(agentId, key);
+    if (context) {
+      this.listAgents()
+        .filter(agent => agent.id !== agentId)
+        .forEach(agent => {
+          this.setContext(agent.id, key, context.value, { ...context.metadata });
+        });
+    }
   }
 }

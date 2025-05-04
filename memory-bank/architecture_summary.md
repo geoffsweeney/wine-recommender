@@ -84,6 +84,11 @@ graph TD
    - Pub/sub model for agent coordination
    - Supports direct and broadcast messaging
    - Message persistence for audit trails
+   - Context sharing capabilities:
+     * Set/get context with metadata
+     * Share context between specific agents
+     * Broadcast context to all agents
+   - Integrated with Shared Context Memory
 
 2. **Shared Context Memory**:
    - Short-term: Redis-based working memory

@@ -62,7 +62,7 @@ export class SharedContextMemory {
   }
 }
 
-interface ContextEntry {
+export interface ContextEntry {
   value: unknown;
   metadata: ContextMetadata;
   timestamp: number;
@@ -75,7 +75,7 @@ interface ContextVersion {
   versionHash: string;
 }
 
-interface ContextMetadata {
+export interface ContextMetadata {
   source?: string;
   confidence?: number;
   expiresAt?: number;

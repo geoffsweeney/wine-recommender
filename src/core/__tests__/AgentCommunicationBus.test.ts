@@ -94,4 +94,43 @@ describe('AgentCommunicationBus', () => {
     const subs = bus.getSubscriptions('agent1');
     expect(subs).toEqual(expect.arrayContaining(['message:wine', 'message:user']));
   });
+
+  // Context Memory Tests
+  test('should set and get context', () => {
+    bus.registerAgent('agent1', { name: 'Agent 1', capabilities: [] });
+    bus.setContext('agent1', 'prefs', { darkMode: true });
+    
+    const context = bus.getContext('agent1', 'prefs');
+    expect(context).toEqual({ darkMode: true });
+  });
+
+  test('should get context with metadata', () => {
+    bus.registerAgent('agent1', { name: 'Agent 1', capabilities: [] });
+    bus.setContext('agent1', 'data', 'test', { source: 'api' });
+    
+    const context = bus.getContextWithMetadata('agent1', 'data');
+    expect(context?.value).toBe('test');
+    expect(context?.metadata.source).toBe('api');
+  });
+
+  test('should share context between agents', () => {
+    bus.registerAgent('agent1', { name: 'Agent 1', capabilities: [] });
+    bus.registerAgent('agent2', { name: 'Agent 2', capabilities: [] });
+    bus.setContext('agent1', 'shared', { value: 42 });
+    bus.shareContext('agent1', 'agent2', 'shared');
+    
+    expect(bus.getContext('agent2', 'shared')).toEqual({ value: 42 });
+  });
+
+  test('should broadcast context to all agents', () => {
+    bus.registerAgent('agent1', { name: 'Agent 1', capabilities: [] });
+    bus.registerAgent('agent2', { name: 'Agent 2', capabilities: [] });
+    bus.registerAgent('agent3', { name: 'Agent 3', capabilities: [] });
+    
+    bus.setContext('agent1', 'broadcast', 'important');
+    bus.broadcastContext('agent1', 'broadcast');
+    
+    expect(bus.getContext('agent2', 'broadcast')).toBe('important');
+    expect(bus.getContext('agent3', 'broadcast')).toBe('important');
+  });
 });
