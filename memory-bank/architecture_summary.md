@@ -100,9 +100,9 @@ graph TD
   - Tiered retry policies (immediate, delayed, final attempt)
   - Error classification (recoverable vs fatal)
 - **Observability**:
-  - Structured logging with OpenTelemetry
+  - Structured logging with minimal OpenTelemetry API
   - Performance metrics (decision latency, error rates)
-  - Distributed tracing spans for agent workflows
+  - Basic tracing spans for agent workflows
 
 ## Technical Validation
 ```mermaid
@@ -116,8 +116,8 @@ graph RL
     A2[Type Safety] --> B2[TypeScript+Zod]
     B2 --> C2[End-to-end validation]
     
-    A3[Observability] --> B3[OpenTelemetry]
-    B3 --> C3[Cloud-native tracing]
+    A3[Observability] --> B3[Minimal OpenTelemetry]
+    B3 --> C3[Lightweight tracing]
     
     A4[Knowledge Management] --> B4[Neo4j Graph]
     B4 --> C4[Relationship-based reasoning]
@@ -152,9 +152,9 @@ graph RL
    - Tiered retry policies
    - Dead letter queue processing
 3. **Observability**:
-   - Distributed tracing setup
+   - Basic tracing implementation
    - Performance metric dashboards
-   - Structured logging pipeline
+   - Structured logging
 4. **Agent Development**:
    - ExplanationAgent knowledge base
    - FallbackAgent degradation scenarios

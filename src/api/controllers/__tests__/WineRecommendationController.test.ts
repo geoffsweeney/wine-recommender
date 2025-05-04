@@ -13,6 +13,7 @@ describe('WineRecommendationController', () => {
   let mockRecommendationService: jest.Mocked<RecommendationService>;
 
   beforeEach(() => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
     mockRecommendationService = {
       getRecommendations: jest.fn(),
       searchWines: jest.fn()
