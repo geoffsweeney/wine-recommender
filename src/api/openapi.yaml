@@ -38,6 +38,11 @@ paths:
       parameters:
         - $ref: '#/components/parameters/queryParam'
         - $ref: '#/components/parameters/limitParam'
+        - $ref: '#/components/parameters/offsetParam'
+        - $ref: '#/components/parameters/regionParam'
+        - $ref: '#/components/parameters/minPriceParam'
+        - $ref: '#/components/parameters/maxPriceParam'
+        - $ref: '#/components/parameters/pageParam'
       responses:
         '200':
           description: Successful search response
@@ -102,3 +107,45 @@ components:
       schema:
         type: integer
         default: 10
+
+    offsetParam:
+      name: offset
+      in: query
+      description: Number of results to skip
+      required: false
+      schema:
+        type: integer
+        default: 0
+
+    regionParam:
+      name: region
+      in: query
+      description: Filter by region
+      required: false
+      schema:
+        type: string
+
+    minPriceParam:
+      name: minPrice
+      in: query
+      description: Minimum price
+      required: false
+      schema:
+        type: number
+
+    maxPriceParam:
+      name: maxPrice
+      in: query
+      description: Maximum price
+      required: false
+      schema:
+        type: number
+
+    pageParam:
+      name: page
+      in: query
+      description: Page number for pagination (overrides offset)
+      required: false
+      schema:
+        type: integer
+        default: 1

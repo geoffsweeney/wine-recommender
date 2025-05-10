@@ -111,8 +111,10 @@ export class SommelierCoordinator implements Agent {
 
         // Basic call to ExplanationAgent after recommendation
         console.log('SommelierCoordinator: Passing recommendation result to ExplanationAgent (Basic)');
+        console.log('SommelierCoordinator: Calling ExplanationAgent with result:', recommendationResult);
         try {
           await this.explanationAgent.handleMessage(recommendationResult); // Basic call
+          console.log('SommelierCoordinator: ExplanationAgent call completed.');
         } catch (error) {
           console.error('Error calling ExplanationAgent:', error);
           await this.deadLetterProcessor.process(message, error instanceof Error ? error : new Error('Error in ExplanationAgent.'), { source: this.getName(), stage: 'ExplanationAgent' });

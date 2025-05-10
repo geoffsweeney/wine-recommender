@@ -29,14 +29,31 @@ router.post(
       const result = await sommelierCoordinator.handleMessage(req.body);
 
       // The SommelierCoordinator now re-throws errors, so this catch block will be reached on agent errors
-      if (result && result.recommendation) {
-        res.status(200).json(result);
-      } else {
-        console.error('Invalid response from SommelierCoordinator:', result);
-        res.status(500).json({ error: 'Invalid response from recommendation service' });
+      if (Array.isArray(result) && result.length > 0) {
+        // Manually construct the response array to ensure only necessary properties are included
+        const cleanResult = result.map((wine: any) => ({
+          id: wine.id,
+          name: wine.name,
+          type: wine.type,
+          region: wine.region,
+          vintage: wine.vintage,
+          price: wine.price,
+          rating: wine.rating,
+        }));
+        res.status(200).json({ recommendation: cleanResult }); // Wrap the clean array
+      }
+      // Optionally, handle a specific case for no recommendations found if the coordinator returns an empty array
+      else if (Array.isArray(result) && result.length === 0) {
+         res.status(200).json({ recommendation: [] }); // Return an empty recommendation array
+      }
+      // Handle other cases (e.g., fallback response object, or unexpected result format)
+      else if (result && result.recommendation) {
+         res.status(200).json(result); // Keep existing logic for fallback response object if needed
+      }
+      else {
+        res.status(500).json({ error: 'Invalid or empty response from recommendation service' });
       }
     } catch (error: any) {
-      console.error('Error processing recommendations:', error);
       // Catch errors thrown by the coordinator and return a 500
       // The validation errors are handled by the middleware, so we don't expect ValidationError here
       res.status(500).json({ error: 'Failed to process recommendation request' });

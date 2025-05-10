@@ -4,8 +4,8 @@
 ```mermaid
 pie
     title Implementation Status
-    "Completed" : 95
-    "Remaining" : 5
+    "Completed" : 98
+    "Remaining" : 2
 ```
 
 ## Phase 1: Core Infrastructure - COMPLETED
@@ -55,6 +55,7 @@ gitGraph
     commit id: "feat: initial data loading"
     commit id: "feat: api endpoints"
     commit id: "docs: openapi specification"
+    commit id: "fix(errors): improve error handling and fix e2e tests"
 ```
 
 ## Remaining Tasks

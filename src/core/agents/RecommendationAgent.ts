@@ -51,6 +51,15 @@ export class RecommendationAgent implements Agent {
 
       console.log('Recommended wines found:', recommendedWines);
 
+      // Return the recommended wines array
+      return recommendedWines;
+
+      // The following formatting logic seems intended for generating a user-friendly string recommendation,
+      // but the SommelierCoordinator expects the actual recommendation data (the array of WineNode objects)
+      // to pass to the ExplanationAgent and eventually return in the API response.
+      // Keeping this code commented out for now, as the primary return is the data itself.
+
+      /*
       // Format a basic response based on the recommendation type
       if (recommendedWines.length > 0) {
         const wineList = recommendedWines.map((w: WineNode) => `${w.name} (${w.region})`).join(', ');
@@ -70,6 +79,7 @@ export class RecommendationAgent implements Agent {
            return { recommendation: 'Sorry, no wines found based on your request.' };
         }
       }
+      */
 
     } catch (err) {
       let errorObj: Error;
