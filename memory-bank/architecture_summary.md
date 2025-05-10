@@ -91,9 +91,10 @@ graph TD
    - Integrated with Shared Context Memory
 
 2. **Shared Context Memory**:
-   - Short-term: Redis-based working memory
+   - Short-term: In-memory working memory (Redis placeholder)
    - Long-term: Vector database for knowledge retention
    - Context versioning and snapshotting
+   - Upgrade path to Redis via configuration
 
 3. **LLM Reasoning Protocols**:
    - Chain-of-thought prompting
@@ -158,32 +159,27 @@ graph RL
 ```
 
 ## Implementation Status
-- **Phase**: Core Implementation
+- **Phase**: Integration and Testing
 - **Current State**:
-  - RecommendationService fully implemented with tests
-  - KnowledgeGraphService implemented with Neo4j integration
-  - Basic recommendation ranking working
-  - Test coverage for core functionality
-  - Tech stack validated and in use
-  - Initial API endpoints operational
+  - Basic Agent Interface and Base Agent Class implemented.
+  - Input Validation Agent, Recommendation Agent, and Sommelier Coordinator implemented (basic functionality).
+  - Basic Knowledge Graph Service interaction implemented.
+  - Basic end-to-end flow from API endpoint through agents to Knowledge Graph Service is working.
+  - Data loading script for Neo4j is available and functional.
+  - Integration test for the recommendations endpoint created and is passing.
+  - Existing validation tests in `validation.test.ts` are currently failing (deferred for later).
+  - Tech stack validated and in use.
+  - Initial API endpoints operational.
 
-## Remaining Tasks
-1. **Core Implementation**:
-   - Knowledge Graph integration (Neo4j)
-   - Agent hierarchy with fallback escalation
-   - Message queue infrastructure
-2. **Resilience**:
-   - Circuit breaker implementation
-   - Tiered retry policies
-   - Dead letter queue processing
-3. **Observability**:
-   - Basic tracing implementation
-   - Performance metric dashboards
-   - Structured logging
-4. **Agent Development**:
-   - ExplanationAgent knowledge base
-   - FallbackAgent degradation scenarios
-5. **Deployment**:
-   - Containerization with Docker
-   - Monitoring for knowledge graph performance
-   - Alerting for circuit breaker triggers
+## Remaining Tasks (Following Revised POC Plan)
+**Phase 4: Advanced Features (Iterative)**
+1. Implement User Preference Agent
+2. Implement Value Analysis Agent
+3. Implement Explanation Agent
+4. Implement MCP Adapter Agent
+5. Implement Agent Communication Bus
+6. Implement Shared Context Memory
+7. Implement Circuit Breaker, Retry Manager, Dead Letter Processor
+8. Address deferred failing tests in `validation.test.ts`.
+9. Implement comprehensive test coverage for all new features.
+10. Deployment and Monitoring setup.

@@ -1,7 +1,12 @@
-import { ParsedQs } from 'express';
+import { ParsedQs } from 'qs';
 
-declare module 'express' {
-  interface Request {
-    parsedQuery?: ParsedQs;
+declare global {
+  namespace Express {
+    interface Request {
+      parsedQuery?: any; // or use a more specific type if you have one
+    }
   }
 }
+
+// This empty export is important to make this file a module
+export {};

@@ -1,7 +1,7 @@
 import { inject, injectable } from 'tsyringe';
 import { Neo4jService } from './Neo4jService';
 
-interface WineNode {
+export interface WineNode {
   id: string;
   name: string;
   type: string;
@@ -34,12 +34,28 @@ export class KnowledgeGraphService {
     });
   }
 
-  async findSimilarWines(wineId: string, limit = 5): Promise<WineNode[]> {
-    return this.neo4j.executeQuery<WineNode>(`
+  async findSimilarWines(wineId: string, limit: number = 5): Promise<WineNode[]> {
+    // Ensure limit is a non-negative integer for the query
+    const integerLimit = Math.floor(Math.max(0, parseInt(limit as any, 10)));
+
+    if (isNaN(integerLimit)) {
+       console.warn(`Invalid limit value provided: ${limit}. Defaulting to 5.`);
+       return this.neo4j.executeQuery<WineNode>(`
+         MATCH (w:Wine {id: $wineId})-[:SIMILAR_TO]->(similar:Wine)
+         RETURN similar
+         LIMIT 5
+       `, { wineId });
+    }
+
+    const similarWines = await this.neo4j.executeQuery<WineNode>(`
       MATCH (w:Wine {id: $wineId})-[:SIMILAR_TO]->(similar:Wine)
       RETURN similar
       LIMIT $limit
-    `, { wineId, limit });
+    `, { wineId, limit: integerLimit }); // Pass the ensured integer limit
+
+    console.log('KnowledgeGraphService - similarWines after executeQuery:', similarWines); // Debug log
+
+    return similarWines;
   }
 
   async getWinePairings(wineId: string): Promise<WineNode[]> {

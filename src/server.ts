@@ -5,6 +5,8 @@ import { createRouter } from './api/routes';
 import { container } from 'tsyringe';
 import { Neo4jService } from './services/Neo4jService';
 import { MockNeo4jService } from './services/MockNeo4jService';
+import { RecommendationService } from './services/RecommendationService';
+import { KnowledgeGraphService } from './services/KnowledgeGraphService'; // Import KnowledgeGraphService
 
 export const createServer = () => {
   const limiter = rateLimit({
@@ -29,19 +31,25 @@ export const createServer = () => {
   container.register('Neo4jService', {
     useClass: useMock ? MockNeo4jService : Neo4jService
   });
+  container.register('RecommendationService', {
+    useClass: RecommendationService
+  });
+  container.register('KnowledgeGraphService', { // Register KnowledgeGraphService
+    useClass: KnowledgeGraphService
+  });
 
   const app = express();
   app.use(limiter);
   app.use(express.json());
   app.use('/api', createRouter());
-  
+
   return app;
 };
 
 export const startServer = (app: express.Express, port: number = 3000) => {
   return app.listen(port, async () => {
     console.log(`Server running on port ${port}`);
-    
+
     const neo4j = container.resolve(Neo4jService);
     const isConnected = await neo4j.verifyConnection();
     console.log(`Neo4j connection: ${isConnected ? 'OK' : 'FAILED'}`);

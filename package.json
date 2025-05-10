@@ -6,7 +6,7 @@
     "test:changed": "jest --onlyChanged --coverage",
     "test:all": "jest --coverage",
     "lint": "eslint . --ext .ts",
-    "dev": "ts-node src/server.ts",
+    "dev": "node -r tsconfig-paths/register -r ts-node/register src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js"
   },
@@ -29,7 +29,8 @@
     "supertest": "^7.1.0",
     "ts-jest": "^29.3.2",
     "ts-mockito": "^2.6.1",
-    "ts-node": "^10.9.2"
+    "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.0",
@@ -41,5 +42,8 @@
     "neo4j-driver": "^5.28.1",
     "tsyringe": "^4.10.0",
     "winston": "^3.17.0"
+  },
+  "ts-node": {
+    "files": true
   }
 }

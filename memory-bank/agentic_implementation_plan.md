@@ -1,99 +1,35 @@
-# Agentic Implementation Roadmap
+# Agentic Implementation Proof of Concept (POC) Plan - Revised
 
-## Phase 1: Core Infrastructure (1-2 weeks)
-1. **Agent Communication Bus** (High Priority)
-   - Implement in-memory communication (Node.js EventEmitter)
-     * Fastest setup (zero dependencies)
-     * Single-process operation
-     * Future enhancement paths:
-       - Redis (for scaling)
-       - PostgreSQL (for persistence)
-       - MQTT (for distributed systems)
-   - Define message schemas and protocols
-   - Add agent registration/discovery
+This plan outlines the steps to implement a Proof of Concept for the agentic architecture, focusing on getting a basic end-to-end recommendation flow working with core agents and knowledge graph interaction.
 
-2. **Shared Context Memory** (High Priority)
-   - Simple in-memory JavaScript Map/WeakMap
-     * Fastest implementation
-     * Automatic garbage collection
-     * Future enhancement paths:
-       - Redis (for persistence)
-       - IndexedDB (browser-based)
-       - Vector DB (for semantic search)
-   - Basic versioning via timestamp+hash
+## Phase 1: Foundational Setup (Completed)
+- [x] Task 1: Initial Project Setup
+- [x] Task 2: Basic Express Server and Routing
+- [x] Task 3: Dependency Injection with tsyringe
+- [x] Task 4: Basic Agent Interface and Base Agent Class
 
-## Phase 2: Reasoning Protocols (2-3 weeks)
-1. **LLM Orchestration Layer**
-   - Chain-of-thought implementation
-   - Confidence scoring system
-   - Reflection/self-critique workflows
-   - Deliberation protocol:
-     * Minimum 3 rounds of agent discussion
-     * Consensus threshold (80% agreement)
-     * Quality scoring for recommendations
+## Phase 2: Core Agent Implementation (Completed)
+- [x] Task 1: Implement Input Validation Agent (Basic)
+- [x] Task 2: Implement Recommendation Agent (Basic)
+- [x] Task 3: Implement Sommelier Coordinator (Basic Orchestration)
 
-2. **Agent Specialization**
-   - Enhance existing agents with reasoning protocols
-   - Add Debate Moderator agent
-   - Implement iterative refinement:
-     * Agents propose → critique → refine
-     * Maximum 5 refinement cycles
-     * Early termination if consensus reached
+## Phase 3: Integration and Testing (In Progress)
+- [x] Task 1: Integrate Agents with API Endpoint
+- [ ] Task 2: Basic Testing
+  - [x] Create basic integration test for recommendations endpoint.
+  - [ ] Fix existing failing tests in `validation.test.ts` (Deferred).
+- [x] Task 3: Implement Basic Knowledge Graph Service Interaction
 
-## Phase 3: Observability (1 week)
-1. **Agent Monitoring**
-   - Decision logging
-   - Reasoning trace capture
-   - Performance metrics
+## Phase 4: Advanced Features (Iterative)
+- [ ] Task 1: Implement User Preference Agent
+- [ ] Task 2: Implement Value Analysis Agent
+- [ ] Task 3: Implement Explanation Agent
+- [ ] Task 4: Implement MCP Adapter Agent
+- [ ] Task 5: Implement Agent Communication Bus
+- [ ] Task 6: Implement Shared Context Memory
+- [ ] Task 7: Implement Circuit Breaker, Retry Manager, Dead Letter Processor
+- [ ] Task 8: Implement comprehensive test coverage for all new features.
+- [ ] Task 9: Deployment and Monitoring setup.
 
-## Dependencies
-- Initial setup: Node.js EventEmitter (no additional setup)
-- Future enhancement options:
-  * Redis cluster (for scaling)
-  * PostgreSQL (for persistence)
-  * MQTT broker (for distributed systems)
-- Vector DB provisioning
-- LLM API access
-
-## Integration with Existing System
-
-1. **Controller Layer**:
-   - Maintain existing WineRecommendationController API
-   - Add agent orchestration wrapper around RecommendationService
-
-2. **Service Layer**:
-   - RecommendationService becomes agent coordinator
-   - Existing business logic preserved
-   - Enhanced with agent deliberation
-
-3. **Data Flow**:
-   [classDiagram]
-   Client-->WineRecommendationController: HTTP Request
-   WineRecommendationController-->AgentOrchestrator: Delegates
-   AgentOrchestrator-->RecommendationService: Original Logic
-   AgentOrchestrator-->AgentNetwork: New Capabilities
-   AgentNetwork-->KnowledgeGraphService: Existing Integration
-
-## Implementation Checkpoints
-
-1. **State Tracking**:
-   - Each phase produces versioned artifacts
-   - Git tags for major milestones
-   - Automated progress snapshots
-
-2. **Restart Process**:
-   - Verify phase completion via:
-     * Test coverage reports
-     * Architecture diagrams
-     * Integration tests
-   - Resume from last verified checkpoint
-
-3. **Data Persistence**:
-   - Agent state serialization format
-   - Context memory backup process
-   - Deliberation history logging
-
-## Current Priorities
-1. Start with Communication Bus (most foundational)
-2. Then implement Context Memory
-3. Finally add Reasoning Protocols
+## Next Steps
+Proceed with Phase 4, Task 1: Implement User Preference Agent.
