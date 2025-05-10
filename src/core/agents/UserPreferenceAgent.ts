@@ -6,10 +6,10 @@ export class UserPreferenceAgent implements Agent {
   }
 
   async handleMessage(message: any): Promise<any> {
-    // Basic placeholder logic for POC
     console.log('UserPreferenceAgent received message:', message);
-    // In a real implementation, this would process user preferences
-    return { preferences: 'Placeholder user preferences' };
+    // Minimal logic: Acknowledge receipt of message
+    console.log('UserPreferenceAgent: Processing user preferences (basic).');
+    return { status: 'User preferences processed (basic)', receivedInput: message };
   }
 }
 

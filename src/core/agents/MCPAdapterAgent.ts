@@ -6,10 +6,10 @@ export class MCPAdapterAgent implements Agent {
   }
 
   async handleMessage(message: any): Promise<any> {
-    // Basic placeholder logic for POC
     console.log('MCPAdapterAgent received message:', message);
-    // In a real implementation, this would interact with MCP servers
-    return { mcpResponse: 'Placeholder MCP response' };
+    // Minimal logic: Simulate an MCP tool call
+    console.log('MCPAdapterAgent: Simulating MCP tool call with message:', message);
+    return { status: 'MCP tool call simulated (basic)', receivedInput: message };
   }
 }
 

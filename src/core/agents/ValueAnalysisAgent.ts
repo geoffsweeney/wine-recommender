@@ -6,10 +6,10 @@ export class ValueAnalysisAgent implements Agent {
   }
 
   async handleMessage(message: any): Promise<any> {
-    // Basic placeholder logic for POC
     console.log('ValueAnalysisAgent received message:', message);
-    // In a real implementation, this would analyze value/price
-    return { analysis: 'Placeholder value analysis' };
+    // Minimal logic: Acknowledge receipt of message
+    console.log('ValueAnalysisAgent: Performing basic value analysis (placeholder).');
+    return { status: 'Value analysis performed (basic)', receivedInput: message };
   }
 }
 

@@ -6,10 +6,10 @@ export class ExplanationAgent implements Agent {
   }
 
   async handleMessage(message: any): Promise<any> {
-    // Basic placeholder logic for POC
     console.log('ExplanationAgent received message:', message);
-    // In a real implementation, this would generate explanations
-    return { explanation: 'Placeholder wine explanation' };
+    // Minimal logic: Acknowledge receipt of recommendation result
+    console.log('ExplanationAgent: Generating basic explanation (placeholder).');
+    return { status: 'Explanation generated (basic)', receivedRecommendation: message };
   }
 }
 
