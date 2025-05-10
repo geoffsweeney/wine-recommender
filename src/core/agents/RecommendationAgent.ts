@@ -30,15 +30,16 @@ export class RecommendationAgent implements Agent {
       } else if ('preferences' in message && message.preferences) {
          console.log('RecommendationAgent: Handling preference-based request.');
          recommendationType = 'preferences';
-         // TODO: Implement logic to query KnowledgeGraphService based on preferences
-         // For now, a placeholder or call a new method
-         if (message.preferences.wineType) {
-             console.log('RecommendationAgent: Finding wines by wine type:', message.preferences.wineType);
-             // Call a new method in KnowledgeGraphService (to be added next)
-             recommendedWines = await this.knowledgeGraphService.findWinesByType(message.preferences.wineType); // Placeholder call
-         } else {
-             // Handle other preferences or no specific preference
-             return { recommendation: 'Please specify a wine type or other preferences.' };
+
+         const preferences = message.preferences;
+         console.log('RecommendationAgent: Processing preferences:', preferences);
+
+         // Call a new method in KnowledgeGraphService to find wines by preferences (to be added next)
+         recommendedWines = await this.knowledgeGraphService.findWinesByPreferences(preferences); // New method call
+
+         // TODO: Refine response based on specific preferences used
+         if (recommendedWines.length === 0) {
+             return { recommendation: `Sorry, we couldn't find any wines matching your preferences.` };
          }
 
       } else {

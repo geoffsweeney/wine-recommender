@@ -116,5 +116,57 @@ describe('Recommendations Integration', () => {
     expect(response.body.recommendation).toContain('Ingredient Wine 2'); // Check for expected wine name
   });
 
+  it('should return a recommendation for a preference-based request (price range)', async () => {
+    // Mock the executeQuery call in MockNeo4jService to return sample data for price range
+    mockNeo4jService.executeQuery.mockResolvedValue([
+      { id: 'w7', name: 'Price Range Wine 1', type: 'White', region: 'Test', vintage: 2022, price: 30, rating: 4.0 },
+      { id: 'w8', name: 'Price Range Wine 2', type: 'Red', region: 'Test', vintage: 2015, price: 45, rating: 4.8 },
+    ]);
+
+    const priceRangeRequestBody = {
+      userId: 'test-user-789',
+      preferences: {
+        priceRange: [25, 50] // Preference for price range
+      },
+    };
+
+    const response = await request(app)
+      .post('/api/recommendations')
+      .send(priceRangeRequestBody)
+      .expect(200);
+
+    // Assert on the response structure and content
+    expect(response.body).toHaveProperty('recommendation');
+    expect(typeof response.body.recommendation).toBe('string');
+    expect(response.body.recommendation).toContain('Based on your preferences, we recommend:'); // Check for expected prefix
+    expect(response.body.recommendation).toContain('Price Range Wine 1'); // Check for expected wine name
+    expect(response.body.recommendation).toContain('Price Range Wine 2'); // Check for expected wine name
+  });
+
+  it('should return a recommendation for a preference-based request (food pairing in preferences)', async () => {
+    // Mock the executeQuery call in MockNeo4jService to return sample data for food pairing
+    mockNeo4jService.executeQuery.mockResolvedValue([
+      { id: 'w9', name: 'Food Pairing Wine 1', type: 'White', region: 'Test', vintage: 2019, price: 35, rating: 4.5 },
+    ]);
+
+    const foodPairingRequestBody = {
+      userId: 'test-user-012',
+      preferences: {
+        foodPairing: 'salmon' // Preference for food pairing
+      },
+    };
+
+    const response = await request(app)
+      .post('/api/recommendations')
+      .send(foodPairingRequestBody)
+      .expect(200);
+
+    // Assert on the response structure and content
+    expect(response.body).toHaveProperty('recommendation');
+    expect(typeof response.body.recommendation).toBe('string');
+    expect(response.body.recommendation).toContain('Based on your preferences, we recommend:'); // Check for expected prefix
+    expect(response.body.recommendation).toContain('Food Pairing Wine 1'); // Check for expected wine name
+  });
+
   // Add more tests as needed for different scenarios
 });
