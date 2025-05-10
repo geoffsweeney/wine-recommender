@@ -7,6 +7,11 @@ import { Neo4jService } from './services/Neo4jService';
 import { MockNeo4jService } from './services/MockNeo4jService';
 import { RecommendationService } from './services/RecommendationService';
 import { KnowledgeGraphService } from './services/KnowledgeGraphService'; // Import KnowledgeGraphService
+// Import new Dead Letter Queue and Retry Manager components
+import { InMemoryDeadLetterQueue } from './core/InMemoryDeadLetterQueue';
+import { LoggingDeadLetterHandler } from './core/BasicDeadLetterProcessor';
+import { BasicRetryManager } from './core/BasicRetryManager';
+import { BasicDeadLetterProcessor } from './core/BasicDeadLetterProcessor';
 
 export const createServer = () => {
   const limiter = rateLimit({
@@ -37,6 +42,12 @@ export const createServer = () => {
   container.register('KnowledgeGraphService', { // Register KnowledgeGraphService
     useClass: KnowledgeGraphService
   });
+
+  // Register Dead Letter Queue and Retry Manager implementations
+  container.registerSingleton('InMemoryDeadLetterQueue', InMemoryDeadLetterQueue);
+  container.registerSingleton('LoggingDeadLetterHandler', LoggingDeadLetterHandler);
+  container.registerSingleton('BasicRetryManager', BasicRetryManager);
+  container.registerSingleton('BasicDeadLetterProcessor', BasicDeadLetterProcessor);
 
   const app = express();
   app.use(limiter);

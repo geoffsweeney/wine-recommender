@@ -8,6 +8,7 @@ import { ExplanationAgent } from './ExplanationAgent';
 import { MCPAdapterAgent } from './MCPAdapterAgent';
 import { FallbackAgent } from './FallbackAgent';
 import { RecommendationRequest } from '@src/api/dtos/RecommendationRequest.dto'; // Import DTO
+import { BasicDeadLetterProcessor } from '../BasicDeadLetterProcessor'; // Import BasicDeadLetterProcessor
 
 @injectable()
 export class SommelierCoordinator implements Agent {
@@ -18,7 +19,8 @@ export class SommelierCoordinator implements Agent {
     @inject(UserPreferenceAgent) private readonly userPreferenceAgent: UserPreferenceAgent,
     @inject(ExplanationAgent) private readonly explanationAgent: ExplanationAgent,
     @inject(MCPAdapterAgent) private readonly mcpAdapterAgent: MCPAdapterAgent,
-    @inject(FallbackAgent) private readonly fallbackAgent: FallbackAgent
+    @inject(FallbackAgent) private readonly fallbackAgent: FallbackAgent,
+    @inject(BasicDeadLetterProcessor) private readonly deadLetterProcessor: BasicDeadLetterProcessor // Inject BasicDeadLetterProcessor
   ) {}
 
   getName(): string {
@@ -38,6 +40,8 @@ export class SommelierCoordinator implements Agent {
 
         if (!validationResult || !validationResult.isValid) {
           console.log('SommelierCoordinator: Input validation failed. Using FallbackAgent.');
+          // On validation failure, send to dead letter queue
+          await this.deadLetterProcessor.process(message, new Error(validationResult?.error || 'Invalid input provided.'), { source: this.getName(), stage: 'InputValidation' });
           return this.fallbackAgent.handleMessage({ error: validationResult?.error || 'Invalid input provided.' });
         }
 
@@ -59,28 +63,69 @@ export class SommelierCoordinator implements Agent {
       // If no valid input found, use FallbackAgent
       if (!recommendationInput) {
          console.log('SommelierCoordinator: Could not determine request type from input. Using FallbackAgent.');
+         // On failure to determine request type, send to dead letter queue
+         await this.deadLetterProcessor.process(message, new Error('Could not determine request type from input.'), { source: this.getName(), stage: 'RequestTypeDetermination' });
          return this.fallbackAgent.handleMessage({ error: 'Could not determine request type from input (no message with ingredients or preferences provided).' });
-      }
+       }
 
 
       // Basic calls to other agents for inclusion in the flow
       console.log('SommelierCoordinator: Passing input to ValueAnalysisAgent (Basic)');
-      await this.valueAnalysisAgent.handleMessage(recommendationInput); // Basic call
+      try {
+        await this.valueAnalysisAgent.handleMessage(recommendationInput); // Basic call
+      } catch (error) {
+        console.error('Error calling ValueAnalysisAgent:', error);
+        await this.deadLetterProcessor.process(message, error instanceof Error ? error : new Error('Error in ValueAnalysisAgent.'), { source: this.getName(), stage: 'ValueAnalysisAgent' });
+        // Decide how to handle this error - maybe continue or return a partial result?
+        // For now, we'll just log and continue, assuming subsequent agents might still provide value.
+      }
 
       console.log('SommelierCoordinator: Passing input to UserPreferenceAgent (Basic)');
-      await this.userPreferenceAgent.handleMessage(recommendationInput); // Basic call
+      try {
+        await this.userPreferenceAgent.handleMessage(recommendationInput); // Basic call
+      } catch (error) {
+        console.error('Error calling UserPreferenceAgent:', error);
+        await this.deadLetterProcessor.process(message, error instanceof Error ? error : new Error('Error in UserPreferenceAgent.'), { source: this.getName(), stage: 'UserPreferenceAgent' });
+        // Decide how to handle this error - maybe continue or return a partial result?
+      }
 
       console.log('SommelierCoordinator: Passing input to MCPAdapterAgent (Basic)');
-      await this.mcpAdapterAgent.handleMessage(recommendationInput); // Basic call
+      try {
+        await this.mcpAdapterAgent.handleMessage(recommendationInput); // Basic call
+      } catch (error) {
+        console.error('Error calling MCPAdapterAgent:', error);
+        await this.deadLetterProcessor.process(message, error instanceof Error ? error : new Error('Error in MCPAdapterAgent.'), { source: this.getName(), stage: 'MCPAdapterAgent' });
+        // Decide how to handle this error - maybe continue or return a partial result?
+      }
 
 
       console.log('SommelierCoordinator: Passing input to RecommendationAgent');
-      const recommendationResult = await this.recommendationAgent.handleMessage(recommendationInput);
-      console.log('SommelierCoordinator: Received recommendation result:', recommendationResult);
+      let recommendationResult;
+      try {
+        recommendationResult = await this.recommendationAgent.handleMessage(recommendationInput);
+        console.log('SommelierCoordinator: Received recommendation result:', recommendationResult);
+      } catch (error) {
+        console.error('Error calling RecommendationAgent:', error);
+        await this.deadLetterProcessor.process(message, error instanceof Error ? error : new Error('Error in RecommendationAgent.'), { source: this.getName(), stage: 'RecommendationAgent' });
+        // If the core recommendation fails, we should probably return a fallback or error
+        let errorMessage = 'An error occurred while generating recommendations.';
+        if (error instanceof Error) {
+          errorMessage = error.message;
+        }
+        // Re-throw the error to be caught by the route handler
+        throw error;
+      }
+
 
       // Basic call to ExplanationAgent after recommendation
       console.log('SommelierCoordinator: Passing recommendation result to ExplanationAgent (Basic)');
-      await this.explanationAgent.handleMessage(recommendationResult); // Basic call
+      try {
+        await this.explanationAgent.handleMessage(recommendationResult); // Basic call
+      } catch (error) {
+        console.error('Error calling ExplanationAgent:', error);
+        await this.deadLetterProcessor.process(message, error instanceof Error ? error : new Error('Error in ExplanationAgent.'), { source: this.getName(), stage: 'ExplanationAgent' });
+        // Decide how to handle this error - maybe continue or return a partial result?
+      }
 
 
       // Return the final result from the RecommendationAgent
@@ -88,6 +133,8 @@ export class SommelierCoordinator implements Agent {
 
     } catch (error) {
       console.error('Error during SommelierCoordinator orchestration:', error);
+      // On error during orchestration, send to dead letter queue
+      await this.deadLetterProcessor.process(message, error instanceof Error ? error : new Error('Unknown error during orchestration.'), { source: this.getName(), stage: 'Orchestration' });
       // Use FallbackAgent for errors during orchestration
       let errorMessage = 'An unexpected error occurred during orchestration.';
       if (error instanceof Error) {
