@@ -43,28 +43,32 @@ describe('Recommendations Integration', () => {
     container.reset();
   });
 
-  it('should return a recommendation for a valid request', async () => {
-    // Mock the executeQuery call in MockNeo4jService to return sample data
+  it('should return a recommendation for a preference-based request (wine type)', async () => {
+    // Mock the executeQuery call in MockNeo4jService to return sample data for wine type
     mockNeo4jService.executeQuery.mockResolvedValue([
-      { id: 'w1', name: 'Sample Wine 1', type: 'Red', region: 'Test', vintage: 2020, price: 10, rating: 4 },
-      { id: 'w2', name: 'Sample Wine 2', type: 'Red', region: 'Test', vintage: 2019, price: 12, rating: 4.5 },
+      { id: 'w5', name: 'Preference Red Wine 1', type: 'Red', region: 'Test', vintage: 2017, price: 25, rating: 4.7 },
+      { id: 'w6', name: 'Preference Red Wine 2', type: 'Red', region: 'Test', vintage: 2016, price: 22, rating: 4.4 },
     ]);
 
-    const validRequestBody = {
+    const preferenceRequestBody = {
       userId: 'test-user-123',
-      preferences: {},
-      message: 'Recommend a red wine'
+      preferences: {
+        wineType: 'red' // Preference for red wine
+      },
+      // message: 'Recommend a red wine' // No message needed for preference-based
     };
 
     const response = await request(app)
       .post('/api/recommendations')
-      .send(validRequestBody)
+      .send(preferenceRequestBody)
       .expect(200);
 
     // Assert on the response structure and content
     expect(response.body).toHaveProperty('recommendation');
     expect(typeof response.body.recommendation).toBe('string');
-    expect(response.body.recommendation).toContain('Sample Wine 1'); // Check for expected content
+    expect(response.body.recommendation).toContain('Based on your preferences, we recommend:'); // Check for expected prefix
+    expect(response.body.recommendation).toContain('Preference Red Wine 1'); // Check for expected wine name
+    expect(response.body.recommendation).toContain('Preference Red Wine 2'); // Check for expected wine name
   });
 
   it('should return an error for an invalid request', async () => {
@@ -84,6 +88,32 @@ describe('Recommendations Integration', () => {
     expect(response.body).toHaveProperty('errors');
     expect(Array.isArray(response.body.errors)).toBe(true);
     expect(response.body.errors.length).toBeGreaterThan(0);
+  });
+
+  it('should return a recommendation for ingredients in the message', async () => {
+    // Mock the executeQuery call in MockNeo4jService to return sample data for ingredients
+    mockNeo4jService.executeQuery.mockResolvedValue([
+      { id: 'w3', name: 'Ingredient Wine 1', type: 'White', region: 'Test', vintage: 2021, price: 15, rating: 4.2 },
+      { id: 'w4', name: 'Ingredient Wine 2', type: 'Red', region: 'Test', vintage: 2018, price: 20, rating: 4.6 },
+    ]);
+
+    const ingredientsRequestBody = {
+      userId: 'test-user-456',
+      preferences: {},
+      message: 'pair wine with chicken and pasta' // Message with ingredients
+    };
+
+    const response = await request(app)
+      .post('/api/recommendations')
+      .send(ingredientsRequestBody)
+      .expect(200);
+
+    // Assert on the response structure and content
+    expect(response.body).toHaveProperty('recommendation');
+    expect(typeof response.body.recommendation).toBe('string');
+    expect(response.body.recommendation).toContain('Based on your ingredients, we recommend:'); // Check for expected prefix
+    expect(response.body.recommendation).toContain('Ingredient Wine 1'); // Check for expected wine name
+    expect(response.body.recommendation).toContain('Ingredient Wine 2'); // Check for expected wine name
   });
 
   // Add more tests as needed for different scenarios

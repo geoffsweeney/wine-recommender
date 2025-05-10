@@ -7,7 +7,8 @@ export const RecommendationRequest = z.object({
     priceRange: z.tuple([z.number().min(0), z.number().min(0)]).optional(),
     foodPairing: z.string().optional(),
     excludeAllergens: z.array(z.string()).optional()
-  }).strict()
+  }).strict(),
+  message: z.string().optional() // Add the new optional message field
 });
 
 export type RecommendationRequest = z.infer<typeof RecommendationRequest>;

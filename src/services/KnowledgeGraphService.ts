@@ -58,6 +58,40 @@ export class KnowledgeGraphService {
     return similarWines;
   }
 
+  async findWinesByIngredients(ingredients: string[]): Promise<WineNode[]> {
+    if (!ingredients || ingredients.length === 0) {
+      return [];
+    }
+
+    const wines = await this.neo4j.executeQuery<WineNode>(`
+      MATCH (i:Ingredient)
+      WHERE i.name IN $ingredients
+      MATCH (i)-[:PAIRS_WITH]->(w:Wine)
+      WITH w, count(DISTINCT i) as ingredientCount
+      WHERE ingredientCount = size($ingredients)
+      RETURN w
+    `, { ingredients });
+
+    console.log('KnowledgeGraphService - findWinesByIngredients after executeQuery:', wines); // Debug log
+
+    return wines;
+  }
+
+  async findWinesByType(wineType: string): Promise<WineNode[]> {
+    if (!wineType) {
+      return [];
+    }
+
+    const wines = await this.neo4j.executeQuery<WineNode>(`
+      MATCH (w:Wine {type: $wineType})
+      RETURN w
+    `, { wineType });
+
+    console.log('KnowledgeGraphService - findWinesByType after executeQuery:', wines); // Debug log
+
+    return wines;
+  }
+
   async getWinePairings(wineId: string): Promise<WineNode[]> {
     return this.neo4j.executeQuery<WineNode>(`
       MATCH (w:Wine {id: $wineId})-[:PAIRS_WITH]->(pairing:Wine)
