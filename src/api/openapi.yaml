@@ -1,0 +1,104 @@
+openapi: 3.0.0
+info:
+  title: Wine Recommendation API
+  version: 1.0.0
+  description: API for wine recommendations based on user preferences
+
+servers:
+  - url: http://localhost:3000/api
+    description: Development server
+
+paths:
+  /recommendations:
+    post:
+      summary: Get wine recommendations
+      description: Returns personalized wine recommendations based on user preferences
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecommendationRequest'
+      responses:
+        '200':
+          description: Successful recommendation response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecommendationResponse'
+        '400':
+          description: Invalid input
+        '500':
+          description: Server error
+
+  /search:
+    get:
+      summary: Search wines
+      description: Search wines by query parameters
+      parameters:
+        - $ref: '#/components/parameters/queryParam'
+        - $ref: '#/components/parameters/limitParam'
+      responses:
+        '200':
+          description: Successful search response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Wine'
+        '500':
+          description: Server error
+
+components:
+  schemas:
+    RecommendationRequest:
+      type: object
+      properties:
+        userId:
+          type: string
+        preferences:
+          type: object
+          properties:
+            wineType:
+              type: string
+            priceRange:
+              type: array
+              items:
+                type: number
+      required:
+        - userId
+        - preferences
+
+    Wine:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+        region:
+          type: string
+        price:
+          type: number
+        rating:
+          type: number
+
+  parameters:
+    queryParam:
+      name: query
+      in: query
+      description: Search query
+      required: true
+      schema:
+        type: string
+
+    limitParam:
+      name: limit
+      in: query
+      description: Maximum number of results
+      schema:
+        type: integer
+        default: 10

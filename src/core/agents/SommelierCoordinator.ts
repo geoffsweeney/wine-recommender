@@ -12,6 +12,8 @@ import { BasicDeadLetterProcessor } from '../BasicDeadLetterProcessor'; // Impor
 
 @injectable()
 export class SommelierCoordinator implements Agent {
+  public failNextRequest: boolean = false; // Add failNextRequest property
+
   constructor(
     @inject(InputValidationAgent) private readonly inputValidationAgent: InputValidationAgent,
     @inject(RecommendationAgent) private readonly recommendationAgent: RecommendationAgent,
@@ -42,7 +44,7 @@ export class SommelierCoordinator implements Agent {
           console.log('SommelierCoordinator: Input validation failed. Using FallbackAgent.');
           // On validation failure, send to dead letter queue
           await this.deadLetterProcessor.process(message, new Error(validationResult?.error || 'Invalid input provided.'), { source: this.getName(), stage: 'InputValidation' });
-          return this.fallbackAgent.handleMessage({ error: validationResult?.error || 'Invalid input provided.' });
+          return this.fallbackAgent.handleMessage({ error: validationResult?.error || 'Invalid input provided.', preferences: { wineType: 'Unknown' } });
         }
 
         if (validationResult.processedInput && validationResult.processedInput.ingredients && validationResult.processedInput.ingredients.length > 0) {
@@ -65,7 +67,7 @@ export class SommelierCoordinator implements Agent {
          console.log('SommelierCoordinator: Could not determine request type from input. Using FallbackAgent.');
          // On failure to determine request type, send to dead letter queue
          await this.deadLetterProcessor.process(message, new Error('Could not determine request type from input.'), { source: this.getName(), stage: 'RequestTypeDetermination' });
-         return this.fallbackAgent.handleMessage({ error: 'Could not determine request type from input (no message with ingredients or preferences provided).' });
+         return this.fallbackAgent.handleMessage({ error: 'Could not determine request type from input (no message with ingredients or preferences provided.)', preferences: { wineType: 'Unknown' } });
        }
 
 
@@ -87,6 +89,7 @@ export class SommelierCoordinator implements Agent {
         console.error('Error calling UserPreferenceAgent:', error);
         await this.deadLetterProcessor.process(message, error instanceof Error ? error : new Error('Error in UserPreferenceAgent.'), { source: this.getName(), stage: 'UserPreferenceAgent' });
         // Decide how to handle this error - maybe continue or return a partial result?
+        // For now, we'll just log and continue, assuming subsequent agents might still provide value.
       }
 
       console.log('SommelierCoordinator: Passing input to MCPAdapterAgent (Basic)');
@@ -96,6 +99,7 @@ export class SommelierCoordinator implements Agent {
         console.error('Error calling MCPAdapterAgent:', error);
         await this.deadLetterProcessor.process(message, error instanceof Error ? error : new Error('Error in MCPAdapterAgent.'), { source: this.getName(), stage: 'MCPAdapterAgent' });
         // Decide how to handle this error - maybe continue or return a partial result?
+        // For now, we'll just log and continue, assuming subsequent agents might still provide value.
       }
 
 
@@ -104,43 +108,34 @@ export class SommelierCoordinator implements Agent {
       try {
         recommendationResult = await this.recommendationAgent.handleMessage(recommendationInput);
         console.log('SommelierCoordinator: Received recommendation result:', recommendationResult);
+
+        // Basic call to ExplanationAgent after recommendation
+        console.log('SommelierCoordinator: Passing recommendation result to ExplanationAgent (Basic)');
+        try {
+          await this.explanationAgent.handleMessage(recommendationResult); // Basic call
+        } catch (error) {
+          console.error('Error calling ExplanationAgent:', error);
+          await this.deadLetterProcessor.process(message, error instanceof Error ? error : new Error('Error in ExplanationAgent.'), { source: this.getName(), stage: 'ExplanationAgent' });
+          // Decide how to handle this error - maybe continue or return a partial result?
+          // For now, we'll just log and continue, assuming subsequent agents might still provide value.
+        }
+
+        // Return the final result from the RecommendationAgent
+        return recommendationResult;
+
       } catch (error) {
         console.error('Error calling RecommendationAgent:', error);
+        // If RecommendationAgent fails, send to DLQ and re-throw the error
         await this.deadLetterProcessor.process(message, error instanceof Error ? error : new Error('Error in RecommendationAgent.'), { source: this.getName(), stage: 'RecommendationAgent' });
-        // If the core recommendation fails, we should probably return a fallback or error
-        let errorMessage = 'An error occurred while generating recommendations.';
-        if (error instanceof Error) {
-          errorMessage = error.message;
-        }
-        // Re-throw the error to be caught by the route handler
-        throw error;
+        throw new Error('Recommendation failed.'); // Re-throw a specific error to be caught by the API route handler
       }
-
-
-      // Basic call to ExplanationAgent after recommendation
-      console.log('SommelierCoordinator: Passing recommendation result to ExplanationAgent (Basic)');
-      try {
-        await this.explanationAgent.handleMessage(recommendationResult); // Basic call
-      } catch (error) {
-        console.error('Error calling ExplanationAgent:', error);
-        await this.deadLetterProcessor.process(message, error instanceof Error ? error : new Error('Error in ExplanationAgent.'), { source: this.getName(), stage: 'ExplanationAgent' });
-        // Decide how to handle this error - maybe continue or return a partial result?
-      }
-
-
-      // Return the final result from the RecommendationAgent
-      return recommendationResult;
 
     } catch (error) {
       console.error('Error during SommelierCoordinator orchestration:', error);
-      // On error during orchestration, send to dead letter queue
+      // On error during orchestration (excluding RecommendationAgent's handled error), send to dead letter queue
       await this.deadLetterProcessor.process(message, error instanceof Error ? error : new Error('Unknown error during orchestration.'), { source: this.getName(), stage: 'Orchestration' });
-      // Use FallbackAgent for errors during orchestration
-      let errorMessage = 'An unexpected error occurred during orchestration.';
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-      return this.fallbackAgent.handleMessage({ error: errorMessage });
+      // Re-throw the error to be caught by the route handler
+      throw error;
     }
   }
 }

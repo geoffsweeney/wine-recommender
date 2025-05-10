@@ -8,8 +8,14 @@ export class FallbackAgent implements Agent {
   async handleMessage(message: any): Promise<any> {
     // Basic placeholder logic for POC
     console.log('FallbackAgent received message:', message);
+
+    if (!message.preferences || !message.preferences.wineType) {
+      console.error('FallbackAgent received message without preferences or wineType:', message);
+      return { recommendation: 'Default mock recommendation.', wineType: 'Unknown' };
+    }
+
     // In a real implementation, this would handle fallback scenarios
-    return { response: 'Placeholder fallback response' };
+    return { recommendation: 'Default mock recommendation.', wineType: message.preferences.wineType };
   }
 }
 

@@ -51,4 +51,14 @@ export class BasicDeadLetterProcessor extends DeadLetterProcessor {
       timestamp: new Date().toISOString(),
     });
   }
+
+  public async addToDLQ(error: Error, message: unknown, metadata: Record<string, unknown>): Promise<void> {
+    console.error('BasicDeadLetterProcessor: Adding to DLQ.');
+    this.dlq.add({
+      message,
+      error: error.message,
+      metadata,
+      timestamp: new Date().toISOString(),
+    });
+  }
 }

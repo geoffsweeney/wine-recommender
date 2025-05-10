@@ -70,6 +70,14 @@ export const startServer = (app: express.Express, port: number = 3000) => {
 // Default server startup
 if (require.main === module) {
   const app = createServer();
+
+  // Error handling middleware
+  app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error('Error caught in middleware:', err.message);
+    container.resolve(BasicDeadLetterProcessor).addToDLQ(err, req.body, { endpoint: req.originalUrl, timestamp: new Date().toISOString() });
+    res.status(500).json({ message: 'Internal Server Error', error: err.message });
+  });
+
   const port = Number(process.env.PORT) || 3000;
   startServer(app, port);
 }

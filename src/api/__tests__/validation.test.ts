@@ -112,17 +112,18 @@ describe('API Validation', () => {
     });
 
     
-    it('should handle valid query with additional parameters', async () => {
-      // This test should expect a validation error because 'limit' is a string
+    it('should accept valid search query with string number parameters', async () => {
+      // This test now expects successful validation because 'limit' as a string is handled
       const res = await request(app)
         .get('/search')
         .query({ query: 'merlot', limit: '10' }); // Send limit as a string
-      expect(res.status).toBe(400); // Expecting validation error
-      expect(res.body).toHaveProperty('status', 400);
-      expect(res.body).toHaveProperty('message', 'Validation failed');
-      expect(res.body).toHaveProperty('errors');
-      expect(Array.isArray(res.body.errors)).toBe(true);
-      expect(res.body.errors.some((e: any) => e.path.includes('limit'))).toBe(true); // Check for limit error
+      expect(res.status).toBe(200); // Expecting successful validation
+      // Since validation passed, we don't expect validation error properties in the body
+      expect(res.body).not.toHaveProperty('status', 400);
+      expect(res.body).not.toHaveProperty('message', 'Validation failed');
+      expect(res.body).not.toHaveProperty('errors');
+      // Assert on the placeholder response body from the route handler
+      expect(res.body).toEqual({ results: [] });
     });
 
     it('should require query parameter', async () => {

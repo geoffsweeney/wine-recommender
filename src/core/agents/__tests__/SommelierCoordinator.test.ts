@@ -71,7 +71,14 @@ describe('SommelierCoordinator', () => {
     mockInputValidationAgent.handleMessage.mockResolvedValue({ isValid: false, error: validationError.message });
     mockFallbackAgent.handleMessage.mockResolvedValue('Fallback response');
 
-    expect(dlq.getAll().length).toBe(0); // DLQ is handled by the processor, not directly in this flow
+    await sommelierCoordinator.handleMessage(invalidMessage as any);
+
+    expect(mockDeadLetterProcessor.process).toHaveBeenCalledWith(
+      invalidMessage,
+      expect.any(Error),
+      { source: 'SommelierCoordinator', stage: 'InputValidation' }
+    );
+    expect(mockFallbackAgent.handleMessage).toHaveBeenCalledWith({ error: validationError.message, preferences: { wineType: 'Unknown' } });
   });
 
   it('should send a message to the dead letter queue when RecommendationAgent fails', async () => {
@@ -81,17 +88,25 @@ describe('SommelierCoordinator', () => {
     mockRecommendationAgent.handleMessage.mockRejectedValue(recommendationError);
     mockFallbackAgent.handleMessage.mockResolvedValue('Fallback response');
 
-    await sommelierCoordinator.handleMessage(validMessage as any);
+    // Expect the SommelierCoordinator.handleMessage to throw an error
+    await expect(sommelierCoordinator.handleMessage(validMessage as any)).rejects.toThrow('Recommendation failed.');
 
+    // Verify that the RecommendationAgent was called
     expect(mockRecommendationAgent.handleMessage).toHaveBeenCalledWith({ preferences: { wineType: 'red' } });
-    expect(mockRecommendationAgent.handleMessage).toHaveBeenCalledWith({ preferences: { wineType: 'red' } });
+
+    // Verify that the dead letter processor was called
     expect(mockDeadLetterProcessor.process).toHaveBeenCalledWith(
       validMessage,
       expect.any(Error),
       { source: 'SommelierCoordinator', stage: 'RecommendationAgent' }
     );
-    expect(mockFallbackAgent.handleMessage).toHaveBeenCalledWith({ error: recommendationError.message });
-    expect(dlq.getAll().length).toBe(0); // DLQ is handled by the processor, not directly in this flow
+
+    // The FallbackAgent should NOT be called in this scenario anymore
+    expect(mockFallbackAgent.handleMessage).not.toHaveBeenCalled();
+
+    // The DLQ assertion here is no longer relevant because we are mocking the processor.
+    // The mock processor doesn't interact with the real DLQ instance.
+    // expect(dlq.getAll().length).toBe(0); // DLQ is handled by the processor, not directly in this flow
   });
 
   // Add more test cases for other agent failures and successful flow

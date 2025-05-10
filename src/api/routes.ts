@@ -12,6 +12,7 @@ import { SommelierCoordinator } from '@src/core/agents/SommelierCoordinator'; //
 import { validateRequest } from '@src/api/middleware/validation';
 import { RecommendationRequest } from '@src/api/dtos/RecommendationRequest.dto';
 import { SearchRequest } from '@src/api/dtos/SearchRequest.dto';
+import { BasicDeadLetterProcessor } from '../core/BasicDeadLetterProcessor'; // Import BasicDeadLetterProcessor
 
 const router = express.Router();
 
@@ -28,7 +29,12 @@ router.post(
       const result = await sommelierCoordinator.handleMessage(req.body);
 
       // The SommelierCoordinator now re-throws errors, so this catch block will be reached on agent errors
-      res.status(200).json(result); // Remove return keyword
+      if (result && result.recommendation) {
+        res.status(200).json(result);
+      } else {
+        console.error('Invalid response from SommelierCoordinator:', result);
+        res.status(500).json({ error: 'Invalid response from recommendation service' });
+      }
     } catch (error: any) {
       console.error('Error processing recommendations:', error);
       // Catch errors thrown by the coordinator and return a 500

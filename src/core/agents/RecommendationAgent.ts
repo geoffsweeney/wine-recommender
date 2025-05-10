@@ -1,5 +1,6 @@
 import { inject, injectable } from 'tsyringe';
 import { Agent } from './Agent';
+import { BasicDeadLetterProcessor } from '../BasicDeadLetterProcessor'; // Add import for BasicDeadLetterProcessor
 import { KnowledgeGraphService, WineNode } from '@src/services/KnowledgeGraphService'; // Using @src alias
 import { RecommendationRequest } from '@src/api/dtos/RecommendationRequest.dto'; // Import DTO
 
@@ -9,7 +10,8 @@ type RecommendationInput = { ingredients: string[] } | { preferences: Recommenda
 @injectable()
 export class RecommendationAgent implements Agent {
   constructor(
-    @inject(KnowledgeGraphService) private readonly knowledgeGraphService: KnowledgeGraphService
+    @inject(KnowledgeGraphService) private readonly knowledgeGraphService: KnowledgeGraphService,
+    @inject(BasicDeadLetterProcessor) private readonly deadLetterProcessor: BasicDeadLetterProcessor
   ) {}
 
   getName(): string {
@@ -43,7 +45,7 @@ export class RecommendationAgent implements Agent {
          }
 
       } else {
-        return { error: 'Invalid input for RecommendationAgent: neither ingredients nor preferences provided.' };
+        throw new Error('Invalid input for RecommendationAgent: neither ingredients nor preferences provided.');
       }
 
 
@@ -69,10 +71,19 @@ export class RecommendationAgent implements Agent {
         }
       }
 
-    } catch (error) {
+    } catch (err) {
+      let errorObj: Error;
+      let error: Error;
+      if (err instanceof Error) {
+        error = err;
+        errorObj = error;
+      } else {
+        error = new Error(`Error in RecommendationAgent: ${String(err)}`);
+        errorObj = error;
+      }
       console.error('Error in RecommendationAgent:', error);
-      // In a real implementation, this might go to a FallbackAgent
-      return { error: 'Failed to get recommendations.' };
+      await this.deadLetterProcessor.addToDLQ(errorObj, message, { agent: 'RecommendationAgent', timestamp: new Date().toISOString() });
+      throw new Error('Failed to get recommendations.');
     }
   }
 }
