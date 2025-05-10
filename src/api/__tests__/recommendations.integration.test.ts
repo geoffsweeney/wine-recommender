@@ -128,6 +128,9 @@ describe('Recommendations Integration', () => {
         .send(requestBody)
         .expect(200);
 
+      // Wait for async operations to complete
+      await new Promise(resolve => setImmediate(resolve));
+
       // Verify DLQ processor was called
       expect(processSpy).toHaveBeenCalledTimes(1);
 
