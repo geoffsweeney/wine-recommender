@@ -21,8 +21,10 @@ router.post(
   '/recommendations',
   validateRequest(RecommendationRequest, 'body'), // Apply body validation middleware
   async (req, res) => { // Type annotation removed as validation middleware handles it
+console.log('Received recommendation request:', req.body); // Log the request body
     try {
       // Resolve the SommelierCoordinator from the container
+console.log('routes.ts: SommelierCoordinator resolved.');
       const sommelierCoordinator = container.resolve(SommelierCoordinator);
 
       // Pass the validated request body to the coordinator
@@ -54,7 +56,7 @@ router.post(
         res.status(500).json({ error: 'Invalid or empty response from recommendation service' });
       }
     } catch (error: any) {
-      // Catch errors thrown by the coordinator and return a 500
+      console.error('Error processing recommendation request:', error); // Log the error
       // The validation errors are handled by the middleware, so we don't expect ValidationError here
       res.status(500).json({ error: 'Failed to process recommendation request' });
     }

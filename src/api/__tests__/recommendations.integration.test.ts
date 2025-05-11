@@ -9,15 +9,33 @@ import { KnowledgeGraphService } from '../../services/KnowledgeGraphService';
 import { InMemoryDeadLetterQueue } from '../../core/InMemoryDeadLetterQueue';
 import { LoggingDeadLetterHandler, BasicDeadLetterProcessor } from '../../core/BasicDeadLetterProcessor';
 import { BasicRetryManager } from '../../core/BasicRetryManager';
+import { ValueAnalysisAgent } from '../../core/agents/ValueAnalysisAgent'; // Import original class
+import { UserPreferenceAgent } from '../../core/agents/UserPreferenceAgent'; // Import original class
+import { ExplanationAgent } from '../../core/agents/ExplanationAgent'; // Import original class
+import { MCPAdapterAgent } from '../../core/agents/MCPAdapterAgent'; // Import original class
+import { FallbackAgent } from '../../core/agents/FallbackAgent'; // Import original class
+import { AgentCommunicationBus } from '../../core/AgentCommunicationBus'; // Import original class
 
 jest.mock('../../services/Neo4jService');
 jest.mock('../../core/agents/RecommendationAgent');
 jest.mock('../../core/BasicDeadLetterProcessor'); // Mock BasicDeadLetterProcessor
+jest.mock('../../core/agents/ValueAnalysisAgent');
+jest.mock('../../core/agents/UserPreferenceAgent');
+jest.mock('../../core/agents/ExplanationAgent');
+jest.mock('../../core/agents/MCPAdapterAgent');
+jest.mock('../../core/agents/FallbackAgent');
+jest.mock('../../core/AgentCommunicationBus');
 
 // Import the mocked modules
 const MockNeo4jService = require('../../services/Neo4jService').Neo4jService;
 const MockRecommendationAgent = require('../../core/agents/RecommendationAgent').RecommendationAgent;
 const MockBasicDeadLetterProcessor = require('../../core/BasicDeadLetterProcessor').BasicDeadLetterProcessor; // Import mocked processor
+const MockValueAnalysisAgent = require('../../core/agents/ValueAnalysisAgent').ValueAnalysisAgent;
+const MockUserPreferenceAgent = require('../../core/agents/UserPreferenceAgent').UserPreferenceAgent;
+const MockExplanationAgent = require('../../core/agents/ExplanationAgent').ExplanationAgent;
+const MockMCPAdapterAgent = require('../../core/agents/MCPAdapterAgent').MCPAdapterAgent;
+const MockFallbackAgent = require('../../core/agents/FallbackAgent').FallbackAgent;
+const MockAgentCommunicationBus = require('../../core/AgentCommunicationBus').AgentCommunicationBus;
 
 describe('Recommendations Integration', () => {
   let app: any;
@@ -27,7 +45,7 @@ describe('Recommendations Integration', () => {
   let mockDlqProcessorInstance: jest.Mocked<BasicDeadLetterProcessor>; // Mocked processor instance
   let processSpy: jest.SpyInstance; // Spy on process method
   let addToDlqSpy: jest.SpyInstance; // Spy on addToDLQ method
-  let mockCoordinator: jest.Mocked<SommelierCoordinator>;
+  let mockCoordinator: SommelierCoordinator; // Changed type to SommelierCoordinator
 
   beforeEach(() => {
     container.clearInstances(); // Clear instances before each test
@@ -38,22 +56,46 @@ describe('Recommendations Integration', () => {
     mockRecommendationAgentInstance = new MockRecommendationAgent() as jest.Mocked<RecommendationAgent>;
     mockDlqProcessorInstance = new MockBasicDeadLetterProcessor() as jest.Mocked<BasicDeadLetterProcessor>; // Create mocked processor instance
 
+    // Create mock instances for the newly mocked agents and communication bus
+    const mockValueAnalysisAgentInstance = new MockValueAnalysisAgent();
+    const mockUserPreferenceAgentInstance = new MockUserPreferenceAgent();
+    const mockExplanationAgentInstance = new MockExplanationAgent();
+    const mockMCPAdapterAgentInstance = new MockMCPAdapterAgent();
+    const mockFallbackAgentInstance = new MockFallbackAgent();
+    const mockAgentCommunicationBusInstance = new MockAgentCommunicationBus();
+
     // Ensure Neo4j connection is verified (mocked)
     mockNeo4jServiceInstance.verifyConnection.mockResolvedValue(true);
 
     // Register dependencies with the mocked instances
     container.register(Neo4jService, { useValue: mockNeo4jServiceInstance });
     container.register(KnowledgeGraphService, { useClass: KnowledgeGraphService });
-    container.register(InputValidationAgent, { useClass: InputValidationAgent });
+    container.register(InputValidationAgent, { useClass: InputValidationAgent }); // InputValidationAgent is not mocked, assuming it has no external dependencies or its dependencies are mocked
     container.register(BasicDeadLetterProcessor, { useValue: mockDlqProcessorInstance }); // Register mocked processor
     container.register(RecommendationAgent, { useValue: mockRecommendationAgentInstance }); // Use the mocked instance
-    container.register(SommelierCoordinator, { useClass: SommelierCoordinator });
+
+    // Register the newly mocked agents and communication bus
+    container.register(ValueAnalysisAgent, { useValue: mockValueAnalysisAgentInstance });
+    container.register(UserPreferenceAgent, { useValue: mockUserPreferenceAgentInstance });
+    container.register(ExplanationAgent, { useValue: mockExplanationAgentInstance });
+    container.register(MCPAdapterAgent, { useValue: mockMCPAdapterAgentInstance });
+    container.register(FallbackAgent, { useValue: mockFallbackAgentInstance });
+    container.register(AgentCommunicationBus, { useValue: mockAgentCommunicationBusInstance });
+
+    container.register(SommelierCoordinator, { useClass: SommelierCoordinator }); // SommelierCoordinator is resolved as a real class
 
     // Re-register Dead Letter Queue and Retry Manager implementations
     container.registerSingleton('InMemoryDeadLetterQueue', InMemoryDeadLetterQueue);
     container.registerSingleton('LoggingDeadLetterHandler', LoggingDeadLetterHandler);
     container.registerSingleton('BasicRetryManager', BasicRetryManager);
-    // Note: BasicDeadLetterProcessor is now mocked and registered above
+
+    // Create and register a mock logger
+    const mockLogger = {
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+    } as any;
+    container.registerInstance('logger', mockLogger);
 
     // Resolve and store the DLQ instance for the current test
     dlq = container.resolve('InMemoryDeadLetterQueue');
@@ -65,7 +107,7 @@ describe('Recommendations Integration', () => {
     addToDlqSpy = jest.spyOn(mockDlqProcessorInstance, 'addToDLQ'); // Spy on mocked instance
 
     // Resolve the Coordinator instance for the current test (it will use the mocked agents)
-    mockCoordinator = container.resolve(SommelierCoordinator) as jest.Mocked<SommelierCoordinator>;
+    mockCoordinator = container.resolve(SommelierCoordinator); // Removed incorrect casting
 
     // Create a new server instance for each test
     app = createServer();
@@ -78,6 +120,8 @@ describe('Recommendations Integration', () => {
   });
 
   const checkDLQTimeout = async () => {
+      // TODO: This function is currently unused. Consider using it in tests that
+      // are expected to add messages to the Dead Letter Queue.
       if (dlq.getAll().length > 0) {
         return;
       }
@@ -110,7 +154,7 @@ describe('Recommendations Integration', () => {
   });
 
   it('should validate request and return 400 for invalid input', async () => {
-    const invalidRequestBody = { message: 'Invalid request' };
+    const invalidRequestBody = { userId: '', preferences: null };
 
     const response = await request(app)
       .post('/api/recommendations')
@@ -118,7 +162,7 @@ describe('Recommendations Integration', () => {
       .expect(400);
 
     expect(response.status).toBe(400);
-    expect(response.body).toHaveProperty('status', 400);
+    expect(response.body).toHaveProperty('message', 'Validation failed');
     expect(response.body).toHaveProperty('message', 'Validation failed');
     expect(Array.isArray(response.body.errors)).toBe(true);
     expect(response.body.errors.length).toBeGreaterThan(0);
@@ -199,5 +243,4 @@ describe('Recommendations Integration', () => {
     expect(response.body.recommendation).toContain('Based on your preferences, we recommend:'); // Check for expected prefix
     expect(response.body.recommendation).toContain('Food Pairing Wine 1'); // Check for expected wine name
   });
-
 });

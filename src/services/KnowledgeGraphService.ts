@@ -1,16 +1,7 @@
 import { inject, injectable } from 'tsyringe';
 import { Neo4jService } from './Neo4jService';
 import { RecommendationRequest } from '@src/api/dtos/RecommendationRequest.dto'; // Import DTO
-
-export interface WineNode {
-  id: string;
-  name: string;
-  type: string;
-  region: string;
-  vintage?: number;
-  price?: number;
-  rating?: number;
-}
+import { WineNode } from '@src/types'; // Import WineNode from types
 
 @injectable()
 export class KnowledgeGraphService {

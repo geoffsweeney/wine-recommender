@@ -14,11 +14,14 @@ export class WineRecommendationController extends BaseController {
   }
 
   protected async executeImpl(req: Request, res: Response): Promise<void> {
+    console.log('Received wine recommendation request in executeImpl:', req.body);
     try {
       const request = req.body as unknown as RecommendationRequest;
       const results = await this.recommendationService.getRecommendations(request);
+      console.log('Recommendation results:', results);
       this.ok(res, results);
     } catch (err) {
+      console.error('Error in executeImpl:', err);
       this.fail(res, err as Error);
     }
   }

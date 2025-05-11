@@ -1,39 +1,97 @@
+import { inject, injectable } from 'tsyringe';
 import { Agent } from './Agent';
+import { AgentCommunicationBus } from '../AgentCommunicationBus'; // Import AgentCommunicationBus
 
+// Define a type for the expected structured output from the LLM
+interface LLMValidationOutput {
+  isValid: boolean;
+  ingredients?: string[];
+  preferences?: { [key: string]: any }; // Flexible for various preferences
+  error?: string;
+}
+
+@injectable()
 export class InputValidationAgent implements Agent {
+  constructor(
+    @inject(AgentCommunicationBus) private readonly communicationBus: AgentCommunicationBus // Inject AgentCommunicationBus
+  ) {
+    console.log('InputValidationAgent constructor entered.');
+  }
+
   getName(): string {
     return 'InputValidationAgent';
   }
 
-  async handleMessage(message: string): Promise<{ isValid: boolean; processedInput?: { ingredients: string[] }; error?: string }> {
+  async handleMessage(message: string): Promise<{ isValid: boolean; processedInput?: { ingredients?: string[], preferences?: { [key: string]: any } }; error?: string }> {
     console.log('InputValidationAgent received message:', message);
+
+    if (!this.communicationBus) {
+      console.error('InputValidationAgent: AgentCommunicationBus not available.');
+      return { isValid: false, error: 'Communication bus not available' };
+    }
 
     if (typeof message !== 'string' || message.trim() === '') {
       return { isValid: false, error: 'Invalid input: message must be a non-empty string.' };
     }
 
-    // Basic ingredient extraction for POC
-    const lowerCaseMessage = message.toLowerCase();
-    const ingredientsKeyword = 'with';
-    const ingredientsIndex = lowerCaseMessage.indexOf(ingredientsKeyword);
+    // --- LLM Integration for Input Validation and Extraction ---
+    try {
+      console.log('InputValidationAgent: Sending input to LLM for validation and extraction.');
+      // Formulate a prompt for the LLM to validate and extract structured data
+      // TODO: Refine the prompt to guide the LLM on the expected output format (e.g., JSON)
+      const llmPrompt = `Analyze the following user input for a wine recommendation request. Determine if it's a valid request and extract key information like ingredients or wine preferences. Provide the output in a JSON format with the following structure: { "isValid": boolean, "ingredients"?: string[], "preferences"?: { [key: string]: any }, "error"?: string }. If the input is invalid, set isValid to false and provide an error message.
 
-    let ingredients: string[] = [];
-    if (ingredientsIndex !== -1) {
-      const ingredientsString = message.substring(ingredientsIndex + ingredientsKeyword.length).trim();
-      if (ingredientsString) {
-        // Simple split by " and " or "," for multiple ingredients
-        ingredients = ingredientsString.split(/ and |,/).map(ingredient => ingredient.trim()).filter(ingredient => ingredient.length > 0);
+User Input: "${message}"`;
+
+      console.log('InputValidationAgent: Calling communicationBus.sendLLMPrompt');
+      const llmResponse = await this.communicationBus.sendLLMPrompt(llmPrompt);
+      console.log('InputValidationAgent: Returned from communicationBus.sendLLMPrompt');
+
+      if (llmResponse) {
+        console.log('InputValidationAgent: Received LLM response for validation.');
+        // TODO: Implement more robust parsing and validation of the LLM's JSON response
+        try {
+          const validationOutput: LLMValidationOutput = JSON.parse(llmResponse);
+
+          // Basic validation of the parsed structure
+          if (typeof validationOutput.isValid !== 'boolean') {
+             console.error('InputValidationAgent: LLM response missing or invalid "isValid" field.');
+             return { isValid: false, error: 'Invalid structure in LLM validation response.' };
+          }
+
+          if (validationOutput.isValid) {
+            console.log('InputValidationAgent: LLM validated input as valid.');
+            return {
+              isValid: true,
+              processedInput: {
+                ingredients: validationOutput.ingredients,
+                preferences: validationOutput.preferences
+              }
+            };
+          } else {
+            console.log('InputValidationAgent: LLM validated input as invalid.');
+            return { isValid: false, error: validationOutput.error || 'Invalid input according to LLM.' };
+          }
+
+        } catch (parseError: any) { // Explicitly type error as any
+          console.error('InputValidationAgent: Error parsing or validating LLM response:', parseError);
+          return { isValid: false, error: `Error processing LLM validation response: ${parseError.message || String(parseError)}` };
+        }
+
+      } else {
+        console.warn('InputValidationAgent: LLM did not return a validation response.');
+        // Fallback or return invalid if LLM doesn't respond
+        return { isValid: false, error: 'LLM failed to provide validation response.' };
       }
+
+    } catch (llmError) {
+      console.error('InputValidationAgent: Error during LLM validation:', llmError);
+      // Log LLM error and return invalid
+      // TODO: Add to Dead Letter Queue if necessary
+      return { isValid: false, error: 'Error communicating with LLM for validation.' };
     }
-
-    if (ingredients.length === 0) {
-       return { isValid: false, error: 'Could not extract ingredients from the message.' };
-    }
-
-
-    console.log('InputValidationAgent extracted ingredients:', ingredients);
-    return { isValid: true, processedInput: { ingredients } };
+    // --- End LLM Integration ---
   }
 }
 
-// TODO: Implement actual input validation logic
+// TODO: Implement more sophisticated input validation logic (now using LLM)

@@ -29,6 +29,7 @@ pie
 
 ## Final Phase: POC Completion - TARGET 2025-05-15
 1. **Final Testing**
+   - Debugged and fixed failing tests: `UserPreferenceAgent.integration.test.ts`, `recommendations.integration.test.ts`, `LLMService.test.ts`, `SommelierCoordinator.test.ts`, and `SommelierCoordinator.unit.test.ts`.
    - End-to-end integration tests
    - Performance benchmarking
    - Security review

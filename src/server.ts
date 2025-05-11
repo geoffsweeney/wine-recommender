@@ -1,83 +1,72 @@
-import "reflect-metadata";
-import express from 'express';
-import rateLimit from 'express-rate-limit';
-import { createRouter } from './api/routes';
-import { container } from 'tsyringe';
-import { Neo4jService } from './services/Neo4jService';
-import { MockNeo4jService } from './services/MockNeo4jService';
-import { RecommendationService } from './services/RecommendationService';
+import express from 'express'; // Import express
+import { LLMService } from './services/LLMService'; // Adjust the import path to the actual location of LLMService
+import { container } from 'tsyringe'; // Ensure tsyringe is imported for dependency injection
+import { AgentCommunicationBus } from './core/AgentCommunicationBus'; // Adjust the import path as necessary
+import { Neo4jService } from './services/Neo4jService'; // Import Neo4jService
 import { KnowledgeGraphService } from './services/KnowledgeGraphService'; // Import KnowledgeGraphService
-// Import new Dead Letter Queue and Retry Manager components
-import { InMemoryDeadLetterQueue } from './core/InMemoryDeadLetterQueue';
-import { LoggingDeadLetterHandler } from './core/BasicDeadLetterProcessor';
-import { BasicRetryManager } from './core/BasicRetryManager';
-import { BasicDeadLetterProcessor } from './core/BasicDeadLetterProcessor';
 
+import { createRouter } from './api/routes'; // Import the API router
+
+// Instantiate LLMService with actual values
+const llmService = new LLMService('https://api.example.com', 'model-name', 'your-api-key');
+
+// Register LLMService
+container.registerInstance('LLMService', llmService);
+
+// Instantiate and register AgentCommunicationBus
+// Resolve LLMService from the container to ensure mock is used in tests
+const agentCommunicationBus = new AgentCommunicationBus(container.resolve('LLMService'));
+container.registerInstance(AgentCommunicationBus, agentCommunicationBus);
+
+// Instantiate and register Neo4jService
+const neo4jService = new Neo4jService(); // Assuming Neo4jService has no dependencies
+container.registerInstance(Neo4jService, neo4jService); // Register with the class token
+
+// Instantiate and register KnowledgeGraphService
+const knowledgeGraphService = new KnowledgeGraphService(neo4jService); // Pass Neo4jService instance
+container.registerInstance('KnowledgeGraphService', knowledgeGraphService);
+
+import { InMemoryDeadLetterQueue } from './core/InMemoryDeadLetterQueue'; // Import InMemoryDeadLetterQueue
+import { BasicDeadLetterProcessor, LoggingDeadLetterHandler } from './core/BasicDeadLetterProcessor'; // Import BasicDeadLetterProcessor and LoggingDeadLetterHandler
+import { BasicRetryManager } from './core/BasicRetryManager'; // Import BasicRetryManager
+
+// Instantiate and register InMemoryDeadLetterQueue
+const deadLetterQueue = new InMemoryDeadLetterQueue();
+container.registerInstance('DeadLetterQueue', deadLetterQueue); // Assuming it's registered with a string token
+
+// Instantiate and register LoggingDeadLetterHandler
+const loggingDeadLetterHandler = new LoggingDeadLetterHandler();
+container.registerInstance(LoggingDeadLetterHandler, loggingDeadLetterHandler); // Register with the class token
+
+// Instantiate and register BasicRetryManager
+const retryManager = new BasicRetryManager();
+container.registerInstance(BasicRetryManager, retryManager); // Register with the class token
+
+// Instantiate and register DeadLetterProcessor (using BasicDeadLetterProcessor implementation)
+const deadLetterProcessor = new BasicDeadLetterProcessor(deadLetterQueue, loggingDeadLetterHandler, retryManager); // Pass all three dependencies
+container.registerInstance('DeadLetterProcessor', deadLetterProcessor); // Register with the string token
+
+import { logger } from './utils/logger'; // Import the logger
+
+// Register the logger
+container.registerInstance('logger', logger);
+
+// Create and configure the Express application
+const app = express();
+app.use(express.json()); // Middleware to parse JSON bodies
+
+// Define routes here
+// Example: app.use('/api/recommendations', recommendationsRouter);
+
+// Function to create and return the server
+import { Request, Response, NextFunction } from 'express'; // Import types
+
+app.use('/api', createRouter()); // Apply rate limiter middleware to /api routes
 export const createServer = () => {
-  const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // limit each IP to 100 requests per windowMs
-    standardHeaders: true, // Return rate limit info in `RateLimit-*` headers
-    legacyHeaders: true, // Enable both `X-RateLimit-*` and `RateLimit-*` headers
-    keyGenerator: (req) => {
-      // Differentiate rate limits by path
-      return `${req.ip}:${req.path}`;
-    },
-    handler: (req, res) => {
-      res.status(429).json({
-        message: 'Rate limit exceeded - please try again later',
-        status: 429
-      });
-    }
-  });
-
-  // Register services
-  const useMock = process.env.NODE_ENV === 'development';
-  container.register('Neo4jService', {
-    useClass: useMock ? MockNeo4jService : Neo4jService
-  });
-  container.register('RecommendationService', {
-    useClass: RecommendationService
-  });
-  container.register('KnowledgeGraphService', { // Register KnowledgeGraphService
-    useClass: KnowledgeGraphService
-  });
-
-  // Register Dead Letter Queue and Retry Manager implementations
-  container.registerSingleton('InMemoryDeadLetterQueue', InMemoryDeadLetterQueue);
-  container.registerSingleton('LoggingDeadLetterHandler', LoggingDeadLetterHandler);
-  container.registerSingleton('BasicRetryManager', BasicRetryManager);
-  container.registerSingleton('BasicDeadLetterProcessor', BasicDeadLetterProcessor);
-
   const app = express();
-  app.use(limiter);
   app.use(express.json());
+
   app.use('/api', createRouter());
 
   return app;
 };
-
-export const startServer = (app: express.Express, port: number = 3000) => {
-  return app.listen(port, async () => {
-    console.log(`Server running on port ${port}`);
-
-    const neo4j = container.resolve(Neo4jService);
-    const isConnected = await neo4j.verifyConnection();
-    console.log(`Neo4j connection: ${isConnected ? 'OK' : 'FAILED'}`);
-  });
-};
-
-// Default server startup
-if (require.main === module) {
-  const app = createServer();
-
-  // Error handling middleware
-  app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
-    console.error('Error caught in middleware:', err.message);
-    container.resolve(BasicDeadLetterProcessor).addToDLQ(err, req.body, { endpoint: req.originalUrl, timestamp: new Date().toISOString() });
-    res.status(500).json({ message: 'Internal Server Error', error: err.message });
-  });
-
-  const port = Number(process.env.PORT) || 3000;
-  startServer(app, port);
-}

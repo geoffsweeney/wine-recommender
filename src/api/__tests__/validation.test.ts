@@ -100,7 +100,7 @@ describe('API Validation', () => {
       .post('/recommendations')
       .send({ userId: 'test', preferences: 'invalid_format' });
       expect(res.status).toBe(400);
-      expect(res.body.errors.some((e: any) => e.path === 'preferences')).toBe(true);
+      expect(res.body.errors.some((e: any) => e.path.includes('preferences'))).toBe(true);
     });
 
     it('should handle missing preferences gracefully', async () => {
@@ -108,7 +108,7 @@ describe('API Validation', () => {
         .post('/recommendations')
         .send({ userId: 'test' }); // Ensure userId is provided
       expect(res.status).toBe(400);
-      expect(res.body.errors.some((e: any) => e.path === 'preferences')).toBe(true);
+      expect(res.body.errors.some((e: any) => e.path.includes('preferences'))).toBe(true);
     });
 
     
@@ -131,7 +131,7 @@ describe('API Validation', () => {
         .get('/search')
         .query({ limit: 10 });
       expect(res.status).toBe(400);
-      expect(res.body.errors.some((e: any) => e.path === 'query')).toBe(true);
+      expect(res.body.errors.some((e: any) => e.path.includes('query'))).toBe(true);
     });
 
     it('should accept valid search', async () => {

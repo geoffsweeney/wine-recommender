@@ -1,6 +1,9 @@
 import { Agent } from './Agent';
 
 export class MCPAdapterAgent implements Agent {
+constructor() {
+    console.log('MCPAdapterAgent constructor entered.');
+  }
   getName(): string {
     return 'MCPAdapterAgent';
   }

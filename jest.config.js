@@ -16,5 +16,6 @@ module.exports = {
   testMatch: [
     '**/__tests__/**/*.test.ts'
   ],
+  setupFilesAfterEnv: ['<rootDir>/src/test-setup.ts'],
   moduleFileExtensions: ['js', 'mjs', 'cjs', 'jsx', 'ts', 'tsx', 'json', 'node', 'd.ts']
 }

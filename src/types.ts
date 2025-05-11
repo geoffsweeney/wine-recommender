@@ -4,6 +4,6 @@ export interface WineNode {
   type: string;
   region: string;
   vintage?: number;
+  price?: number; // Added price property
   rating?: number;
-  priceRange?: string;
 }

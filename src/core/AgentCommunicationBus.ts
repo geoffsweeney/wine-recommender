@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events';
 import { SharedContextMemory, type ContextEntry, type ContextMetadata } from './SharedContextMemory';
+import { LLMService } from '../services/LLMService';
 
 interface AgentInfo {
   id: string;
@@ -26,12 +27,15 @@ export class AgentCommunicationBus {
   private agents: Map<string, AgentInfo>;
   private subscriptions: Map<string, Set<string>>;
   private contextMemory: SharedContextMemory;
+  private llmService?: LLMService; // Optional LLM Service
 
-  constructor() {
+  constructor(llmService?: LLMService) {
+console.log('AgentCommunicationBus constructor entered.');
     this.emitter = new EventEmitter();
     this.agents = new Map();
     this.subscriptions = new Map();
     this.contextMemory = new SharedContextMemory();
+    this.llmService = llmService;
   }
 
   registerAgent(agentId: string, info: Omit<AgentInfo, 'id' | 'lastSeen'>): void {
@@ -118,5 +122,18 @@ export class AgentCommunicationBus {
           this.setContext(agent.id, key, context.value, { ...context.metadata });
         });
     }
+  }
+
+  /**
+   * Sends a prompt to the configured LLM service.
+   * @param prompt The prompt to send to the LLM.
+   * @returns A promise that resolves with the LLM's response, or undefined if no LLM service is configured.
+   */
+  async sendLLMPrompt(prompt: string): Promise<string | undefined> {
+    if (!this.llmService) {
+      console.warn('LLMService is not configured in AgentCommunicationBus.');
+      return undefined;
+    }
+    return this.llmService.sendPrompt(prompt);
   }
 }

@@ -18,7 +18,7 @@
     "paths": {
       "@src/*": ["src/*"]
     },
-    "types": ["node"],
+    "types": ["node", "jest"], // Updated to include jest
     "typeRoots": [
       "./node_modules/@types",
       "./src/types"
@@ -28,5 +28,5 @@
     "src/**/*",
     "src/types/**/*.d.ts"
   ],
-  "exclude": ["node_modules", "dist", "**/__tests__/*"]
+  "exclude": ["node_modules", "dist"]
 }
