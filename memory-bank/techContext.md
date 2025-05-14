@@ -52,6 +52,14 @@
 - End-to-end tests for user flows
 - Mock services for external dependencies
 
+### Service Mocking
+
+We utilize `jest-mock-extended` to create deep mocks of service dependencies in our unit and integration tests. This approach provides granular control over mock behavior, ensuring better test isolation and reliability compared to manual mocking or extending base classes.
+
+For example, in `src/services/__tests__/RecommendationService.test.ts`, we use `mockDeep` to create mocks for `Neo4jService`, `KnowledgeGraphService`, and the logger, injecting these mocks into the `RecommendationService` instance under test.
+
+It is recommended to implement mocks for services that interact with external dependencies or have complex side effects, such as the `LLMService`, to ensure fast, deterministic, and cost-effective test execution.
+
 ## Deployment Considerations
 - Containerized deployment with Docker
 - CI/CD pipeline setup

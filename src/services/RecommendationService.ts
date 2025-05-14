@@ -29,6 +29,20 @@ export class RecommendationService {
 
   async getRecommendations(request: RecommendationRequest): Promise<any[]> {
     this.logger.info('RecommendationService: Getting recommendations for request:', request); // Log start
+
+    // Basic validation: Check if preferences are provided
+    const hasPreferences = request.preferences && (
+      request.preferences.wineType ||
+      (request.preferences.priceRange && (request.preferences.priceRange[0] > 0 || request.preferences.priceRange[1] < Infinity)) || // Check if price range is meaningful
+      request.preferences.foodPairing ||
+      (request.preferences.excludeAllergens && request.preferences.excludeAllergens.length > 0)
+    );
+
+    if (!hasPreferences && !request.message) { // Also consider if there's a message
+       this.logger.warn('RecommendationService: Received empty or invalid recommendation request.');
+       throw new Error('Invalid request: Please provide some preferences or a message.');
+    }
+
     try {
       const allResults = await Promise.all(
         this.strategies.map(strategy => strategy.getRecommendations(request))
@@ -189,8 +203,21 @@ class PopularWinesStrategy implements IRecommendationStrategy {
   ) {}
 
   async getRecommendations(request: RecommendationRequest): Promise<any[]> {
-    // Placeholder implementation returning a hardcoded popular wine
-    this.logger.info('PopularWinesStrategy: Returning placeholder recommendation.');
+    // Basic validation: Check if preferences are provided (similar to main service)
+    const hasPreferences = request.preferences && (
+      request.preferences.wineType ||
+      (request.preferences.priceRange && (request.preferences.priceRange[0] > 0 || request.preferences.priceRange[1] < Infinity)) ||
+      request.preferences.foodPairing ||
+      (request.preferences.excludeAllergens && request.preferences.excludeAllergens.length > 0)
+    );
+
+    if (!hasPreferences && !request.message) {
+       this.logger.warn('PopularWinesStrategy: Received empty or invalid recommendation request.');
+       throw new Error('Invalid request: Please provide some preferences or a message.'); // Throw error for invalid requests
+    }
+
+    // Placeholder implementation returning a hardcoded popular wine for valid requests
+    this.logger.info('PopularWinesStrategy: Returning placeholder recommendation for valid request.');
     return [{ id: 'wine-123', name: 'Popular Red Wine', region: 'Bordeaux', price: 25 }];
   }
 }

@@ -1,3 +1,4 @@
+import { CircuitOptions } from '../../core/CircuitBreaker';
 import { Neo4jCircuitWrapper } from '../Neo4jCircuitWrapper';
 import { logger } from '../../utils/logger';
 import neo4j from 'neo4j-driver';
@@ -5,13 +6,13 @@ import neo4j from 'neo4j-driver';
 jest.mock('../../core/CircuitBreaker', () => {
   const originalModule = jest.requireActual('../../core/CircuitBreaker');
   return {
-    CircuitBreaker: jest.fn().mockImplementation((options) => ({
+    CircuitBreaker: jest.fn().mockImplementation((options: CircuitOptions) => ({
       ...originalModule.CircuitBreaker.prototype,
       execute: jest.fn().mockImplementation(async (fn) => {
         try {
           return await fn();
         } catch (error) {
-          options.fallback(error);
+          options.fallback(error as Error);
           return []; // Return fallback value
         }
       }),
@@ -54,8 +55,8 @@ describe('Neo4jCircuitWrapper', () => {
 
   it('should use fallback when circuit is open', async () => {
     const mockCircuitBreaker = require('../../core/CircuitBreaker').CircuitBreaker;
-    mockCircuitBreaker.mockImplementationOnce((options) => ({
-      execute: jest.fn().mockResolvedValue(options.fallback()),
+    mockCircuitBreaker.mockImplementationOnce((options: CircuitOptions) => ({
+      execute: jest.fn().mockResolvedValue(options.fallback(new Error())),
       getState: jest.fn().mockReturnValue('OPEN')
     }));
 

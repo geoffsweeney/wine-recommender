@@ -1,3 +1,4 @@
+import { mockDeep, DeepMockProxy } from 'jest-mock-extended';
 import request from 'supertest';
 import express from 'express';
 import { createRouter } from '../routes';
@@ -8,7 +9,6 @@ import { InputValidationAgent } from '../../core/agents/InputValidationAgent';
 import { RecommendationAgent } from '../../core/agents/RecommendationAgent';
 import { KnowledgeGraphService } from '../../services/KnowledgeGraphService'; // Import services
 import { Neo4jService } from '../../services/Neo4jService';
-import { MockNeo4jService } from '../../services/MockNeo4jService';
 
 
 // Mock controller (still needed for the /search endpoint tests)
@@ -48,26 +48,9 @@ describe('API Validation', () => {
     container.registerInstance(WineRecommendationController, mockController as any); // Register the mock controller
     container.register(KnowledgeGraphService, { useClass: KnowledgeGraphService });
 
-    // Register a factory that provides a Jest mock for Neo4jService
-    container.register(Neo4jService, {
-      useFactory: () => {
-        // Create a Jest mock of Neo4jService
-        const mock = {
-          executeQuery: jest.fn(),
-          verifyConnection: jest.fn(),
-          close: jest.fn(),
-          // Add mock implementations for missing members
-          convertToNeo4jTypes: jest.fn(value => value), // Basic passthrough mock
-          // Private members should not be included in the mock object definition
-          // driver: {} as any,
-          // circuit: {} as any,
-        } as any as jest.Mocked<Neo4jService>; // Cast to any first
-        return mock;
-      },
-    });
-
-    // Resolve the mocked Neo4jService instance from the container
-    mockNeo4jService = container.resolve(Neo4jService) as jest.Mocked<Neo4jService>;
+    // Use mockDeep from jest-mock-extended
+    mockNeo4jService = mockDeep<Neo4jService>();
+    container.registerInstance(Neo4jService, mockNeo4jService); // Register the mock instance
 
     container.register(InputValidationAgent, { useClass: InputValidationAgent });
     container.register(RecommendationAgent, { useClass: RecommendationAgent });
