@@ -22,7 +22,7 @@ Here are the features required for the MVP, ordered for optimal implementation f
 
 **Goal:** Improve the reliability of LLM interactions for the core recommendation task.
 
-**Status:** Mostly Completed
+**Status:** Completed
 
 **Detailed Steps:**
 
@@ -85,7 +85,11 @@ Here are the features required for the MVP, ordered for optimal implementation f
   - Increased test coverage for `SommelierCoordinator.ts`, covering various input handling and error scenarios.
 - [x] 2. Refine LLM Integration for Core Agents
   - Increased test coverage for `InputValidationAgent.ts`, including handling of invalid inputs and robust LLM response parsing.
+  - Fixed test errors in `InputValidationAgent.test.ts` and `recommendations.integration.test.ts` related to `DeadLetterProcessor` integration and `tsyringe` dependency injection.
+  - Applied prompt refinements to `InputValidationAgent.ts` and `RecommendationAgent.ts`.
 - [ ] 3. Enhance Knowledge Graph Interaction
 - [ ] 4. Complete Basic API Functionality
+  - Fixed integration test errors in `recommendations.integration.test.ts`.
 - [ ] 5. Implement Basic User Interface
 - [ ] 6. Finalize Basic End-to-End Testing
+  - Fixed integration test errors in `recommendations.integration.test.ts`.

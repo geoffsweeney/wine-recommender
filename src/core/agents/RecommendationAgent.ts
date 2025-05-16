@@ -55,32 +55,65 @@ export class RecommendationAgent implements Agent {
   }
 
   private async enhanceRecommendations(recommendedWines: Wine[], message: any, recommendationType: string) {
-    const llmPrompt = `Enhance the following wine recommendations based on the user's input (${recommendationType}):\n\nUser Input: ${JSON.stringify(message)}\n\nRecommended Wines: ${JSON.stringify(recommendedWines)}`;
+    const llmPrompt = `Based on the user's input (${recommendationType}) and the provided wine recommendations, provide an enhanced list of recommendations and a brief explanation. The explanation should highlight why the recommended wines are a good match for the user's request. Respond strictly in JSON format with the following structure:
+{
+  "recommendedWines": Wine[], // An array of enhanced wine objects (same structure as input Wine objects).
+  "llmEnhancement": string // A brief text explaining the recommendations, focusing on the match with user input.
+}
+
+Keep the "llmEnhancement" concise and helpful.
+
+User Input: ${JSON.stringify(message)}
+
+Recommended Wines: ${JSON.stringify(recommendedWines)}`;
     this.logger.info('Sending recommendations and input to LLM for enhancement.');
 
-    const llmResponse = await this.llmService.sendPrompt(llmPrompt);
-    if (!llmResponse) {
-      this.logger.warn('LLM did not return an enhancement. Returning original recommendations.');
-      return { recommendedWines };
-    }
+    try { // Outer try for LLM call
+      const llmResponse = await this.llmService.sendPrompt(llmPrompt);
 
-    try {
-      const enhancedRecommendations = JSON.parse(llmResponse);
-      if (enhancedRecommendations && Array.isArray(enhancedRecommendations.recommendedWines)) {
-        return {
-          recommendedWines: enhancedRecommendations.recommendedWines,
-          llmEnhancement: enhancedRecommendations.llmEnhancement,
-        };
-      } else {
-        this.logger.warn('LLM response did not contain expected structure. Returning original recommendations.');
+      if (!llmResponse) {
+        this.logger.warn('LLM did not return an enhancement. Returning original recommendations.');
         return { recommendedWines };
       }
-    } catch (parseError: any) {
-      this.logger.error('Failed to parse LLM enhancement response:', parseError);
+
+      try { // Inner try for parsing
+        const enhancedRecommendations = JSON.parse(llmResponse);
+
+        // Enhanced validation of the parsed structure
+        if (enhancedRecommendations &&
+            Array.isArray(enhancedRecommendations.recommendedWines) &&
+            typeof enhancedRecommendations.llmEnhancement === 'string') {
+          return {
+            recommendedWines: enhancedRecommendations.recommendedWines,
+            llmEnhancement: enhancedRecommendations.llmEnhancement,
+          };
+        } else {
+          this.logger.warn('LLM response did not contain expected structure for enhancement. Returning original recommendations.');
+          // Optionally log the unexpected LLM response for debugging
+          this.logger.debug('Unexpected LLM response:', llmResponse);
+          return { recommendedWines };
+        }
+      } catch (parseError: any) { // Catch for parsing errors
+        this.logger.error('Failed to parse LLM enhancement response as JSON:', parseError);
+        // Add to Dead Letter Queue for parsing errors
+        await this.deadLetterProcessor.process({ recommendedWines, message, recommendationType, llmResponse }, parseError instanceof Error ? parseError : new Error(parseError), { source: this.getName(), stage: 'LLMEnhancementParsing' });
+        // Return original recommendations and the raw LLM response for debugging
+        return {
+          recommendedWines,
+          llmEnhancement: `Error processing LLM enhancement: ${parseError.message}. Raw LLM response: ${llmResponse}`,
+          error: 'Error during LLM enhancement: Failed to parse response as JSON.',
+        };
+      }
+
+    } catch (llmCallError: any) { // Catch for LLM call errors
+      this.logger.error('Error calling LLM service for enhancement:', llmCallError);
+      // Add to Dead Letter Queue for LLM call errors
+      await this.deadLetterProcessor.process({ recommendedWines, message, recommendationType }, llmCallError instanceof Error ? llmCallError : new Error(llmCallError), { source: this.getName(), stage: 'LLMEnhancementCall' });
+      // Return original recommendations and an error message
       return {
         recommendedWines,
-        llmEnhancement: llmResponse,
-        error: 'Error during LLM enhancement: Failed to parse response as JSON.',
+        llmEnhancement: `Error communicating with LLM for enhancement: ${llmCallError.message || String(llmCallError)}`,
+        error: 'Error during LLM enhancement: Failed to communicate with LLM.',
       };
     }
   }

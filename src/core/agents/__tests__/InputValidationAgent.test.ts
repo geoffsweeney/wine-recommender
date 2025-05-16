@@ -2,10 +2,25 @@ import "reflect-metadata";
 import { container } from 'tsyringe';
 import { InputValidationAgent } from '../InputValidationAgent';
 import { AgentCommunicationBus } from '../../AgentCommunicationBus';
-import { LLMService } from '../../../services/LLMService'; // Import LLMService
+import { LLMService } from '../../../services/LLMService';
+import { DeadLetterProcessor } from '../../DeadLetterProcessor';
+import { BasicDeadLetterProcessor } from '../../BasicDeadLetterProcessor';
 
-// Mock the LLMService module
-// Mock the AgentCommunicationBus module
+
+class MockDeadLetterProcessor extends DeadLetterProcessor {
+  constructor() {
+    super({ maxReplayAttempts: 0, retryManager: {} as any }, []);
+  }
+
+  protected async handlePermanentFailure(
+    message: unknown,
+    error: Error,
+    metadata: Record<string, unknown>
+  ): Promise<void> {
+    // Mock implementation
+  }
+}
+
 jest.mock('../../AgentCommunicationBus');
 
 const MockAgentCommunicationBus = AgentCommunicationBus as jest.MockedClass<typeof AgentCommunicationBus>;
@@ -13,63 +28,57 @@ const MockAgentCommunicationBus = AgentCommunicationBus as jest.MockedClass<type
 describe('InputValidationAgent Integration with AgentCommunicationBus', () => {
   let agent: InputValidationAgent;
   let mockCommunicationBusInstance: jest.Mocked<AgentCommunicationBus>;
+  let processSpy: jest.SpyInstance; // Declare processSpy here
 
-  beforeEach(() => {
-    // Clear all instances and calls to constructor and all methods:
-    MockAgentCommunicationBus.mockClear();
-    container.clearInstances(); // Clear container before each test
+    let mockDeadLetterProcessor: DeadLetterProcessor; // Declare mockDeadLetterProcessor here
+  
+    beforeEach(() => {
+      MockAgentCommunicationBus.mockClear();
+      container.clearInstances();
+  
+      container.register<AgentCommunicationBus>(AgentCommunicationBus, { useClass: MockAgentCommunicationBus });
+      mockDeadLetterProcessor = new MockDeadLetterProcessor(); // Assign to the top-level variable
+      processSpy = jest.spyOn(mockDeadLetterProcessor, 'process'); // Spy on the process method and assign to processSpy
+    container.register<DeadLetterProcessor>('DeadLetterProcessor', { useValue: mockDeadLetterProcessor });
 
-    // Bind the mocked AgentCommunicationBus to the container
-    container.register<AgentCommunicationBus>(AgentCommunicationBus, { useClass: MockAgentCommunicationBus });
-
-    // Resolve the InputValidationAgent. This will cause tsyringe to resolve
-    // AgentCommunicationBus (using the mock we just registered) and inject it.
     agent = container.resolve(InputValidationAgent);
-
-    // Get the mock instance created by tsyringe and jest.mock
     mockCommunicationBusInstance = MockAgentCommunicationBus.mock.instances[0] as jest.Mocked<AgentCommunicationBus>;
+    // mockDeadLetterProcessorInstance is no longer needed, use processSpy directly
   });
 
   afterEach(() => {
-    // Clear the container after each test
     container.clearInstances();
   });
 
   it('should send the user input to the LLMService via the communication bus for validation and return the LLM response', async () => {
     const testUserInput = 'I want a sweet red wine';
-    const mockLlmResponse = '{"isValid": true, "ingredients": ["grape"], "preferences": {"wineType": "red", "sweetness": "dry"}}'; // Mock LLM response as a JSON string
+    const mockLlmResponse = '{"isValid": true, "ingredients": ["grape"], "preferences": {"wineType": "red", "sweetness": "dry"}}';
 
-   // Mock the sendLLMPrompt method of the mocked AgentCommunicationBus to return a JSON string
-   mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(mockLlmResponse);
+    mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(mockLlmResponse);
 
-   const result = await agent.handleMessage(testUserInput);
+    const result = await agent.handleMessage(testUserInput);
 
-   // Expect AgentCommunicationBus.sendLLMPrompt to have been called with a prompt based on the user input
-   expect(mockCommunicationBusInstance.sendLLMPrompt).toHaveBeenCalled();
-   const sentPrompt = mockCommunicationBusInstance.sendLLMPrompt.mock.calls[0][0];
-   expect(sentPrompt).toContain(testUserInput);
-   expect(sentPrompt).toContain('Analyze the following user input for a wine recommendation request.'); // Check for prompt structure hint
+    expect(mockCommunicationBusInstance.sendLLMPrompt).toHaveBeenCalled();
+    const sentPrompt = mockCommunicationBusInstance.sendLLMPrompt.mock.calls[0][0];
+    expect(sentPrompt).toContain(testUserInput);
+    expect(sentPrompt).toContain('Analyze the following user input for a wine recommendation request.');
 
-   // Expect the result to contain the parsed LLM response
-   expect(result).toEqual({
-     isValid: true,
-     processedInput: {
-       ingredients: ["grape"],
-       preferences: { wineType: 'red', sweetness: 'dry' },
-     },
-   });
- });
+    expect(result).toEqual({
+      isValid: true,
+      processedInput: {
+        ingredients: ["grape"],
+        preferences: { wineType: 'red', sweetness: 'dry' },
+      },
+    });
+  });
 
   it('should handle cases where LLMService does not return a response via the communication bus', async () => {
     const testUserInput = 'Tell me about beer';
-
-    // Mock the sendLLMPrompt method to return undefined
     mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(undefined);
 
     const result = await agent.handleMessage(testUserInput);
 
     expect(mockCommunicationBusInstance.sendLLMPrompt).toHaveBeenCalled();
-
     expect(result).toEqual({
       isValid: false,
       error: 'LLM failed to provide validation response.',
@@ -79,14 +88,16 @@ describe('InputValidationAgent Integration with AgentCommunicationBus', () => {
   it('should handle errors during LLMService communication via the communication bus', async () => {
     const testUserInput = 'Invalid query';
     const mockError = new Error('LLM API error');
-
-    // Mock the sendLLMPrompt method to throw an error
     mockCommunicationBusInstance.sendLLMPrompt.mockRejectedValue(mockError);
 
     const result = await agent.handleMessage(testUserInput);
 
     expect(mockCommunicationBusInstance.sendLLMPrompt).toHaveBeenCalled();
-
+    expect(processSpy).toHaveBeenCalledWith(
+      testUserInput,
+      expect.any(Error),
+      { source: agent.getName(), stage: 'LLMValidation' }
+    );
     expect(result).toEqual({
       isValid: false,
       error: 'Error communicating with LLM for validation.',
@@ -95,20 +106,17 @@ describe('InputValidationAgent Integration with AgentCommunicationBus', () => {
 
   it('should handle invalid JSON response format from LLMService via the communication bus', async () => {
     const testUserInput = 'Another query';
-    const invalidJsonResponse = 'This is not JSON'; // Invalid JSON response
-
-    // Mock the sendLLMPrompt method to return invalid JSON
+    const invalidJsonResponse = 'This is not JSON';
     mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(invalidJsonResponse);
 
     const result = await agent.handleMessage(testUserInput);
 
     expect(mockCommunicationBusInstance.sendLLMPrompt).toHaveBeenCalled();
-
-    // The error message will contain the specific parsing error, so we check for a substring
     expect(result.isValid).toBe(false);
     expect(result.error).toContain('Error processing LLM validation response:');
     expect(result.error).toContain('Unexpected token');
   });
+
   it('should handle empty or whitespace-only input', async () => {
     const emptyInput = '';
     const whitespaceInput = '   ';
@@ -143,7 +151,7 @@ describe('InputValidationAgent Integration with AgentCommunicationBus', () => {
 
   it('should handle LLM response with isValid: true but missing optional fields', async () => {
     const testUserInput = 'Just a general wine question';
-    const mockLlmResponse = '{"isValid": true}'; // Missing ingredients and preferences
+    const mockLlmResponse = '{"isValid": true}';
 
     mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(mockLlmResponse);
 
@@ -161,7 +169,7 @@ describe('InputValidationAgent Integration with AgentCommunicationBus', () => {
 
   it('should handle LLM response with isValid: true and empty optional fields', async () => {
     const testUserInput = 'Any wine will do';
-    const mockLlmResponse = '{"isValid": true, "ingredients": [], "preferences": {}}'; // Empty ingredients and preferences
+    const mockLlmResponse = '{"isValid": true, "ingredients": [], "preferences": {}}';
 
     mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(mockLlmResponse);
 
@@ -179,7 +187,7 @@ describe('InputValidationAgent Integration with AgentCommunicationBus', () => {
 
   it('should handle LLM response with incorrect type for isValid', async () => {
     const testUserInput = 'Query with invalid isValid type';
-    const mockLlmResponse = '{"isValid": "true", "ingredients": [], "preferences": {}}'; // isValid is a string
+    const mockLlmResponse = '{"isValid": "true", "ingredients": [], "preferences": {}}';
 
     mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(mockLlmResponse);
 
@@ -192,7 +200,7 @@ describe('InputValidationAgent Integration with AgentCommunicationBus', () => {
 
   it('should handle LLM response with incorrect type for ingredients', async () => {
     const testUserInput = 'Query with invalid ingredients type';
-    const mockLlmResponse = '{"isValid": true, "ingredients": "grape", "preferences": {}}'; // ingredients is a string
+    const mockLlmResponse = '{"isValid": true, "ingredients": "grape", "preferences": {}}';
 
     mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(mockLlmResponse);
 
@@ -205,7 +213,7 @@ describe('InputValidationAgent Integration with AgentCommunicationBus', () => {
 
   it('should handle LLM response with incorrect type for preferences', async () => {
     const testUserInput = 'Query with invalid preferences type';
-    const mockLlmResponse = '{"isValid": true, "ingredients": [], "preferences": "sweet"}'; // preferences is a string
+    const mockLlmResponse = '{"isValid": true, "ingredients": [], "preferences": "sweet"}';
 
     mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(mockLlmResponse);
 
@@ -218,7 +226,7 @@ describe('InputValidationAgent Integration with AgentCommunicationBus', () => {
 
   it('should handle LLM response with incorrect type for error when isValid is false', async () => {
     const testUserInput = 'Query with invalid error type';
-    const mockLlmResponse = '{"isValid": false, "error": 123}'; // error is a number
+    const mockLlmResponse = '{"isValid": false, "error": 123}';
 
     mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(mockLlmResponse);
 
@@ -227,5 +235,77 @@ describe('InputValidationAgent Integration with AgentCommunicationBus', () => {
     expect(mockCommunicationBusInstance.sendLLMPrompt).toHaveBeenCalled();
     expect(result.isValid).toBe(false);
     expect(result.error).toContain('Invalid structure in LLM validation response: "error" is not a string.');
+  });
+
+  // Additional tests
+
+  it('should handle when AgentCommunicationBus is not available', async () => {
+    // @ts-ignore
+    agent = new InputValidationAgent(undefined, mockDeadLetterProcessor);
+    const result = await agent.handleMessage('test');
+    expect(result).toEqual({ isValid: false, error: 'Communication bus not available' });
+  });
+
+  it('should handle when LLM response is missing isValid field', async () => {
+    const testUserInput = 'Missing isValid';
+    const mockLlmResponse = '{"ingredients": ["grape"], "preferences": {}}';
+    mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(mockLlmResponse);
+
+    const result = await agent.handleMessage(testUserInput);
+
+    expect(result.isValid).toBe(false);
+    expect(result.error).toContain('Invalid structure in LLM validation response: missing or invalid "isValid".');
+  });
+
+  it('should handle when LLM response has extra unexpected fields', async () => {
+    const testUserInput = 'Extra fields';
+    const mockLlmResponse = '{"isValid": true, "ingredients": ["grape"], "preferences": {}, "extra": 123}';
+    mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(mockLlmResponse);
+
+    const result = await agent.handleMessage(testUserInput);
+
+    expect(result.isValid).toBe(true);
+    expect(result.processedInput).toEqual({
+      ingredients: ["grape"],
+      preferences: {},
+    });
+  });
+
+  it('should handle when LLM response has null for optional fields', async () => {
+    const testUserInput = 'Null fields';
+    const mockLlmResponse = '{"isValid": true, "ingredients": null, "preferences": null}';
+    mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(mockLlmResponse);
+
+    const result = await agent.handleMessage(testUserInput);
+
+    // null is not an array/object, so should error
+    expect(result.isValid).toBe(false);
+    expect(result.error).toContain('Invalid structure in LLM validation response: "ingredients" is not an array.');
+  });
+
+  it('should handle when LLM response has undefined for optional fields', async () => {
+    const testUserInput = 'Undefined fields';
+    // JSON.stringify omits undefined, so this is same as missing fields
+    const mockLlmResponse = '{"isValid": true}';
+    mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(mockLlmResponse);
+
+    const result = await agent.handleMessage(testUserInput);
+
+    expect(result.isValid).toBe(true);
+    expect(result.processedInput).toEqual({
+      ingredients: undefined,
+      preferences: undefined,
+    });
+  });
+
+  it('should handle when LLM response has empty object', async () => {
+    const testUserInput = 'Empty object';
+    const mockLlmResponse = '{}';
+    mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(mockLlmResponse);
+
+    const result = await agent.handleMessage(testUserInput);
+
+    expect(result.isValid).toBe(false);
+    expect(result.error).toContain('Invalid structure in LLM validation response: missing or invalid "isValid".');
   });
 });

@@ -71,7 +71,7 @@ describe('Recommendations Integration', () => {
     container.register(Neo4jService, { useValue: mockNeo4jServiceInstance });
     container.register(KnowledgeGraphService, { useClass: KnowledgeGraphService });
     container.register(InputValidationAgent, { useClass: InputValidationAgent }); // InputValidationAgent is not mocked, assuming it has no external dependencies or its dependencies are mocked
-    container.register(BasicDeadLetterProcessor, { useValue: mockDlqProcessorInstance }); // Register mocked processor
+    container.register('DeadLetterProcessor', { useValue: mockDlqProcessorInstance }); // Register mocked processor with token
     container.register(RecommendationAgent, { useValue: mockRecommendationAgentInstance }); // Use the mocked instance
 
     // Register the newly mocked agents and communication bus
