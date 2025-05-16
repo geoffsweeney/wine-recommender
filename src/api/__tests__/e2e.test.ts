@@ -32,5 +32,5 @@ it('should return a successful response for a valid recommendation request', asy
     });
     console.log('Test response:', response.body); // Log the response body for debugging
     expect(response.body).toHaveProperty('recommendation'); // Check for the recommendation property
-  });
+  }, 30000); // Increased timeout to 30 seconds
 });

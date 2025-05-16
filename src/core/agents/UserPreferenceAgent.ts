@@ -13,7 +13,7 @@ export class UserPreferenceAgent implements Agent {
   constructor(
     @inject(AgentCommunicationBus) private readonly communicationBus: AgentCommunicationBus // Inject AgentCommunicationBus
   ) {
-    console.log('UserPreferenceAgent constructor entered.');
+    // console.log('UserPreferenceAgent constructor entered.');
   }
 
   getName(): string {
@@ -21,10 +21,10 @@ export class UserPreferenceAgent implements Agent {
   }
 
   async handleMessage(message: any): Promise<{ preferences?: { [key: string]: any }; error?: string }> {
-    console.log('UserPreferenceAgent received message:', message);
+    // console.log('UserPreferenceAgent received message:', message);
 
     if (!this.communicationBus) {
-      console.error('UserPreferenceAgent: AgentCommunicationBus not available.');
+      // console.error('UserPreferenceAgent: AgentCommunicationBus not available.');
       return { error: 'Communication bus not available' };
     }
 
@@ -34,18 +34,18 @@ export class UserPreferenceAgent implements Agent {
 
     // --- LLM Integration for User Preference Extraction ---
     try {
-      console.log('UserPreferenceAgent: Sending input to LLM for preference extraction.');
+      // console.log('UserPreferenceAgent: Sending input to LLM for preference extraction.');
       // Formulate a prompt for the LLM to extract user preferences
       // TODO: Refine the prompt to guide the LLM on the expected output format (e.g., JSON)
-      const llmPrompt = `Analyze the following user input and extract any stated or implied wine preferences (e.g., sweet, dry, red, white, region, price range). Provide the extracted preferences in a JSON format with a 'preferences' key containing an object of key-value pairs. If no preferences are found, return an empty object for preferences.
+      const llmPrompt = `Analyze the following user input for a wine recommendation request. Determine if it's a valid request and extract key information like ingredients or wine preferences. Provide the output in a JSON format with the following structure: { "isValid": boolean, "ingredients"?: string[], "preferences"?: { [key: string]: any }, "error"?: string }. If the input is invalid, set isValid to false and provide an error message.
 
 User Input: "${inputForLLM}"`;
 
       const llmResponse = await this.communicationBus.sendLLMPrompt(llmPrompt);
 
       if (llmResponse) {
-        console.log('UserPreferenceAgent: Received LLM response for preferences.');
-        console.log('UserPreferenceAgent: LLM response content:', llmResponse); // Add this line to log the LLM response
+        // console.log('UserPreferenceAgent: Received LLM response for preferences.');
+        // console.log('UserPreferenceAgent: LLM response content:', llmResponse); // Add this line to log the LLM response
         // Extract the JSON string from the LLM response
         const jsonMatch = llmResponse.match(/```json\n([\s\S]*?)\n```/);
         let jsonString = llmResponse;
@@ -61,7 +61,7 @@ User Input: "${inputForLLM}"`;
             }
         }
 
-        console.log('UserPreferenceAgent: Extracted JSON string:', jsonString);
+        // console.log('UserPreferenceAgent: Extracted JSON string:', jsonString);
 
         // TODO: Implement more robust parsing and validation of the LLM's JSON response
         try {
@@ -69,26 +69,26 @@ User Input: "${inputForLLM}"`;
 
           // Basic validation of the parsed structure
           if (typeof preferenceOutput.preferences !== 'object' || preferenceOutput.preferences === null) {
-             console.error('UserPreferenceAgent: LLM response missing or invalid "preferences" field.');
+             // console.error('UserPreferenceAgent: LLM response missing or invalid "preferences" field.');
              return { preferences: {}, error: 'Invalid structure in LLM preference response.' };
           }
 
-          console.log('UserPreferenceAgent: Extracted preferences from LLM.');
+          // console.log('UserPreferenceAgent: Extracted preferences from LLM.');
           return { preferences: preferenceOutput.preferences };
 
         } catch (parseError: any) { // Explicitly type error as any
-          console.error('UserPreferenceAgent: Error parsing or validating LLM response:', parseError);
+          // console.error('UserPreferenceAgent: Error parsing or validating LLM response:', parseError);
           return { error: `Error processing LLM preference response: ${parseError.message || String(parseError)}` };
         }
 
       } else {
-        console.warn('UserPreferenceAgent: LLM did not return a preference response.');
+        // console.warn('UserPreferenceAgent: LLM did not return a preference response.');
         // Return empty preferences if LLM doesn't respond
         return { preferences: {} };
       }
 
     } catch (llmError) {
-      console.error('UserPreferenceAgent: Error during LLM preference extraction:', llmError);
+      // console.error('UserPreferenceAgent: Error during LLM preference extraction:', llmError);
       // Log LLM error and return empty preferences
       // TODO: Add to Dead Letter Queue if necessary
       return { error: 'Error communicating with LLM for preference extraction.' };

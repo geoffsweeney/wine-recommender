@@ -56,7 +56,7 @@ describe('UserPreferenceAgent Integration with LLMService', () => {
     const sentPrompt = mockLlmServiceInstance.sendPrompt.mock.calls[0][0];
     expect(sentPrompt).toContain(testUserInput);
     // Check if the prompt contains the core instruction and the user input
-    expect(sentPrompt).toContain('Analyze the following user input and extract any stated or implied wine preferences');
+    expect(sentPrompt).toContain('Analyze the following user input for a wine recommendation request');
     expect(sentPrompt).toContain('User Input: "I prefer dry red wine"');
 
     // Expect the result to contain the extracted preferences

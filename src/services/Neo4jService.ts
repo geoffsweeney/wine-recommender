@@ -25,9 +25,9 @@ export class Neo4jService {
     return this.circuit.execute(async (driver) => {
       const session = driver.session();
       try {
-        console.log('Executing Neo4j Query:');
-        console.log('Query:', query);
-        console.log('Parameters:', processedParams);
+        // console.log('Executing Neo4j Query:');
+        // console.log('Query:', query);
+        // console.log('Parameters:', processedParams);
         const result = await session.run(query, processedParams);
         return result.records.map(record => record.toObject() as T);
       } finally {
@@ -43,9 +43,9 @@ export class Neo4jService {
     for (const [key, value] of Object.entries(params)) {
       if (typeof value === "number" && Number.isFinite(value)) {
         // For numeric values, explicitly convert to Neo4j integer for known integer parameters
-        if (Number.isInteger(value) || 
-            key === 'limit' || 
-            key === 'skip' || 
+        if (Number.isInteger(value) ||
+            key === 'limit' ||
+            key === 'skip' ||
             key.toLowerCase().includes('count') ||
             key.toLowerCase().includes('id') && !Number.isNaN(parseInt(value.toString(), 10))) {
           processed[key] = neo4jInt(Math.floor(value));
@@ -57,11 +57,11 @@ export class Neo4jService {
         processed[key] = this.convertToNeo4jTypes(value);
       } else if (Array.isArray(value)) {
         // Process arrays
-        processed[key] = value.map(item => 
-          typeof item === "object" && item !== null 
-            ? this.convertToNeo4jTypes(item) 
-            : (typeof item === "number" && Number.isInteger(item) 
-                ? neo4jInt(item) 
+        processed[key] = value.map(item =>
+          typeof item === "object" && item !== null
+            ? this.convertToNeo4jTypes(item)
+            : (typeof item === "number" && Number.isInteger(item)
+                ? neo4jInt(item)
                 : item)
         );
       } else {

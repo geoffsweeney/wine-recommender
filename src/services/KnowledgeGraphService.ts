@@ -45,7 +45,7 @@ export class KnowledgeGraphService {
       LIMIT $limit
     `, { wineId, limit: integerLimit }); // Pass the ensured integer limit
 
-    console.log('KnowledgeGraphService - similarWines after executeQuery:', similarWines); // Debug log
+    // console.log('KnowledgeGraphService - similarWines after executeQuery:', similarWines); // Debug log
 
     return similarWines;
   }
@@ -64,13 +64,13 @@ export class KnowledgeGraphService {
       RETURN w
     `, { ingredients });
 
-    console.log('KnowledgeGraphService - findWinesByIngredients after executeQuery:', wines); // Debug log
+    // console.log('KnowledgeGraphService - findWinesByIngredients after executeQuery:', wines); // Debug log
 
     return wines;
   }
 
   async findWinesByPreferences(preferences: RecommendationRequest['preferences']): Promise<WineNode[]> {
-    console.log('KnowledgeGraphService: Finding wines by preferences:', preferences);
+    // console.log('KnowledgeGraphService: Finding wines by preferences:', preferences);
     let query = 'MATCH (w:Wine)';
     const parameters: any = {};
     const conditions: string[] = [];
@@ -103,7 +103,7 @@ export class KnowledgeGraphService {
     if (preferences.excludeAllergens && preferences.excludeAllergens.length > 0) {
         // This is more complex and might require a WHERE NOT EXISTS or a separate match and filter
         // For minimum implementation, let's skip excludeAllergens for now or add a basic placeholder
-        console.warn('Excluding allergens is not yet fully implemented.');
+        // console.warn('Excluding allergens is not yet fully implemented.');
         // TODO: Implement allergen exclusion logic
     }
 
@@ -114,13 +114,13 @@ export class KnowledgeGraphService {
 
     query += ' RETURN w';
 
-    console.log('KnowledgeGraphService - findWinesByPreferences query:', query);
-    console.log('KnowledgeGraphService - findWinesByPreferences parameters:', parameters);
+    // console.log('KnowledgeGraphService - findWinesByPreferences query:', query);
+    // console.log('KnowledgeGraphService - findWinesByPreferences parameters:', parameters);
 
 
     const wines = await this.neo4j.executeQuery<WineNode>(query, parameters);
 
-    console.log('KnowledgeGraphService - findWinesByPreferences after executeQuery:', wines); // Debug log
+    // console.log('KnowledgeGraphService - findWinesByPreferences after executeQuery:', wines); // Debug log
 
     return wines;
   }
@@ -136,7 +136,7 @@ export class KnowledgeGraphService {
       RETURN w
     `, { wineType });
 
-    console.log('KnowledgeGraphService - findWinesByType after executeQuery:', wines); // Debug log
+    // console.log('KnowledgeGraphService - findWinesByType after executeQuery:', wines); // Debug log
 
     return wines;
   }

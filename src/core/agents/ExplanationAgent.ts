@@ -15,10 +15,10 @@ export class ExplanationAgent implements Agent {
   }
 
   async handleMessage(recommendationResult: any): Promise<any> {
-    console.log('ExplanationAgent received recommendation result:', recommendationResult);
+    // console.log('ExplanationAgent received recommendation result:', recommendationResult);
 
     if (!this.communicationBus) {
-      console.error('ExplanationAgent: AgentCommunicationBus not available.');
+      // console.error('ExplanationAgent: AgentCommunicationBus not available.');
       return { status: 'Explanation generation failed', error: 'Communication bus not available' };
     }
 
@@ -27,20 +27,20 @@ export class ExplanationAgent implements Agent {
     const prompt = `Provide a concise explanation for the following wine recommendation:\n\n${JSON.stringify(recommendationResult, null, 2)}`;
 
     try {
-      console.log('ExplanationAgent: Sending prompt to LLM for explanation.');
+      // console.log('ExplanationAgent: Sending prompt to LLM for explanation.');
       const llmExplanation = await this.communicationBus.sendLLMPrompt(prompt);
 
       if (llmExplanation) {
-        console.log('ExplanationAgent: Received explanation from LLM.');
+        // console.log('ExplanationAgent: Received explanation from LLM.');
         // TODO: Process and format the LLM explanation if needed
         return { status: 'Explanation generated', explanation: llmExplanation, receivedRecommendation: recommendationResult };
       } else {
-        console.warn('ExplanationAgent: LLM did not return an explanation.');
+        // console.warn('ExplanationAgent: LLM did not return an explanation.');
         return { status: 'Explanation generation failed', error: 'LLM did not return an explanation', receivedRecommendation: recommendationResult };
       }
 
     } catch (error) {
-      console.error('ExplanationAgent: Error sending prompt to LLM:', error);
+      // console.error('ExplanationAgent: Error sending prompt to LLM:', error);
       return { status: 'Explanation generation failed', error: 'Error communicating with LLM', receivedRecommendation: recommendationResult };
     }
   }
