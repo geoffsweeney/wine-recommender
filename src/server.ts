@@ -7,6 +7,7 @@ import { Neo4jService } from './services/Neo4jService'; // Import Neo4jService
 import { KnowledgeGraphService } from './services/KnowledgeGraphService'; // Import KnowledgeGraphService
 
 import { createRouter } from './api/routes'; // Import the API router
+import apiRateLimiter from './api/middleware/rateLimiter'; // Import rate limiter middleware
 
 // Instantiate LLMService with actual values
 const llmService = new LLMService('http://localhost:11434', 'llama3.1:latest', 'your-api-key');
@@ -62,7 +63,7 @@ app.use(express.json()); // Middleware to parse JSON bodies
 // Function to create and return the server
 import { Request, Response, NextFunction } from 'express'; // Import types
 
-app.use('/api', createRouter()); // Apply rate limiter middleware to /api routes
+app.use('/api', apiRateLimiter, createRouter()); // Apply rate limiter middleware to /api routes
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   logger.info(`Server is running on port ${PORT}`);
@@ -71,7 +72,7 @@ export const createServer = () => {
   const app = express();
   app.use(express.json());
 
-  app.use('/api', createRouter());
+  app.use('/api', apiRateLimiter, createRouter());
 
   return app;
 };

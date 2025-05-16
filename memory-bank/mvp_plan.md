@@ -46,14 +46,14 @@ Here are the features required for the MVP, ordered for optimal implementation f
 
 **Goal:** Ensure the API endpoint correctly handles requests and integrates with the agent system.
 
-**Status:** Partially Completed
+**Status:** Completed
 
 **Detailed Steps:**
 
 - Verify that the `/api/recommendations` endpoint ([`src/api/routes.ts`](src/api/routes.ts)) correctly receives user input and passes it to the `SommelierCoordinator`.
 - Ensure the response from the `SommelierCoordinator` is correctly formatted and returned by the API endpoint.
-- Address the deferred failing tests in `src/api/middleware/__tests__/validation.test.ts` ([`src/api/middleware/__tests__/validation.test.ts`](src/api/middleware/__tests__/validation.test.ts)).
-- Implement basic rate limiting for the `/api` endpoints as outlined in the `Rate Limiter Refinement Plan` ([`memory-bank/rate_limiter_refinement_plan.md`](memory-bank/rate_limiter_refinement_plan.md)), focusing on applying it to the `/api` path and basic error handling for exceeding the limit.
+- Ensured tests are passing in `src/api/middleware/__tests__/validation.test.ts` ([`src/api/middleware/__tests__/validation.test.ts`](src/api/middleware/__tests__/validation.test.ts)).
+- Implemented basic rate limiting for the `/api` endpoints as outlined in the `Rate Limiter Refinement Plan` ([`memory-bank/rate_limiter_refinement_plan.md`](memory-bank/rate_limiter_refinement_plan.md)), focusing on applying it to the `/api` path and basic error handling for exceeding the limit. Associated tests are passing.
 
 ### 5. Implement Basic User Interface
 
@@ -87,9 +87,12 @@ Here are the features required for the MVP, ordered for optimal implementation f
   - Increased test coverage for `InputValidationAgent.ts`, including handling of invalid inputs and robust LLM response parsing.
   - Fixed test errors in `InputValidationAgent.test.ts` and `recommendations.integration.test.ts` related to `DeadLetterProcessor` integration and `tsyringe` dependency injection.
   - Applied prompt refinements to `InputValidationAgent.ts` and `RecommendationAgent.ts`.
-- [ ] 3. Enhance Knowledge Graph Interaction
-- [ ] 4. Complete Basic API Functionality
+- [x] 3. Enhance Knowledge Graph Interaction
+  - Verified functionality of Knowledge Graph Service methods and data loading script.
+- [x] 4. Complete Basic API Functionality
   - Fixed integration test errors in `recommendations.integration.test.ts`.
+  - Verified `/api/recommendations` endpoint input handling and response formatting.
+  - Implemented basic rate limiting middleware and applied it to `/api` routes, with associated tests passing.
 - [ ] 5. Implement Basic User Interface
 - [ ] 6. Finalize Basic End-to-End Testing
   - Fixed integration test errors in `recommendations.integration.test.ts`.
