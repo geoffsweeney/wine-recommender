@@ -28,9 +28,18 @@ export class SommelierCoordinator implements Agent {
     @inject(BasicDeadLetterProcessor) private readonly deadLetterProcessor: BasicDeadLetterProcessor, // Inject BasicDeadLetterProcessor
     @inject(AgentCommunicationBus) private readonly communicationBus: AgentCommunicationBus, // Inject AgentCommunicationBus
     @inject('logger') private logger: winston.Logger // Inject the logger
-  ) {}
+  ) {
+    // Register agents with the communication bus
+    this.communicationBus.registerAgent(this.inputValidationAgent.getName(), { name: this.inputValidationAgent.getName(), capabilities: ['input-validation'] });
+    this.communicationBus.registerAgent(this.recommendationAgent.getName(), { name: this.recommendationAgent.getName(), capabilities: ['recommendation'] });
+    this.communicationBus.registerAgent(this.valueAnalysisAgent.getName(), { name: this.valueAnalysisAgent.getName(), capabilities: ['value-analysis'] });
+    this.communicationBus.registerAgent(this.userPreferenceAgent.getName(), { name: this.userPreferenceAgent.getName(), capabilities: ['user-preferences'] });
+    this.communicationBus.registerAgent(this.explanationAgent.getName(), { name: this.explanationAgent.getName(), capabilities: ['explanation'] });
+    this.communicationBus.registerAgent(this.mcpAdapterAgent.getName(), { name: this.mcpAdapterAgent.getName(), capabilities: ['mcp-adapter'] });
+    this.communicationBus.registerAgent(this.fallbackAgent.getName(), { name: this.fallbackAgent.getName(), capabilities: ['fallback'] });
+  }
 
-  getName(): string {
+ getName(): string {
     return 'SommelierCoordinator';
   }
 
@@ -43,8 +52,13 @@ export class SommelierCoordinator implements Agent {
       // Prioritize message content for ingredient parsing
       if (message.message !== undefined) {
         this.logger.info('SommelierCoordinator: Processing message content for input validation.'); // Use logger
+        // Use SharedContextMemory to pass input to InputValidationAgent
+        this.communicationBus.setContext(this.getName(), 'inputMessage', message.message);
         const validationResult = await this.inputValidationAgent.handleMessage(message.message);
         this.logger.info('SommelierCoordinator: Input validation result:', validationResult); // Log validation result
+
+        // Use SharedContextMemory to retrieve result from InputValidationAgent (assuming agent sets it)
+        // const validationResult = this.communicationBus.getContext(this.inputValidationAgent.getName(), 'validationResult'); // This would be the pattern if agents set context
 
         if (!validationResult || !validationResult.isValid) {
           this.logger.warn('SommelierCoordinator: Input validation failed. Using FallbackAgent.'); // Use logger
@@ -82,7 +96,11 @@ export class SommelierCoordinator implements Agent {
        // Basic calls to other agents for inclusion in the flow
        this.logger.info('SommelierCoordinator: Passing input to ValueAnalysisAgent (Basic)'); // Use logger
        try {
+         // Use SharedContextMemory to pass input to ValueAnalysisAgent
+         this.communicationBus.setContext(this.getName(), 'recommendationInput', recommendationInput);
          await this.valueAnalysisAgent.handleMessage(recommendationInput); // Basic call
+         // Use SharedContextMemory to retrieve result from ValueAnalysisAgent (assuming agent sets it)
+         // const valueAnalysisResult = this.communicationBus.getContext(this.valueAnalysisAgent.getName(), 'analysisResult'); // This would be the pattern if agents set context
          this.logger.info('SommelierCoordinator: ValueAnalysisAgent call completed.'); // Log completion
        } catch (error) {
          this.logger.error('Error calling ValueAnalysisAgent:', error); // Use logger
@@ -93,7 +111,11 @@ export class SommelierCoordinator implements Agent {
 
        this.logger.info('SommelierCoordinator: Passing input to UserPreferenceAgent (Basic)'); // Use logger
        try {
+         // Use SharedContextMemory to pass input to UserPreferenceAgent
+         this.communicationBus.setContext(this.getName(), 'recommendationInput', recommendationInput);
          await this.userPreferenceAgent.handleMessage(recommendationInput); // Basic call
+         // Use SharedContextMemory to retrieve result from UserPreferenceAgent (assuming agent sets it)
+         // const userPreferenceResult = this.communicationBus.getContext(this.userPreferenceAgent.getName(), 'preferencesResult'); // This would be the pattern if agents set context
          this.logger.info('SommelierCoordinator: UserPreferenceAgent call completed.'); // Log completion
        } catch (error) {
          this.logger.error('Error calling UserPreferenceAgent:', error); // Use logger
@@ -104,7 +126,11 @@ export class SommelierCoordinator implements Agent {
 
        this.logger.info('SommelierCoordinator: Passing input to MCPAdapterAgent (Basic)'); // Use logger
        try {
+         // Use SharedContextMemory to pass input to MCPAdapterAgent
+         this.communicationBus.setContext(this.getName(), 'recommendationInput', recommendationInput);
          await this.mcpAdapterAgent.handleMessage(recommendationInput); // Basic call
+         // Use SharedContextMemory to retrieve result from MCPAdapterAgent (assuming agent sets it)
+         // const mcpResult = this.communicationBus.getContext(this.mcpAdapterAgent.getName(), 'mcpResult'); // This would be the pattern if agents set context
          this.logger.info('SommelierCoordinator: MCPAdapterAgent call completed.'); // Log completion
        } catch (error) {
          this.logger.error('Error calling MCPAdapterAgent:', error); // Use logger
@@ -115,10 +141,14 @@ export class SommelierCoordinator implements Agent {
 
 
        this.logger.info('SommelierCoordinator: Passing input to RecommendationAgent'); // Use logger
-       let recommendationResult;
-       try {
-         recommendationResult = await this.recommendationAgent.handleMessage(recommendationInput);
-         this.logger.info('SommelierCoordinator: Received recommendation result:', recommendationResult); // Use logger
+        let recommendationResult;
+        try {
+          // Use SharedContextMemory to pass input to RecommendationAgent
+          this.communicationBus.setContext(this.getName(), 'recommendationInput', recommendationInput);
+          recommendationResult = await this.recommendationAgent.handleMessage(recommendationInput);
+          // Use SharedContextMemory to retrieve result from RecommendationAgent (assuming agent sets it)
+          // recommendationResult = this.communicationBus.getContext(this.recommendationAgent.getName(), 'recommendationResult'); // This would be the pattern if agents set context
+          this.logger.info('SommelierCoordinator: Received recommendation result:', recommendationResult); // Use logger
 
          // Check if the RecommendationAgent returned an error
          if (recommendationResult && recommendationResult.error) {
@@ -131,11 +161,15 @@ export class SommelierCoordinator implements Agent {
          // Basic call to ExplanationAgent after recommendation
          this.logger.info('SommelierCoordinator: Passing recommendation result to ExplanationAgent (Basic)'); // Use logger
          this.logger.info('SommelierCoordinator: Calling ExplanationAgent with result:', recommendationResult); // Use logger
-         try {
-           const explanationResult = await this.explanationAgent.handleMessage(recommendationResult); // Basic call
-           this.logger.info('SommelierCoordinator: ExplanationAgent call completed. Result:', explanationResult); // Log completion and result
-           // TODO: Integrate explanationResult into the final response if needed
-         } catch (error) {
+        try {
+          // Use SharedContextMemory to pass input to ExplanationAgent
+          this.communicationBus.setContext(this.getName(), 'recommendationResult', recommendationResult);
+          const explanationResult = await this.explanationAgent.handleMessage(recommendationResult); // Basic call
+          // Use SharedContextMemory to retrieve result from ExplanationAgent (assuming agent sets it)
+          // const explanationResult = this.communicationBus.getContext(this.explanationAgent.getName(), 'explanationResult'); // This would be the pattern if agents set context
+          this.logger.info('SommelierCoordinator: ExplanationAgent call completed. Result:', explanationResult); // Log completion and result
+          // TODO: Integrate explanationResult into the final response if needed
+        } catch (error) {
            this.logger.error('Error calling ExplanationAgent:', error); // Use logger
            await this.deadLetterProcessor.process(message, error instanceof Error ? error : new Error('Error in ExplanationAgent.'), { source: this.getName(), stage: 'ExplanationAgent' });
            // Decide how to handle this error - maybe continue or return a partial result?
@@ -167,5 +201,3 @@ export class SommelierCoordinator implements Agent {
  }
 
  // TODO: Implement more sophisticated orchestration logic involving other agents
- // TODO: Integrate with Agent Communication Bus and Shared Context Memory
- // Now that AgentCommunicationBus is injected, update agent interactions to use the bus.

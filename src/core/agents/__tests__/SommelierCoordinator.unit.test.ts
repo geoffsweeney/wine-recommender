@@ -171,4 +171,164 @@ describe('SommelierCoordinator Unit Tests', () => {
   });
 
   // Add more unit test cases for SommelierCoordinator here...
+  it('should process a message with both message and preferences, prioritizing message for ingredient extraction', async () => {
+    const message = { userId: 'test-user', message: 'wine with cheese', preferences: { wineType: "red" } };
+    const mockValidationResult = { isValid: true, processedInput: { ingredients: ['cheese'], preferences: {} } }; // Validation extracts ingredients
+    const mockRecommendationResult = { recommendedWines: [{ id: 'wine-2', name: 'Test White', type: 'white', price: 25, region: 'Test Region', rating: 4.5 }] };
+
+    mockInputValidationAgent.handleMessage.mockResolvedValue(mockValidationResult);
+    mockRecommendationAgent.handleMessage.mockResolvedValue(mockRecommendationResult);
+
+    const result = await sommelierCoordinator.handleMessage(message as any);
+
+    // Expect InputValidationAgent to be called with the message content
+    expect(mockInputValidationAgent.handleMessage).toHaveBeenCalledWith(message.message);
+    // Expect RecommendationAgent to be called with extracted ingredients, not preferences from the original message
+    expect(mockRecommendationAgent.handleMessage).toHaveBeenCalledWith({ ingredients: mockValidationResult.processedInput.ingredients });
+    expect(result).toEqual(mockRecommendationResult);
+  });
+
+  it('should process a message with message but no extractable info, falling back to preferences', async () => {
+    const message = { userId: 'test-user', message: 'general query', preferences: { wineType: "white" } };
+    const mockValidationResult = { isValid: true, processedInput: { ingredients: [], preferences: {} } }; // Validation finds no ingredients/preferences
+    const mockRecommendationResult = { recommendedWines: [{ id: 'wine-3', name: 'Test Rose', type: 'rose', price: 15, region: 'Test Region', rating: 3.5 }] };
+
+    mockInputValidationAgent.handleMessage.mockResolvedValue(mockValidationResult);
+    mockRecommendationAgent.handleMessage.mockResolvedValue(mockRecommendationResult);
+
+    const result = await sommelierCoordinator.handleMessage(message as any);
+
+    // Expect InputValidationAgent to be called with the message content
+    expect(mockInputValidationAgent.handleMessage).toHaveBeenCalledWith(message.message);
+    // Expect RecommendationAgent to be called with preferences from the original message
+    expect(mockRecommendationAgent.handleMessage).toHaveBeenCalledWith({ preferences: message.preferences });
+    expect(result).toEqual(mockRecommendationResult);
+  });
+
+  it('should use FallbackAgent when neither message nor preferences are provided', async () => {
+    const message = { userId: 'test-user' }; // No message or preferences
+    const mockFallbackResult = { recommendation: 'Fallback recommendation for no input' };
+
+    mockFallbackAgent.handleMessage.mockResolvedValue(mockFallbackResult);
+
+    const result = await sommelierCoordinator.handleMessage(message as any);
+
+    // Expect FallbackAgent to be called
+    expect(mockFallbackAgent.handleMessage).toHaveBeenCalledWith({ error: 'Could not determine request type from input (no message with ingredients or preferences provided.)', preferences: { wineType: 'Unknown' } });
+    expect(result).toEqual(mockFallbackResult);
+    // Expect dead letter processor to be called
+    expect(mockDeadLetterProcessor.process).toHaveBeenCalledWith(
+      message,
+      expect.any(Error),
+      { source: 'SommelierCoordinator', stage: 'RequestTypeDetermination' }
+    );
+  });
+
+  it('should catch and log errors from ValueAnalysisAgent and continue orchestration', async () => {
+    const message = { userId: 'test-user', preferences: { wineType: 'red' } };
+    const vaError = new Error('Value analysis failed');
+    const mockRecommendationResult = { recommendedWines: [] };
+
+    mockValueAnalysisAgent.handleMessage.mockRejectedValue(vaError);
+    mockRecommendationAgent.handleMessage.mockResolvedValue(mockRecommendationResult);
+
+    await sommelierCoordinator.handleMessage(message as any);
+
+    // Expect ValueAnalysisAgent to have been called and rejected
+    expect(mockValueAnalysisAgent.handleMessage).toHaveBeenCalledWith({ preferences: message.preferences });
+    // Expect dead letter processor to be called for ValueAnalysisAgent error
+    expect(mockDeadLetterProcessor.process).toHaveBeenCalledWith(
+      message,
+      expect.any(Error),
+      { source: 'SommelierCoordinator', stage: 'ValueAnalysisAgent' }
+    );
+    // Expect RecommendationAgent to still be called
+    expect(mockRecommendationAgent.handleMessage).toHaveBeenCalledWith({ preferences: message.preferences });
+  });
+
+  it('should catch and log errors from UserPreferenceAgent and continue orchestration', async () => {
+    const message = { userId: 'test-user', preferences: { wineType: 'red' } };
+    const upError = new Error('User preference failed');
+    const mockRecommendationResult = { recommendedWines: [] };
+
+    mockUserPreferenceAgent.handleMessage.mockRejectedValue(upError);
+    mockRecommendationAgent.handleMessage.mockResolvedValue(mockRecommendationResult);
+
+    await sommelierCoordinator.handleMessage(message as any);
+
+    // Expect UserPreferenceAgent to have been called and rejected
+    expect(mockUserPreferenceAgent.handleMessage).toHaveBeenCalledWith({ preferences: message.preferences });
+    // Expect dead letter processor to be called for UserPreferenceAgent error
+    expect(mockDeadLetterProcessor.process).toHaveBeenCalledWith(
+      message,
+      expect.any(Error),
+      { source: 'SommelierCoordinator', stage: 'UserPreferenceAgent' }
+    );
+    // Expect RecommendationAgent to still be called
+    expect(mockRecommendationAgent.handleMessage).toHaveBeenCalledWith({ preferences: message.preferences });
+  });
+
+  it('should catch and log errors from MCPAdapterAgent and continue orchestration', async () => {
+    const message = { userId: 'test-user', preferences: { wineType: 'red' } };
+    const mcpError = new Error('MCP adapter failed');
+    const mockRecommendationResult = { recommendedWines: [] };
+
+    mockMCPAdapterAgent.handleMessage.mockRejectedValue(mcpError);
+    mockRecommendationAgent.handleMessage.mockResolvedValue(mockRecommendationResult);
+
+    await sommelierCoordinator.handleMessage(message as any);
+
+    // Expect MCPAdapterAgent to have been called and rejected
+    expect(mockMCPAdapterAgent.handleMessage).toHaveBeenCalledWith({ preferences: message.preferences });
+    // Expect dead letter processor to be called for MCPAdapterAgent error
+    expect(mockDeadLetterProcessor.process).toHaveBeenCalledWith(
+      message,
+      expect.any(Error),
+      { source: 'SommelierCoordinator', stage: 'MCPAdapterAgent' }
+    );
+    // Expect RecommendationAgent to still be called
+    expect(mockRecommendationAgent.handleMessage).toHaveBeenCalledWith({ preferences: message.preferences });
+  });
+
+  it('should catch and log errors from ExplanationAgent and continue orchestration', async () => {
+    const message = { userId: 'test-user', preferences: { wineType: 'red' } };
+    const expError = new Error('Explanation failed');
+    const mockRecommendationResult = { recommendedWines: [] };
+
+    mockRecommendationAgent.handleMessage.mockResolvedValue(mockRecommendationResult);
+    mockExplanationAgent.handleMessage.mockRejectedValue(expError);
+
+    await sommelierCoordinator.handleMessage(message as any);
+
+    // Expect RecommendationAgent to have been called
+    expect(mockRecommendationAgent.handleMessage).toHaveBeenCalledWith({ preferences: message.preferences });
+    // Expect ExplanationAgent to have been called and rejected
+    expect(mockExplanationAgent.handleMessage).toHaveBeenCalledWith(mockRecommendationResult);
+    // Expect dead letter processor to be called for ExplanationAgent error
+    expect(mockDeadLetterProcessor.process).toHaveBeenCalledWith(
+      message,
+      expect.any(Error),
+      { source: 'SommelierCoordinator', stage: 'ExplanationAgent' }
+    );
+  });
+
+  it('should catch RecommendationAgent error returned within result and send to dead letter queue', async () => {
+    const message = { userId: 'test-user', preferences: { wineType: 'red' } };
+    const recommendationErrorResult = { error: 'No wines found for preferences' }; // Error within result
+
+    mockRecommendationAgent.handleMessage.mockResolvedValue(recommendationErrorResult);
+
+    // Expect the SommelierCoordinator.handleMessage to throw an error
+    await expect(sommelierCoordinator.handleMessage(message as any)).rejects.toThrow('Recommendation Agent Error: No wines found for preferences');
+
+    // Verify that the RecommendationAgent was called
+    expect(mockRecommendationAgent.handleMessage).toHaveBeenCalledWith({ preferences: message.preferences });
+
+    // Verify that the dead letter processor was called
+    expect(mockDeadLetterProcessor.process).toHaveBeenCalledWith(
+      message,
+      expect.any(Error), // Expecting an Error object
+      { source: 'SommelierCoordinator', stage: 'RecommendationAgent' }
+    );
+  });
 });

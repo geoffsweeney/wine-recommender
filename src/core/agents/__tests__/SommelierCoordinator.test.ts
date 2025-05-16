@@ -65,7 +65,7 @@ describe('SommelierCoordinator', () => {
         const mockMCPAdapterAgent = { handleMessage: jest.fn(), getName: () => 'MockMCPAdapterAgent' } as any;
         const mockFallbackAgent = { handleMessage: jest.fn(), getName: () => 'MockFallbackAgent' } as any;
         const mockDeadLetterProcessor = { process: jest.fn() } as any;
-        const mockCommunicationBus = {} as any; // Mock the communication bus
+        const mockCommunicationBus = new MockAgentCommunicationBus() as any; // Use the mocked communication bus
 
         sommelierCoordinator = new SommelierCoordinator(
             mockInputValidationAgent,
