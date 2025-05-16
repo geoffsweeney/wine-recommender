@@ -10,7 +10,7 @@ Here are the features required for the MVP, ordered for optimal implementation f
 
 **Goal:** Ensure the basic flow through the core agents is robust for handling user input and returning a basic recommendation.
 
-**Status:** Partially Completed
+**Status:** Completed
 
 **Detailed Steps:**
 
@@ -22,7 +22,7 @@ Here are the features required for the MVP, ordered for optimal implementation f
 
 **Goal:** Improve the reliability of LLM interactions for the core recommendation task.
 
-**Status:** Partially Completed
+**Status:** Mostly Completed
 
 **Detailed Steps:**
 
@@ -81,8 +81,10 @@ Here are the features required for the MVP, ordered for optimal implementation f
 
 ## Progress Tracker
 
-- [ ] 1. Solidify Core Agentic Flow
-- [ ] 2. Refine LLM Integration for Core Agents
+- [x] 1. Solidify Core Agentic Flow
+  - Increased test coverage for `SommelierCoordinator.ts`, covering various input handling and error scenarios.
+- [x] 2. Refine LLM Integration for Core Agents
+  - Increased test coverage for `InputValidationAgent.ts`, including handling of invalid inputs and robust LLM response parsing.
 - [ ] 3. Enhance Knowledge Graph Interaction
 - [ ] 4. Complete Basic API Functionality
 - [ ] 5. Implement Basic User Interface
