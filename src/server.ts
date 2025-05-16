@@ -1,3 +1,4 @@
+import "reflect-metadata";
 import express from 'express'; // Import express
 import { LLMService } from './services/LLMService'; // Adjust the import path to the actual location of LLMService
 import { container } from 'tsyringe'; // Ensure tsyringe is imported for dependency injection
@@ -8,7 +9,7 @@ import { KnowledgeGraphService } from './services/KnowledgeGraphService'; // Imp
 import { createRouter } from './api/routes'; // Import the API router
 
 // Instantiate LLMService with actual values
-const llmService = new LLMService('https://api.example.com', 'model-name', 'your-api-key');
+const llmService = new LLMService('http://localhost:11434', 'llama3.1:latest', 'your-api-key');
 
 // Register LLMService
 container.registerInstance('LLMService', llmService);
@@ -62,6 +63,10 @@ app.use(express.json()); // Middleware to parse JSON bodies
 import { Request, Response, NextFunction } from 'express'; // Import types
 
 app.use('/api', createRouter()); // Apply rate limiter middleware to /api routes
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  logger.info(`Server is running on port ${PORT}`);
+});
 export const createServer = () => {
   const app = express();
   app.use(express.json());

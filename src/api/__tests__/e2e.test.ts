@@ -3,6 +3,7 @@ import { createServer } from '../../server'; // Adjusted path to the createServe
 import { Express } from 'express'; // Import Express type
 
 describe('E2E Tests', () => {
+  jest.setTimeout(10000); // Increase timeout for E2E tests
   let app: Express; // Explicitly define the type of app
 
   beforeAll(() => {

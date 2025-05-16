@@ -45,9 +45,27 @@ User Input: "${inputForLLM}"`;
 
       if (llmResponse) {
         console.log('UserPreferenceAgent: Received LLM response for preferences.');
+        console.log('UserPreferenceAgent: LLM response content:', llmResponse); // Add this line to log the LLM response
+        // Extract the JSON string from the LLM response
+        const jsonMatch = llmResponse.match(/```json\n([\s\S]*?)\n```/);
+        let jsonString = llmResponse;
+
+        if (jsonMatch && jsonMatch[1]) {
+            jsonString = jsonMatch[1];
+        } else {
+            // Fallback if the ```json block is not found, try to find the first { and last }
+            const firstBracket = llmResponse.indexOf('{');
+            const lastBracket = llmResponse.lastIndexOf('}');
+            if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
+                jsonString = llmResponse.substring(firstBracket, lastBracket + 1);
+            }
+        }
+
+        console.log('UserPreferenceAgent: Extracted JSON string:', jsonString);
+
         // TODO: Implement more robust parsing and validation of the LLM's JSON response
         try {
-          const preferenceOutput: LLMPreferenceOutput = JSON.parse(llmResponse);
+          const preferenceOutput: LLMPreferenceOutput = JSON.parse(jsonString);
 
           // Basic validation of the parsed structure
           if (typeof preferenceOutput.preferences !== 'object' || preferenceOutput.preferences === null) {
