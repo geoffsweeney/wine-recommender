@@ -19,6 +19,9 @@ This plan outlines the steps to implement a Proof of Concept for the agentic arc
     - Task 2: Basic Testing: Create basic integration test for recommendations endpoint (Confirmed by code)
     - Task 3: Implement Basic Knowledge Graph Service Interaction (Confirmed by code)
 
+### Completed:
+- **Phase 3: Basic Testing:** Fixed failing test in `SommelierCoordinator.unit.test.ts`.
+
 ### Partially Completed (Basic Implementation Exists, but further work needed as per plan/TODOs):
 - **Phase 3: Basic Testing:** Fix existing failing tests in `validation.test.ts` (Deferred in plan, test file exists).
 - **Phase 4: Advanced Features:**

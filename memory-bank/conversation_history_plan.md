@@ -24,6 +24,7 @@
     *   Update agents that will utilize conversation history (e.g., `UserPreferenceAgent`, `RecommendationAgent`) to accept and process the conversation history data. This might involve modifying their `handleMessage` signatures and internal logic to consider past interactions.
 
 **Phase 2: API Modifications**
+  Status: Completed
 
 1.  **Update OpenAPI Specification:**
     *   Modify [`openapi.yaml`](src/api/openapi.yaml) to include the `conversationHistory` field in the `RecommendationRequest` schema, specifying its structure (array of objects with `role` and `content`).
@@ -58,7 +59,8 @@
 **Phase 4: Testing**
 
 1.  **Unit Tests:**
-    *   Add unit tests for the modified DTO, the new `ConversationHistoryService`, `SommelierCoordinator`, and relevant agents to ensure they correctly handle conversation history.
+    *   Unit tests for `SommelierCoordinator` have been reviewed and a failing test related to conversation history handling was fixed.
+    *   Add unit tests for the modified DTO, the new `ConversationHistoryService`, and other relevant agents to ensure they correctly handle conversation history.
 2.  **Integration Tests:**
     *   Create integration tests for the `/recommendations` endpoint to verify that conversation history is correctly passed, stored (in-memory), and utilized through the system.
 3.  **Frontend Tests:**
