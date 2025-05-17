@@ -22,6 +22,7 @@
     *   Pass the relevant parts of the conversation history to agents that need it (e.g., `UserPreferenceAgent`, `RecommendationAgent`). **(Implemented)**
 4.  **Agent Modifications:**
     *   Update agents that will utilize conversation history (e.g., `UserPreferenceAgent`, `RecommendationAgent`) to accept and process the conversation history data. This might involve modifying their `handleMessage` signatures and internal logic to consider past interactions.
+    *   **Fixed LLM response parsing in `InputValidationAgent.ts` to handle extra text and markdown.**
 
 **Phase 2: API Modifications**
   Status: Completed
@@ -32,7 +33,7 @@
     *   Ensure the `/recommendations` endpoint in [`routes.ts`](src/api/routes.ts) correctly receives the `conversationHistory` from the request body and passes it to the `SommelierCoordinator`.
 
 **Phase 3: Frontend Modifications**
-  Status: Not Started
+  Status: Completed
 
 1.  **Implement Conversation State Management:**
     *   Use browser `sessionStorage` to store the conversation history for simplicity in this MVP.
@@ -40,13 +41,13 @@
         *   `saveConversationTurn(userId, role, content)`: Adds a new message (user input or assistant response) to the history in `sessionStorage` for a given user ID.
         *   `getConversationHistory(userId)`: Retrieves the current conversation history array from `sessionStorage` for a given user ID.
         *   `clearConversationHistory(userId)`: Removes the conversation history from `sessionStorage` for a given user ID (e.g., for starting a new conversation).
-    *   The history will be stored as a JSON string representing an array of `{ role: string, content: string }` objects.
+    *   The history will be stored as a JSON string representing an array of `{ role: string, content: string }` objects. **(Implemented in `src/index.html`)**
 2.  **Modify API Calls:**
     *   Locate the JavaScript function that sends the POST request to `/api/recommendations`.
     *   Before sending the request:
         *   Call `getConversationHistory(userId)` to retrieve the current history.
         *   Include the retrieved history array in the request body under the `conversationHistory` field, ensuring it matches the structure defined in the `RecommendationRequest` DTO.
-        *   Include the current user input as the latest turn in the history sent with the request.
+        *   Include the current user input as the latest turn in the history sent with the request. **(Implemented in `src/index.html`)**
 3.  **Display Conversation History:**
     *   Identify or create a dedicated HTML element (e.g., a `div` with a specific ID) where the conversation history will be displayed.
     *   Create a JavaScript function `displayConversationHistory(history)`:
@@ -55,7 +56,7 @@
         *   Iterates through the history array.
         *   For each turn, creates appropriate HTML elements (e.g., paragraphs or list items, potentially with different styling for user and assistant messages).
         *   Appends these elements to the history display area.
-    *   After a new response is received from the API, update the history in `sessionStorage` using `saveConversationTurn` for both the user's input and the assistant's response, and then call `displayConversationHistory` to refresh the displayed history.
+    *   After a new response is received from the API, update the history in `sessionStorage` using `saveConversationTurn` for both the user's input and the assistant's response, and then call `displayConversationHistory` to refresh the displayed history. **(Implemented in `src/index.html`)**
 
 **Phase 4: Testing**
   Status: In Progress

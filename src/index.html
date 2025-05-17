@@ -16,11 +16,63 @@
     <div id="recommendation-output"></div>
 
     <script>
+        const userId = 'test-user'; // Using a static user ID for MVP
+        const historyStorageKey = `conversationHistory_${userId}`;
+
+        // Function to save conversation turn to sessionStorage
+        function saveConversationTurn(role, content) {
+            const history = getConversationHistory();
+            history.push({ role, content });
+            sessionStorage.setItem(historyStorageKey, JSON.stringify(history));
+        }
+
+        // Function to get conversation history from sessionStorage
+        function getConversationHistory() {
+            const historyString = sessionStorage.getItem(historyStorageKey);
+            return historyString ? JSON.parse(historyString) : [];
+        }
+
+        // Function to clear conversation history from sessionStorage
+        function clearConversationHistory() {
+            sessionStorage.removeItem(historyStorageKey);
+            displayConversationHistory([]); // Clear displayed history as well
+        }
+
+        // Function to display conversation history in the UI
+        function displayConversationHistory(history) {
+            const recommendationOutput = document.getElementById('recommendation-output');
+            recommendationOutput.innerHTML = ''; // Clear current content
+
+            history.forEach(turn => {
+                const p = document.createElement('p');
+                p.innerHTML = `<strong>${turn.role}:</strong> ${turn.content}`;
+                recommendationOutput.appendChild(p);
+            });
+        }
+
+        // Initial display of history on page load
+        displayConversationHistory(getConversationHistory());
+
         document.getElementById('get-recommendation').addEventListener('click', async () => {
             const userInput = document.getElementById('user-input').value;
             const recommendationOutput = document.getElementById('recommendation-output');
 
-            recommendationOutput.innerHTML = 'Getting recommendation...';
+            if (!userInput.trim()) {
+                alert('Please enter your preferences or ingredients.');
+                return;
+            }
+
+            // Get current history and add user input
+            const conversationHistory = getConversationHistory();
+            saveConversationTurn('user', userInput); // Save user turn immediately
+
+            // Update display with user input
+            displayConversationHistory(getConversationHistory());
+
+            // Clear input field
+            document.getElementById('user-input').value = '';
+
+            // recommendationOutput.innerHTML = 'Getting recommendation...'; // This will be cleared by displayConversationHistory
 
             try {
                 const response = await fetch('http://localhost:3000/api/recommendations', {
@@ -29,27 +81,38 @@
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        userId: 'test-user', // Using a static user ID for MVP
+                        userId: userId,
                         input: {
-                            preferences: { // Assuming preference-based input for now
-                                wineType: 'red' // Use a valid default wine type for basic MVP
-                            }
+                            message: userInput // Sending user input as message
+                            // preferences can be added here if the UI supports structured input
                         },
-                        conversationHistory: [] // No conversation history for basic MVP
+                        conversationHistory: conversationHistory // Include history in the request
                     }),
                 });
 
                 const data = await response.json();
 
                 if (response.ok) {
-                    recommendationOutput.innerHTML = '<strong>Recommendation:</strong> ' + JSON.stringify(data.recommendation, null, 2);
+                    const assistantResponse = data.recommendation ? JSON.stringify(data.recommendation, null, 2) : (data.error || 'No recommendation provided.');
+                     saveConversationTurn('assistant', assistantResponse); // Save assistant turn
                 } else {
-                    recommendationOutput.innerHTML = '<strong>Error:</strong> ' + (data.error || 'Unknown error');
+                    const errorResponse = data.error || 'Unknown error';
+                    saveConversationTurn('assistant', 'Error: ' + errorResponse); // Save error as assistant turn
                 }
             } catch (error) {
-                recommendationOutput.innerHTML = '<strong>Error:</strong> ' + error.message;
+                saveConversationTurn('assistant', 'Error: ' + error.message); // Save error as assistant turn
+            } finally {
+                 // Always update display after API call (success or failure)
+                 displayConversationHistory(getConversationHistory());
             }
         });
+
+        // Optional: Add a button to clear history for testing
+        // const clearHistoryButton = document.createElement('button');
+        // clearHistoryButton.textContent = 'Clear History';
+        // clearHistoryButton.addEventListener('click', clearConversationHistory);
+        // document.body.insertBefore(clearHistoryButton, document.getElementById('recommendation-output'));
+
     </script>
 </body>
 </html>

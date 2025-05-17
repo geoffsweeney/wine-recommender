@@ -83,7 +83,18 @@ Output: { "isValid": false, "error": "Input is not related to wine." }
         console.log('InputValidationAgent: Received LLM response for validation.');
         console.log('InputValidationAgent: Raw LLM response:', llmResponse); // Added logging
         try {
-          const validationOutput: LLMValidationOutput = JSON.parse(llmResponse);
+          // Extract JSON string from the LLM response
+          const jsonMatch = llmResponse.match(/```json\n([\s\S]*?)\n```/);
+          let jsonString = llmResponse; // Default to full response if markers not found
+
+          if (jsonMatch && jsonMatch[1]) {
+            jsonString = jsonMatch[1];
+            console.log('InputValidationAgent: Extracted JSON string:', jsonString); // Added logging
+          } else {
+             console.warn('InputValidationAgent: Could not find ```json\n...\n``` markers in LLM response. Attempting to parse full response.'); // Added logging
+          }
+
+          const validationOutput: LLMValidationOutput = JSON.parse(jsonString);
           console.log('InputValidationAgent: Parsed validation output:', validationOutput); // Added logging
 
 
