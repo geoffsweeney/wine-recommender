@@ -59,5 +59,39 @@ describe('RecommendationAgent', () => {
 
     await expect(recommendationAgent.handleMessage(message)).rejects.toThrow(error);
     expect(mockDeadLetterProcessor.process).toHaveBeenCalledWith(message, error, expect.any(Object));
+    expect(mockDeadLetterProcessor.process).toHaveBeenCalledWith(message, error, expect.any(Object));
+  });
+
+  it('should include conversation history in the prompt sent to the LLM for preference-based requests', async () => {
+    const userId = 'history-user-rec';
+    const conversationHistory = [
+      { role: 'user', content: 'I like dry red wine.' },
+      { role: 'assistant', content: 'That is a great choice!' },
+    ];
+    const message = {
+      userId: userId,
+      input: { preferences: { foodPairing: 'pasta' } },
+      conversationHistory: conversationHistory,
+    };
+
+    const wines = [{ id: '3', name: 'Wine C', region: 'Region C', type: 'Red' }];
+    mockKnowledgeGraphService.findWinesByPreferences.mockResolvedValue(wines);
+    mockLLMService.sendPrompt.mockResolvedValue(JSON.stringify({ recommendedWines: wines }));
+
+    await recommendationAgent.handleMessage(message);
+
+    // Expect KnowledgeGraphService to be called with preferences
+    expect(mockKnowledgeGraphService.findWinesByPreferences).toHaveBeenCalledWith(message.input.preferences);
+
+    // Expect LLMService.sendPrompt to have been called
+    expect(mockLLMService.sendPrompt).toHaveBeenCalled();
+
+    // Get the prompt that was sent to the LLM
+    const sentPrompt = mockLLMService.sendPrompt.mock.calls[0][0];
+
+    // Verify that the prompt includes elements from the conversation history
+    expect(sentPrompt).toContain(conversationHistory[0].content);
+    expect(sentPrompt).toContain(conversationHistory[1].content);
+    expect(sentPrompt).toContain(JSON.stringify(message.input.preferences)); // Check if preferences are included
   });
 });

@@ -107,7 +107,11 @@ describe('Recommendations Integration', () => {
     addToDlqSpy = jest.spyOn(mockDlqProcessorInstance, 'addToDLQ'); // Spy on mocked instance
 
     // Resolve the Coordinator instance for the current test (it will use the mocked agents)
-    mockCoordinator = container.resolve(SommelierCoordinator); // Removed incorrect casting
+    // Spy on the handleMessage method of the SommelierCoordinator prototype
+    jest.spyOn(SommelierCoordinator.prototype, 'handleMessage');
+
+    // Resolve the Coordinator instance for the current test (it will use the mocked agents)
+    mockCoordinator = container.resolve(SommelierCoordinator);
 
     // Create a new server instance for each test
     app = createServer();
@@ -244,5 +248,67 @@ describe('Recommendations Integration', () => {
     expect(typeof response.body.recommendation).toBe('string');
     expect(response.body.recommendation).toContain('Based on your preferences, we recommend:'); // Check for expected prefix
     expect(response.body.recommendation).toContain('Food Pairing Wine 1'); // Check for expected wine name
+  });
+
+  describe('Conversation History Handling', () => {
+    it('should process a request with conversation history', async () => {
+      // Mock the RecommendationAgent's handleMessage for this specific test
+      mockRecommendationAgentInstance.handleMessage.mockResolvedValue({
+        recommendation: "Recommendation based on history."
+      });
+
+      const userId = 'history-user-1';
+      const initialRequest = {
+        userId: userId,
+        input: { preferences: { wineType: 'red' } },
+        conversationHistory: []
+      };
+
+      // First request
+      await request(app)
+        .post('/api/recommendations')
+        .send(initialRequest)
+        .expect(200);
+
+      // Assuming the SommelierCoordinator adds the turn to history,
+      // the next request for the same user should include it.
+      // We need to manually construct the history for the second request
+      // as the frontend would.
+      const historyAfterFirstTurn = [
+        { role: 'user', content: JSON.stringify(initialRequest.input) }, // Simplified representation
+        { role: 'assistant', content: JSON.stringify({ recommendation: "Recommendation based on history." }) } // Simplified representation
+      ];
+
+      const subsequentRequest = {
+        userId: userId,
+        input: { preferences: { foodPairing: 'pasta' } },
+        conversationHistory: historyAfterFirstTurn
+      };
+
+      // Mock the RecommendationAgent's handleMessage for the second request
+      mockRecommendationAgentInstance.handleMessage.mockResolvedValue({
+        recommendation: "Recommendation based on history and pasta."
+      });
+
+      // Second request with history
+      const response = await request(app)
+        .post('/api/recommendations')
+        .send(subsequentRequest)
+        .expect(200);
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveProperty('recommendation');
+      expect(response.body.recommendation).toBe("Recommendation based on history and pasta.");
+
+      // Verify that SommelierCoordinator's handleMessage was called with the correct history
+      // Note: This checks what the API passes to the coordinator, not necessarily
+      // what the coordinator does with the history internally.
+      expect(mockCoordinator.handleMessage).toHaveBeenCalledWith(subsequentRequest);
+    });
+
+    // TODO: Add more integration tests for conversation history, e.g.,
+    // - Testing with an empty conversationHistory array
+    // - Testing with multiple turns in history
+    // - Testing how different agents might use the history (requires more specific mocks)
   });
 });

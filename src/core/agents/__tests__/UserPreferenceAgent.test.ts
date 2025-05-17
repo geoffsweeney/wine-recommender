@@ -197,4 +197,33 @@ describe('UserPreferenceAgent Integration with AgentCommunicationBus', () => {
 
     expect(result).toEqual({ error: 'Invalid structure in LLM preference response.', preferences: {} });
   });
+
+  it('should include conversation history in the prompt sent to the LLM', async () => {
+    const userId = 'history-user';
+    const conversationHistory = [
+      { role: 'user', content: 'I like dry red wine.' },
+      { role: 'assistant', content: 'That is a great choice!' },
+    ];
+    const testMessage = {
+      userId: userId,
+      input: { userInput: 'What about a wine for pasta?' },
+      conversationHistory: conversationHistory,
+    };
+
+    const mockLlmResponse = '{"preferences": {"foodPairing": "pasta"}}';
+    mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(mockLlmResponse);
+
+    await agent.handleMessage(testMessage);
+
+    // Expect AgentCommunicationBus.sendLLMPrompt to have been called
+    expect(mockCommunicationBusInstance.sendLLMPrompt).toHaveBeenCalled();
+
+    // Get the prompt that was sent to the LLM
+    const sentPrompt = mockCommunicationBusInstance.sendLLMPrompt.mock.calls[0][0];
+
+    // Verify that the prompt includes elements from the conversation history
+    expect(sentPrompt).toContain(conversationHistory[0].content);
+    expect(sentPrompt).toContain(conversationHistory[1].content);
+    expect(sentPrompt).toContain(testMessage.input.userInput);
+  });
 });

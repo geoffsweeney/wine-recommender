@@ -87,4 +87,34 @@ describe('FallbackAgent Integration with LLMService', () => {
     // Expect a default fallback message on error
     expect(result).toEqual({ recommendation: 'Sorry, I encountered an issue and cannot provide a recommendation at this time. Please try again later.' });
   });
+
+  it('should include conversation history in the prompt sent to the LLM for fallback', async () => {
+    const userId = 'history-user-fallback';
+    const conversationHistory = [
+      { role: 'user', content: 'This is the first message.' },
+      { role: 'assistant', content: 'This is the first response.' },
+    ];
+    const testUserInput = 'This is the unhandled query.';
+    const message = {
+      userId: userId,
+      input: testUserInput,
+      conversationHistory: conversationHistory,
+    };
+
+    const mockLlmResponse = 'I am sorry, I cannot help with that based on our history.';
+    mockLlmServiceInstance.sendPrompt.mockResolvedValue(mockLlmResponse);
+
+    await agent.handleMessage(message);
+
+    // Expect LLMService.sendPrompt to have been called
+    expect(mockLlmServiceInstance.sendPrompt).toHaveBeenCalled();
+
+    // Get the prompt that was sent to the LLM
+    const sentPrompt = mockLlmServiceInstance.sendPrompt.mock.calls[0][0];
+
+    // Verify that the prompt includes elements from the conversation history and user input
+    expect(sentPrompt).toContain(conversationHistory[0].content);
+    expect(sentPrompt).toContain(conversationHistory[1].content);
+    expect(sentPrompt).toContain(testUserInput);
+  });
 });

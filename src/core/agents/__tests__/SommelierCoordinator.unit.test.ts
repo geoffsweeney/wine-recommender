@@ -182,9 +182,9 @@ describe('SommelierCoordinator Unit Tests', () => {
     const result = await sommelierCoordinator.handleMessage(message as any);
 
     // Expect InputValidationAgent to be called with the message content
-    expect(mockInputValidationAgent.handleMessage).toHaveBeenCalledWith(message.input.message);
-    // Expect RecommendationAgent to be called with extracted ingredients, not preferences from the original message
-    expect(mockRecommendationAgent.handleMessage).toHaveBeenCalledWith({ input: { ingredients: mockValidationResult.processedInput.ingredients }, conversationHistory: message.conversationHistory });
+    expect(mockInputValidationAgent.handleMessage).toHaveBeenCalledWith({ input: message.input.message, conversationHistory: message.conversationHistory });
+    // Expect RecommendationAgent to be called with extracted ingredients and preferences from the validation result
+    expect(mockRecommendationAgent.handleMessage).toHaveBeenCalledWith({ input: { ingredients: mockValidationResult.processedInput.ingredients, preferences: mockValidationResult.processedInput.preferences }, conversationHistory: message.conversationHistory });
     expect(result).toEqual(mockRecommendationResult);
   });
 
@@ -199,7 +199,7 @@ describe('SommelierCoordinator Unit Tests', () => {
     const result = await sommelierCoordinator.handleMessage(message as any);
 
     // Expect InputValidationAgent to be called with the message content
-    expect(mockInputValidationAgent.handleMessage).toHaveBeenCalledWith(message.input.message);
+    expect(mockInputValidationAgent.handleMessage).toHaveBeenCalledWith({ input: message.input.message, conversationHistory: message.conversationHistory });
     // Expect RecommendationAgent to be called with preferences from the original message
     expect(mockRecommendationAgent.handleMessage).toHaveBeenCalledWith({ input: { preferences: message.input.preferences }, conversationHistory: message.conversationHistory });
     expect(result).toEqual(mockRecommendationResult);
@@ -265,7 +265,7 @@ describe('SommelierCoordinator Unit Tests', () => {
       { source: 'SommelierCoordinator', stage: 'UserPreferenceAgent' }
     );
     // Expect RecommendationAgent to still be called
-    expect(mockRecommendationAgent.handleMessage).toHaveBeenCalledWith({ input: message.input, conversationHistory: message.conversationHistory });
+    expect(mockRecommendationAgent.handleMessage).toHaveBeenCalledWith({ input: { preferences: message.input.preferences }, conversationHistory: message.conversationHistory });
   });
 
   it('should catch and log errors from MCPAdapterAgent and continue orchestration', async () => {

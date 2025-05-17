@@ -2,6 +2,7 @@ import { inject, injectable } from 'tsyringe';
 import { Agent } from './Agent';
 import { AgentCommunicationBus } from '../AgentCommunicationBus'; // Import AgentCommunicationBus
 import { DeadLetterProcessor } from '../DeadLetterProcessor'; // Import DeadLetterProcessor
+import { ConversationTurn } from '../ConversationHistoryService'; // Import ConversationTurn interface
 
 // Define a type for the expected structured output from the LLM
 interface LLMValidationOutput {
@@ -24,7 +25,7 @@ export class InputValidationAgent implements Agent {
     return 'InputValidationAgent';
   }
 
-  async handleMessage(message: string): Promise<{ isValid: boolean; processedInput?: { ingredients?: string[], preferences?: { [key: string]: any } }; error?: string }> {
+  async handleMessage(message: { input: string; conversationHistory?: ConversationTurn[] }): Promise<{ isValid: boolean; processedInput?: { ingredients?: string[], preferences?: { [key: string]: any } }; error?: string }> {
     console.log('InputValidationAgent received message:', message);
 
     if (!this.communicationBus) {
@@ -32,15 +33,16 @@ export class InputValidationAgent implements Agent {
       return { isValid: false, error: 'Communication bus not available' };
     }
 
-    if (typeof message !== 'string' || message.trim() === '') {
-      return { isValid: false, error: 'Invalid input: message must be a non-empty string.' };
+    // Validate that the input property is a non-empty string
+    if (typeof message.input !== 'string' || message.input.trim() === '') {
+      return { isValid: false, error: 'Invalid input: message input must be a non-empty string.' };
     }
 
     // --- LLM Integration for Input Validation and Extraction ---
     try {
       console.log('InputValidationAgent: Sending input to LLM for validation and extraction.');
       // Formulate a prompt for the LLM to validate and extract structured data
-      const llmPrompt = `Analyze the following user input for a wine recommendation request. Determine if it's a valid request and extract key information like ingredients or wine preferences. Provide the output strictly in JSON format with the following structure:
+      let llmPrompt = `Analyze the following user input for a wine recommendation request. Determine if it's a valid request and extract key information like ingredients or wine preferences. Provide the output strictly in JSON format with the following structure:
 {
 "isValid": boolean, // true if the input is valid and contains recognizable ingredients or preferences, false otherwise.
 "ingredients"?: string[], // An array of extracted ingredients if applicable.
@@ -60,7 +62,18 @@ Output: { "isValid": true, "preferences": { "sweetness": "sweet", "wineType": "w
 User Input: "Tell me about cars"
 Output: { "isValid": false, "error": "Input is not related to wine." }
 
-User Input: "${message}"`;
+`;
+
+      // Include conversation history if available
+      if (message.conversationHistory && message.conversationHistory.length > 0) {
+        llmPrompt += "Conversation History:\n";
+        message.conversationHistory.forEach(turn => {
+          llmPrompt += `${turn.role}: ${turn.content}\n`;
+        });
+        llmPrompt += "\n"; // Add a newline for separation
+      }
+
+      llmPrompt += `User Input: "${message.input}"`; // Use message.input
 
       console.log('InputValidationAgent: Calling communicationBus.sendLLMPrompt');
       const llmResponse = await this.communicationBus.sendLLMPrompt(llmPrompt);

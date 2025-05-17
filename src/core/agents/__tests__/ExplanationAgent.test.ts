@@ -116,4 +116,34 @@ describe('ExplanationAgent', () => {
     // as tsyringe ensures the dependency is provided.
   });
   */
+
+  it('should include conversation history in the prompt sent to the LLM for explanation', async () => {
+    const userId = 'history-user-exp';
+    const conversationHistory = [
+      { role: 'user', content: 'I like dry red wine.' },
+      { role: 'assistant', content: 'That is a great choice!' },
+    ];
+    const testRecommendationResult = { wine: 'Sample Wine', details: '...' };
+    const message = {
+      userId: userId,
+      recommendationResult: testRecommendationResult,
+      conversationHistory: conversationHistory,
+    };
+
+    const mockLlmExplanation = 'This wine is great because... based on our chat.';
+    mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(mockLlmExplanation);
+
+    await agent.handleMessage(message);
+
+    // Expect AgentCommunicationBus.sendLLMPrompt to have been called
+    expect(mockCommunicationBusInstance.sendLLMPrompt).toHaveBeenCalled();
+
+    // Get the prompt that was sent to the LLM
+    const sentPrompt = mockCommunicationBusInstance.sendLLMPrompt.mock.calls[0][0];
+
+    // Verify that the prompt includes elements from the conversation history
+    expect(sentPrompt).toContain(conversationHistory[0].content);
+    expect(sentPrompt).toContain(conversationHistory[1].content);
+    expect(sentPrompt).toContain(JSON.stringify(message, null, 2)); // Check if the entire message is included
+  });
 });

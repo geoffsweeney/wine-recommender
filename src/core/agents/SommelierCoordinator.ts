@@ -60,7 +60,10 @@ export class SommelierCoordinator implements Agent {
         this.logger.info('SommelierCoordinator: Processing message content for input validation.'); // Use logger
         // Use SharedContextMemory to pass input to InputValidationAgent
         this.communicationBus.setContext(this.getName(), 'inputMessage', message.input.message);
-        const validationResult = await this.inputValidationAgent.handleMessage(message.input.message);
+        const validationResult = await this.inputValidationAgent.handleMessage({
+          input: message.input.message,
+          conversationHistory: conversationHistory,
+        });
         this.logger.info('SommelierCoordinator: Input validation result:', validationResult); // Log validation result
 
         // Use SharedContextMemory to retrieve result from InputValidationAgent (assuming agent sets it)
@@ -75,7 +78,11 @@ export class SommelierCoordinator implements Agent {
 
         if (validationResult.processedInput && validationResult.processedInput.ingredients && validationResult.processedInput.ingredients.length > 0) {
           this.logger.info('SommelierCoordinator: Detected ingredient-based request from message.'); // Use logger
+          // Use ingredients from validation result, and include preferences if also extracted
           recommendationInput = { ingredients: validationResult.processedInput.ingredients };
+          if (validationResult.processedInput.preferences) {
+              recommendationInput.preferences = validationResult.processedInput.preferences;
+          }
         } else {
            this.logger.info('SommelierCoordinator: Message processed, but no ingredients found. Checking preferences.'); // Use logger
            // Fall through to check preferences if no ingredients were found in the message

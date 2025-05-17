@@ -1,5 +1,6 @@
 import "reflect-metadata";
 import express from 'express'; // Import express
+import cors from 'cors'; // Import cors middleware
 import { LLMService } from './services/LLMService'; // Adjust the import path to the actual location of LLMService
 import { container } from 'tsyringe'; // Ensure tsyringe is imported for dependency injection
 import { AgentCommunicationBus } from './core/AgentCommunicationBus'; // Adjust the import path as necessary
@@ -55,6 +56,7 @@ container.registerInstance('logger', logger);
 
 // Create and configure the Express application
 const app = express();
+app.use(cors()); // Enable CORS for all origins
 app.use(express.json()); // Middleware to parse JSON bodies
 
 // Define routes here
@@ -70,6 +72,7 @@ app.listen(PORT, () => {
 });
 export const createServer = () => {
   const app = express();
+  app.use(cors()); // Enable CORS for all origins
   app.use(express.json());
 
   app.use('/api', apiRateLimiter, createRouter());

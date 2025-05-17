@@ -12,7 +12,7 @@ export const RecommendationRequest = z.object({
     message: z.string().optional(), // Keep message optional within input
   }).strict(), // Ensure no extra properties in input
   conversationHistory: z.array(z.object({
-    role: z.string(),
+    role: z.enum(['user', 'assistant']),
     content: z.string()
   })).optional()
 });

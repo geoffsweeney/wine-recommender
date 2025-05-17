@@ -1,6 +1,6 @@
 import { injectable } from 'tsyringe';
 
-interface ConversationTurn {
+export interface ConversationTurn {
   role: 'user' | 'assistant';
   content: string;
 }

@@ -18,4 +18,22 @@ describe('MCPAdapterAgent', () => {
 
     expect(result).toEqual({ status: 'MCP tool call simulated (basic)', receivedInput: testMessage });
   });
+
+  it('should include conversation history in the acknowledgment', async () => {
+    const userId = 'history-user-mcp';
+    const conversationHistory = [
+      { role: 'user', content: 'Call tool X.' },
+      { role: 'assistant', content: 'Calling tool X.' },
+    ];
+    const testMessage = {
+      userId: userId,
+      tool: 'some_tool',
+      params: { id: '456' },
+      conversationHistory: conversationHistory,
+    };
+
+    const result = await agent.handleMessage(testMessage);
+
+    expect(result).toEqual({ status: 'MCP tool call simulated (basic)', receivedInput: testMessage });
+  });
 });

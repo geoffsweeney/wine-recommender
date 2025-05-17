@@ -1,3 +1,4 @@
+import { ConversationTurn } from '../../ConversationHistoryService';
 import "reflect-metadata";
 import { container } from 'tsyringe';
 import { InputValidationAgent } from '../InputValidationAgent';
@@ -56,7 +57,7 @@ describe('InputValidationAgent Integration with AgentCommunicationBus', () => {
 
     mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(mockLlmResponse);
 
-    const result = await agent.handleMessage(testUserInput);
+    const result = await agent.handleMessage({ input: testUserInput });
 
     expect(mockCommunicationBusInstance.sendLLMPrompt).toHaveBeenCalled();
     const sentPrompt = mockCommunicationBusInstance.sendLLMPrompt.mock.calls[0][0];
@@ -76,7 +77,7 @@ describe('InputValidationAgent Integration with AgentCommunicationBus', () => {
     const testUserInput = 'Tell me about beer';
     mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(undefined);
 
-    const result = await agent.handleMessage(testUserInput);
+    const result = await agent.handleMessage({ input: testUserInput });
 
     expect(mockCommunicationBusInstance.sendLLMPrompt).toHaveBeenCalled();
     expect(result).toEqual({
@@ -90,11 +91,11 @@ describe('InputValidationAgent Integration with AgentCommunicationBus', () => {
     const mockError = new Error('LLM API error');
     mockCommunicationBusInstance.sendLLMPrompt.mockRejectedValue(mockError);
 
-    const result = await agent.handleMessage(testUserInput);
+    const result = await agent.handleMessage({ input: testUserInput });
 
     expect(mockCommunicationBusInstance.sendLLMPrompt).toHaveBeenCalled();
     expect(processSpy).toHaveBeenCalledWith(
-      testUserInput,
+      { input: testUserInput },
       expect.any(Error),
       { source: agent.getName(), stage: 'LLMValidation' }
     );
@@ -109,7 +110,7 @@ describe('InputValidationAgent Integration with AgentCommunicationBus', () => {
     const invalidJsonResponse = 'This is not JSON';
     mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(invalidJsonResponse);
 
-    const result = await agent.handleMessage(testUserInput);
+    const result = await agent.handleMessage({ input: testUserInput });
 
     expect(mockCommunicationBusInstance.sendLLMPrompt).toHaveBeenCalled();
     expect(result.isValid).toBe(false);
@@ -121,16 +122,16 @@ describe('InputValidationAgent Integration with AgentCommunicationBus', () => {
     const emptyInput = '';
     const whitespaceInput = '   ';
 
-    let result = await agent.handleMessage(emptyInput);
+    let result = await agent.handleMessage({ input: emptyInput });
     expect(result).toEqual({
       isValid: false,
-      error: 'Invalid input: message must be a non-empty string.',
+      error: 'Invalid input: message input must be a non-empty string.',
     });
 
-    result = await agent.handleMessage(whitespaceInput);
+    result = await agent.handleMessage({ input: whitespaceInput });
     expect(result).toEqual({
       isValid: false,
-      error: 'Invalid input: message must be a non-empty string.',
+      error: 'Invalid input: message input must be a non-empty string.',
     });
   });
 
@@ -140,7 +141,7 @@ describe('InputValidationAgent Integration with AgentCommunicationBus', () => {
 
     mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(mockLlmResponse);
 
-    const result = await agent.handleMessage(testUserInput);
+    const result = await agent.handleMessage({ input: testUserInput });
 
     expect(mockCommunicationBusInstance.sendLLMPrompt).toHaveBeenCalled();
     expect(result).toEqual({
@@ -155,7 +156,7 @@ describe('InputValidationAgent Integration with AgentCommunicationBus', () => {
 
     mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(mockLlmResponse);
 
-    const result = await agent.handleMessage(testUserInput);
+    const result = await agent.handleMessage({ input: testUserInput });
 
     expect(mockCommunicationBusInstance.sendLLMPrompt).toHaveBeenCalled();
     expect(result).toEqual({
@@ -173,7 +174,7 @@ describe('InputValidationAgent Integration with AgentCommunicationBus', () => {
 
     mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(mockLlmResponse);
 
-    const result = await agent.handleMessage(testUserInput);
+    const result = await agent.handleMessage({ input: testUserInput });
 
     expect(mockCommunicationBusInstance.sendLLMPrompt).toHaveBeenCalled();
     expect(result).toEqual({
@@ -191,7 +192,7 @@ describe('InputValidationAgent Integration with AgentCommunicationBus', () => {
 
     mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(mockLlmResponse);
 
-    const result = await agent.handleMessage(testUserInput);
+    const result = await agent.handleMessage({ input: testUserInput });
 
     expect(mockCommunicationBusInstance.sendLLMPrompt).toHaveBeenCalled();
     expect(result.isValid).toBe(false);
@@ -204,7 +205,7 @@ describe('InputValidationAgent Integration with AgentCommunicationBus', () => {
 
     mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(mockLlmResponse);
 
-    const result = await agent.handleMessage(testUserInput);
+    const result = await agent.handleMessage({ input: testUserInput });
 
     expect(mockCommunicationBusInstance.sendLLMPrompt).toHaveBeenCalled();
     expect(result.isValid).toBe(false);
@@ -217,7 +218,7 @@ describe('InputValidationAgent Integration with AgentCommunicationBus', () => {
 
     mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(mockLlmResponse);
 
-    const result = await agent.handleMessage(testUserInput);
+    const result = await agent.handleMessage({ input: testUserInput });
 
     expect(mockCommunicationBusInstance.sendLLMPrompt).toHaveBeenCalled();
     expect(result.isValid).toBe(false);
@@ -230,7 +231,7 @@ describe('InputValidationAgent Integration with AgentCommunicationBus', () => {
 
     mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(mockLlmResponse);
 
-    const result = await agent.handleMessage(testUserInput);
+    const result = await agent.handleMessage({ input: testUserInput });
 
     expect(mockCommunicationBusInstance.sendLLMPrompt).toHaveBeenCalled();
     expect(result.isValid).toBe(false);
@@ -242,7 +243,7 @@ describe('InputValidationAgent Integration with AgentCommunicationBus', () => {
   it('should handle when AgentCommunicationBus is not available', async () => {
     // @ts-ignore
     agent = new InputValidationAgent(undefined, mockDeadLetterProcessor);
-    const result = await agent.handleMessage('test');
+    const result = await agent.handleMessage({ input: 'test' });
     expect(result).toEqual({ isValid: false, error: 'Communication bus not available' });
   });
 
@@ -251,7 +252,7 @@ describe('InputValidationAgent Integration with AgentCommunicationBus', () => {
     const mockLlmResponse = '{"ingredients": ["grape"], "preferences": {}}';
     mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(mockLlmResponse);
 
-    const result = await agent.handleMessage(testUserInput);
+    const result = await agent.handleMessage({ input: testUserInput });
 
     expect(result.isValid).toBe(false);
     expect(result.error).toContain('Invalid structure in LLM validation response: missing or invalid "isValid".');
@@ -262,7 +263,7 @@ describe('InputValidationAgent Integration with AgentCommunicationBus', () => {
     const mockLlmResponse = '{"isValid": true, "ingredients": ["grape"], "preferences": {}, "extra": 123}';
     mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(mockLlmResponse);
 
-    const result = await agent.handleMessage(testUserInput);
+    const result = await agent.handleMessage({ input: testUserInput });
 
     expect(result.isValid).toBe(true);
     expect(result.processedInput).toEqual({
@@ -276,36 +277,67 @@ describe('InputValidationAgent Integration with AgentCommunicationBus', () => {
     const mockLlmResponse = '{"isValid": true, "ingredients": null, "preferences": null}';
     mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(mockLlmResponse);
 
-    const result = await agent.handleMessage(testUserInput);
+    const result = await agent.handleMessage({ input: testUserInput });
 
     // null is not an array/object, so should error
     expect(result.isValid).toBe(false);
     expect(result.error).toContain('Invalid structure in LLM validation response: "ingredients" is not an array.');
   });
+  
+    it('should include conversation history in the prompt sent to the LLM for validation', async () => {
+      const userId = 'history-user-validation';
 
-  it('should handle when LLM response has undefined for optional fields', async () => {
-    const testUserInput = 'Undefined fields';
-    // JSON.stringify omits undefined, so this is same as missing fields
-    const mockLlmResponse = '{"isValid": true}';
-    mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(mockLlmResponse);
-
-    const result = await agent.handleMessage(testUserInput);
-
-    expect(result.isValid).toBe(true);
-    expect(result.processedInput).toEqual({
-      ingredients: undefined,
-      preferences: undefined,
+      const conversationHistory: ConversationTurn[] = [
+        { role: 'user', content: 'My first message.' },
+        { role: 'assistant', content: 'My first response.' },
+      ];
+      const testInput = 'My second message.';
+      const message = {
+        userId: userId,
+        input: testInput,
+        conversationHistory: conversationHistory,
+      };
+  
+      const mockLlmResponse = '{"isValid": true, "processedInput": {}}';
+      mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(mockLlmResponse);
+  
+      await agent.handleMessage(message);
+  
+      // Expect AgentCommunicationBus.sendLLMPrompt to have been called
+      expect(mockCommunicationBusInstance.sendLLMPrompt).toHaveBeenCalled();
+  
+      // Get the prompt that was sent to the LLM
+      const sentPrompt = mockCommunicationBusInstance.sendLLMPrompt.mock.calls[0][0];
+  
+      // Verify that the prompt includes elements from the conversation history and current input
+      expect(sentPrompt).toContain(conversationHistory[0].content);
+      expect(sentPrompt).toContain(conversationHistory[1].content);
+      expect(sentPrompt).toContain(testInput);
+    });
+  
+    it('should handle when LLM response has undefined for optional fields', async () => {
+      const testUserInput = 'Undefined fields';
+      // JSON.stringify omits undefined, so this is same as missing fields
+      const mockLlmResponse = '{"isValid": true}';
+      mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(mockLlmResponse);
+  
+      const result = await agent.handleMessage({ input: testUserInput });
+  
+      expect(result.isValid).toBe(true);
+      expect(result.processedInput).toEqual({
+        ingredients: undefined,
+        preferences: undefined,
+      });
+    });
+  
+    it('should handle when LLM response has empty object', async () => {
+      const testUserInput = 'Empty object';
+      const mockLlmResponse = '{}';
+      mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(mockLlmResponse);
+  
+      const result = await agent.handleMessage({ input: testUserInput });
+  
+      expect(result.isValid).toBe(false);
+      expect(result.error).toContain('Invalid structure in LLM validation response: missing or invalid "isValid".');
     });
   });
-
-  it('should handle when LLM response has empty object', async () => {
-    const testUserInput = 'Empty object';
-    const mockLlmResponse = '{}';
-    mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(mockLlmResponse);
-
-    const result = await agent.handleMessage(testUserInput);
-
-    expect(result.isValid).toBe(false);
-    expect(result.error).toContain('Invalid structure in LLM validation response: missing or invalid "isValid".');
-  });
-});

@@ -17,6 +17,7 @@
     }
   },
   "devDependencies": {
+    "@types/cors": "^2.8.18",
     "@types/express": "^5.0.1",
     "@types/jest": "^29.5.14",
     "@types/node": "^22.15.3",
@@ -38,6 +39,7 @@
     "@types/winston": "^2.4.4",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
+    "cors": "^2.8.5",
     "express-rate-limit": "^7.5.0",
     "neo4j-driver": "^5.28.1",
     "rate-limiter-flexible": "^7.1.0",

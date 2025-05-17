@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wine Recommendation App</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; }
+        #recommendation-output { margin-top: 20px; border: 1px solid #ccc; padding: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Get a Wine Recommendation</h1>
+    <input type="text" id="user-input" placeholder="Enter your preferences or ingredients">
+    <button id="get-recommendation">Get Recommendation</button>
+    <div id="recommendation-output"></div>
+
+    <script>
+        document.getElementById('get-recommendation').addEventListener('click', async () => {
+            const userInput = document.getElementById('user-input').value;
+            const recommendationOutput = document.getElementById('recommendation-output');
+
+            recommendationOutput.innerHTML = 'Getting recommendation...';
+
+            try {
+                const response = await fetch('http://localhost:3000/api/recommendations', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        userId: 'test-user', // Using a static user ID for MVP
+                        input: {
+                            preferences: { // Assuming preference-based input for now
+                                wineType: 'red' // Use a valid default wine type for basic MVP
+                            }
+                        },
+                        conversationHistory: [] // No conversation history for basic MVP
+                    }),
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    recommendationOutput.innerHTML = '<strong>Recommendation:</strong> ' + JSON.stringify(data.recommendation, null, 2);
+                } else {
+                    recommendationOutput.innerHTML = '<strong>Error:</strong> ' + (data.error || 'Unknown error');
+                }
+            } catch (error) {
+                recommendationOutput.innerHTML = '<strong>Error:</strong> ' + error.message;
+            }
+        });
+    </script>
+</body>
+</html>
