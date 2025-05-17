@@ -36,4 +36,16 @@ it('should return a successful response for a valid recommendation request', asy
     console.log('Test response:', response.body); // Log the response body for debugging
     expect(response.body).toHaveProperty('recommendation'); // Check for the recommendation property
   }, 30000); // Increased timeout to 30 seconds
+
+  it('should return a successful response for a valid ingredient-based recommendation request', async () => {
+    const response = await request(app).post('/api/recommendations').send({
+      userId: 'test-user-ingredient',
+      input: { // Wrap ingredients in the 'input' property
+        ingredients: ['beef']
+      },
+      conversationHistory: [] // Include an empty conversation history array
+    });
+    console.log('Test response (ingredient-based):', response.body); // Log the response body for debugging
+    expect(response.body).toHaveProperty('recommendation'); // Check for the recommendation property
+  }, 30000); // Increased timeout to 30 seconds
 });

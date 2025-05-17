@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const RecommendationRequest = z.object({
   userId: z.string().min(1, 'User ID is required'),
-  input: z.object({ // Wrap preferences and message in an 'input' object
+  input: z.object({ // Wrap preferences, message, and ingredients in an 'input' object
     preferences: z.object({
       wineType: z.enum(['red', 'white', 'sparkling', 'rose']).optional().default('red'),
       priceRange: z.tuple([z.number().min(0), z.number().min(0)]).optional(),
@@ -10,7 +10,8 @@ export const RecommendationRequest = z.object({
       excludeAllergens: z.array(z.string()).optional()
     }).strict().optional(), // Make preferences optional within input
     message: z.string().optional(), // Keep message optional within input
-  }).strict(), // Ensure no extra properties in input
+    ingredients: z.array(z.string()).optional(), // Add ingredients as an optional array of strings
+  }), // Allow other properties in input (removed .strict())
   conversationHistory: z.array(z.object({
     role: z.enum(['user', 'assistant']),
     content: z.string()

@@ -4,7 +4,7 @@ This plan outlines the essential features and steps required to implement a Mini
 
 ## Related Plans
 
-- **Conversation History Implementation Plan:** A separate plan detailing the implementation of conversation history support, including backend, API, and frontend modifications. See [`memory-bank/conversation_history_plan.md`](memory-bank/conversation_history_plan.md).
+- **Conversation History Implementation Plan:** A separate plan detailing the implementation of conversation history support, including backend, API, and frontend modifications. See [`memory-bank/conversation_history_plan.md`](memory-bank/conversation_history_plan.md). **(Completed - Conversation history feature implemented)**
 
 ## MVP Features and Implementation Steps
 
@@ -62,13 +62,14 @@ Here are the features required for the MVP, ordered for optimal implementation f
 ### 5. Implement Basic User Interface (Without Conversation History)
 
 **Goal:** Provide a simple interface for users to interact with the recommendation system, focusing on a single request/response cycle. Conversation history is planned separately.
+**Note:** The Conversation History feature has been implemented as a related plan.
 
-**Status:** Remaining
+**Status:** Completed
 
 **Detailed Steps:**
 
-- Create a new frontend page (e.g., in the `src/app` directory if using Next.js App Router, or `src/pages` if using Pages Router) with a text input field and a button.
-- Implement logic to capture user input from the text field.
+- Created a basic frontend page ([`src/index.html`](src/index.html)) with a text input field and a button.
+- Implemented logic to capture user input from the text field.
 - On button click, send a POST request with the user input (formatted as a recommendation request body) to the `/api/recommendations` endpoint.
 - Display the recommendation received in the API response on the page.
 
@@ -76,12 +77,12 @@ Here are the features required for the MVP, ordered for optimal implementation f
 
 **Goal:** Ensure the core end-to-end recommendation flow is verified with automated tests.
 
-**Status:** Partially Completed
+**Status:** Completed
 
 **Detailed Steps:**
 
-- Write a specific end-to-end test case in [`src/api/__tests__/e2e.test.ts`](src/api/__tests__/e2e.test.ts) that provides ingredient-based input and asserts on the expected recommendation output.
-- Ensure all existing and newly added basic end-to-end tests for the `/api/recommendations` endpoint (covering both preference and ingredient-based inputs) are passing.
+- Added a specific end-to-end test case in [`src/api/__tests__/e2e.test.ts`](src/api/__tests__/e2e.test.ts) that provides ingredient-based input and asserts on the expected recommendation output.
+- Ensured all existing and newly added basic end-to-end tests for the `/api/recommendations` endpoint (covering both preference and ingredient-based inputs) are passing.
 
 ## Progress Tracker
 
@@ -97,6 +98,9 @@ Here are the features required for the MVP, ordered for optimal implementation f
   - Fixed integration test errors in `recommendations.integration.test.ts`.
   - Verified `/api/recommendations` endpoint input handling and response formatting.
   - Implemented basic rate limiting middleware and applied it to `/api` routes, with associated tests passing.
-- [ ] 5. Implement Basic User Interface
-- [ ] 6. Finalize Basic End-to-End Testing
-  - Fixed integration test errors in `recommendations.integration.test.ts`.
+- [x] Conversation History Feature (Implemented as a related plan)
+- [x] 5. Implement Basic User Interface
+- [x] 6. Finalize Basic End-to-End Testing
+  - Added end-to-end test for ingredient-based input and ensured all end-to-end tests are passing.
+
+The MVP is now complete according to this plan.

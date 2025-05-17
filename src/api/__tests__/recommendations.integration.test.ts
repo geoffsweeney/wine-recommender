@@ -306,9 +306,62 @@ describe('Recommendations Integration', () => {
       expect(mockCoordinator.handleMessage).toHaveBeenCalledWith(subsequentRequest);
     });
 
-    // TODO: Add more integration tests for conversation history, e.g.,
-    // - Testing with an empty conversationHistory array
-    // - Testing with multiple turns in history
-    // - Testing how different agents might use the history (requires more specific mocks)
+    it('should process a request with an empty conversation history array', async () => {
+      // Mock the RecommendationAgent's handleMessage for this specific test
+      mockRecommendationAgentInstance.handleMessage.mockResolvedValue({
+        recommendation: "Recommendation based on empty history."
+      });
+
+      const userId = 'history-user-empty';
+      const requestBody = {
+        userId: userId,
+        input: { preferences: { wineType: 'white' } },
+        conversationHistory: [] // Empty history array
+      };
+
+      const response = await request(app)
+        .post('/api/recommendations')
+        .send(requestBody)
+        .expect(200);
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveProperty('recommendation');
+      expect(response.body.recommendation).toBe("Recommendation based on empty history.");
+
+      // Verify that SommelierCoordinator's handleMessage was called with the empty history
+      expect(mockCoordinator.handleMessage).toHaveBeenCalledWith(requestBody);
+    });
+
+    it('should process a request with multiple turns in conversation history', async () => {
+      // Mock the RecommendationAgent's handleMessage for this specific test
+      mockRecommendationAgentInstance.handleMessage.mockResolvedValue({
+        recommendation: "Recommendation based on multiple history turns."
+      });
+
+      const userId = 'history-user-multi';
+      const conversationHistory = [
+        { role: 'user', content: 'First message.' },
+        { role: 'assistant', content: 'First response.' },
+        { role: 'user', content: 'Second message.' },
+        { role: 'assistant', content: 'Second response.' },
+      ];
+      const requestBody = {
+        userId: userId,
+        input: { preferences: { foodPairing: 'beef' } },
+        conversationHistory: conversationHistory // Multiple turns in history
+      };
+
+      const response = await request(app)
+        .post('/api/recommendations')
+        .send(requestBody)
+        .expect(200);
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveProperty('recommendation');
+      expect(response.body.recommendation).toBe("Recommendation based on multiple history turns.");
+
+      // Verify that SommelierCoordinator's handleMessage was called with the multiple turns history
+      expect(mockCoordinator.handleMessage).toHaveBeenCalledWith(requestBody);
+    });
   });
 });

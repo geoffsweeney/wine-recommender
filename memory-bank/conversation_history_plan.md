@@ -64,7 +64,7 @@
 1.  **Unit Tests:**
     *   Unit tests for `SommelierCoordinator` have been reviewed and failing tests related to conversation history handling are being addressed.
     *   Unit tests for the `ConversationHistoryService` have been created.
-    *   Add unit tests for the modified DTO and other relevant agents to ensure they correctly handle conversation history.
+    *   Add unit tests for the modified DTO and other relevant agents to ensure they correctly handle conversation history. **(Remaining unit tests for conversation history handling have been added.)**
 2.  **Integration Tests:**
     *   Create integration tests for the `/recommendations` endpoint to verify that conversation history is correctly passed, stored (in-memory), and utilized through the system.
 3.  **Frontend Tests:**
