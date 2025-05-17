@@ -13,6 +13,16 @@
     <h1>Get a Wine Recommendation</h1>
     <input type="text" id="user-input" placeholder="Enter your preferences or ingredients">
     <button id="get-recommendation">Get Recommendation</button>
+    <button id="clear-history">Clear History</button> <!-- Added Clear History button -->
+
+    <div>
+        <label for="recommendation-source">Recommendation Source:</label>
+        <select id="recommendation-source">
+            <option value="knowledgeGraph">Knowledge Graph</option>
+            <option value="llm">LLM</option>
+        </select>
+    </div>
+
     <div id="recommendation-output"></div>
 
     <script>
@@ -56,6 +66,7 @@
         document.getElementById('get-recommendation').addEventListener('click', async () => {
             const userInput = document.getElementById('user-input').value;
             const recommendationOutput = document.getElementById('recommendation-output');
+            const recommendationSource = document.getElementById('recommendation-source').value; // Get selected source
 
             if (!userInput.trim()) {
                 alert('Please enter your preferences or ingredients.');
@@ -83,7 +94,8 @@
                     body: JSON.stringify({
                         userId: userId,
                         input: {
-                            message: userInput // Sending user input as message
+                            message: userInput, // Sending user input as message
+                            recommendationSource: recommendationSource // Include selected source
                             // preferences can be added here if the UI supports structured input
                         },
                         conversationHistory: conversationHistory // Include history in the request
@@ -107,11 +119,8 @@
             }
         });
 
-        // Optional: Add a button to clear history for testing
-        // const clearHistoryButton = document.createElement('button');
-        // clearHistoryButton.textContent = 'Clear History';
-        // clearHistoryButton.addEventListener('click', clearConversationHistory);
-        // document.body.insertBefore(clearHistoryButton, document.getElementById('recommendation-output'));
+        // Event listener for the Clear History button
+        document.getElementById('clear-history').addEventListener('click', clearConversationHistory);
 
     </script>
 </body>

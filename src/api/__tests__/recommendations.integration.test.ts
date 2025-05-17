@@ -75,6 +75,10 @@ describe('Recommendations Integration', () => {
     container.register(RecommendationAgent, { useValue: mockRecommendationAgentInstance }); // Use the mocked instance
 
     // Register the newly mocked agents and communication bus
+    const MockLLMRecommendationAgent = require('../../core/agents/LLMRecommendationAgent').LLMRecommendationAgent as jest.Mock<any>;
+    const mockLLMRecommendationAgentInstance = new MockLLMRecommendationAgent() as jest.Mocked<any>; // Create mock instance
+    container.register(MockLLMRecommendationAgent, { useValue: mockLLMRecommendationAgentInstance }); // Register LLMRecommendationAgent mock
+
     container.register(ValueAnalysisAgent, { useValue: mockValueAnalysisAgentInstance });
     container.register(UserPreferenceAgent, { useValue: mockUserPreferenceAgentInstance });
     container.register(ExplanationAgent, { useValue: mockExplanationAgentInstance });

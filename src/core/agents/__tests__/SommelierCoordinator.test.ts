@@ -51,47 +51,54 @@ describe('SommelierCoordinator', () => {
         MockAgentCommunicationBus.mockClear();
 
         // Register the mock logger with the container
-        container.register('Logger', { useValue: mockLogger });
+        container.register('logger', { useValue: mockLogger }); // Corrected token to 'logger'
 
         // Mock dependencies (ensure return types match the agents' updated signatures)
         mockInputValidationAgent = { handleMessage: jest.fn(), getName: () => 'MockInputValidationAgent' } as any;
-        // ... rest of the code remains the same ...
+        mockRecommendationAgent = { handleMessage: jest.fn(), getName: () => 'MockRecommendationAgent' } as any;
+        mockValueAnalysisAgent = { handleMessage: jest.fn(), getName: () => 'MockValueAnalysisAgent' } as any;
+        mockUserPreferenceAgent = { handleMessage: jest.fn(), getName: () => 'MockUserPreferenceAgent' } as any;
+        mockExplanationAgent = { handleMessage: jest.fn(), getName: () => 'MockExplanationAgent' } as any;
+        mockMCPAdapterAgent = { handleMessage: jest.fn(), getName: () => 'MockMCPAdapterAgent' } as any;
+        mockFallbackAgent = { handleMessage: jest.fn(), getName: () => 'MockFallbackAgent' } as any;
+        mockDeadLetterProcessor = { process: jest.fn() } as any;
+        mockCommunicationBus = new MockAgentCommunicationBus() as any; // Use the mocked communication bus
+        mockConversationHistoryService = { // Create mock ConversationHistoryService here
+            addConversationTurn: jest.fn(),
+            getConversationHistory: jest.fn().mockReturnValue([]), // Default to returning empty history
+            clearConversationHistory: jest.fn(),
+        } as any; // Use 'any' to avoid strict type checking for the mock
+
+        // Register all mocked dependencies in the container
+        container.registerInstance(InputValidationAgent, mockInputValidationAgent);
+        container.registerInstance(RecommendationAgent, mockRecommendationAgent);
+        // Register LLMRecommendationAgent mock
+        const MockLLMRecommendationAgent = require('../LLMRecommendationAgent').LLMRecommendationAgent as jest.Mock<any>;
+        const mockLLMRecommendationAgent = { handleMessage: jest.fn().mockResolvedValue({ recommendation: 'LLM recommendation' }), getName: () => 'MockLLMRecommendationAgent' } as any;
+        container.registerInstance(MockLLMRecommendationAgent, mockLLMRecommendationAgent);
+
+        container.registerInstance(ValueAnalysisAgent, mockValueAnalysisAgent);
+        container.registerInstance(UserPreferenceAgent, mockUserPreferenceAgent);
+        container.registerInstance(ExplanationAgent, mockExplanationAgent);
+        container.registerInstance(MCPAdapterAgent, mockMCPAdapterAgent);
+        container.registerInstance(FallbackAgent, mockFallbackAgent);
+        container.registerInstance(BasicDeadLetterProcessor, mockDeadLetterProcessor);
+        container.registerInstance(AgentCommunicationBus, mockCommunicationBus);
+        container.registerInstance(ConversationHistoryService, mockConversationHistoryService); // Register mock ConversationHistoryService
+
+        // Resolve the SommelierCoordinator
+        sommelierCoordinator = container.resolve(SommelierCoordinator);
     });
 
-   beforeEach(() => {
-       // Create a new mock instance for ConversationHistoryService before each test
-       mockConversationHistoryService = {
-           addConversationTurn: jest.fn(),
-           getConversationHistory: jest.fn().mockReturnValue([]), // Default to returning empty history
-           clearConversationHistory: jest.fn(),
-       } as any; // Use 'any' to avoid strict type checking for the mock
-   });
+    afterEach(() => {
+        // Clear mock calls after each test
+        jest.clearAllMocks();
+    });
 
-   test('should create an instance of SommelierCoordinator', () => {
-        const mockInputValidationAgent = { handleMessage: jest.fn(), getName: () => 'MockInputValidationAgent' } as any;
-        const mockRecommendationAgent = { handleMessage: jest.fn(), getName: () => 'MockRecommendationAgent' } as any;
-        const mockValueAnalysisAgent = { handleMessage: jest.fn(), getName: () => 'MockValueAnalysisAgent' } as any;
-        const mockUserPreferenceAgent = { handleMessage: jest.fn(), getName: () => 'MockUserPreferenceAgent' } as any;
-        const mockExplanationAgent = { handleMessage: jest.fn(), getName: () => 'MockExplanationAgent' } as any;
-        const mockMCPAdapterAgent = { handleMessage: jest.fn(), getName: () => 'MockMCPAdapterAgent' } as any;
-        const mockFallbackAgent = { handleMessage: jest.fn(), getName: () => 'MockFallbackAgent' } as any;
-        const mockDeadLetterProcessor = { process: jest.fn() } as any;
-        const mockCommunicationBus = new MockAgentCommunicationBus() as any; // Use the mocked communication bus
-
-        sommelierCoordinator = new SommelierCoordinator(
-            mockInputValidationAgent,
-            mockRecommendationAgent,
-            mockValueAnalysisAgent,
-            mockUserPreferenceAgent,
-            mockExplanationAgent,
-            mockMCPAdapterAgent,
-            mockFallbackAgent,
-            mockDeadLetterProcessor,
-            mockCommunicationBus,
-            mockConversationHistoryService, // Provide mock ConversationHistoryService
-            mockLogger
-        ); // Create an instance with mocked dependencies
-
+    test('should create an instance of SommelierCoordinator', () => {
         expect(sommelierCoordinator).toBeDefined(); // Check if the instance is defined
     });
-}); // Close the describe block
+
+    // Add other tests for SommelierCoordinator functionality here, using the resolved instance
+    // For example, you can add tests similar to the unit tests but using the resolved coordinator
+});

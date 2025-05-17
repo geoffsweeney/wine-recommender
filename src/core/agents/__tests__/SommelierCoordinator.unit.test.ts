@@ -74,6 +74,11 @@ describe('SommelierCoordinator Unit Tests', () => {
     // Register mocks in the container
     container.registerInstance(InputValidationAgent, mockInputValidationAgent);
     container.registerInstance(RecommendationAgent, mockRecommendationAgent);
+    // Register LLMRecommendationAgent mock
+    const MockLLMRecommendationAgent = require('../LLMRecommendationAgent').LLMRecommendationAgent as jest.Mock<any>;
+    const mockLLMRecommendationAgent = { handleMessage: jest.fn().mockResolvedValue({ recommendation: 'LLM recommendation' }), getName: () => 'MockLLMRecommendationAgent' } as any;
+    container.registerInstance(MockLLMRecommendationAgent, mockLLMRecommendationAgent);
+
     container.registerInstance(ValueAnalysisAgent, mockValueAnalysisAgent);
     container.registerInstance(UserPreferenceAgent, mockUserPreferenceAgent);
     container.registerInstance(ExplanationAgent, mockExplanationAgent);
@@ -99,7 +104,7 @@ describe('SommelierCoordinator Unit Tests', () => {
   });
 
   it('should process a preference-based message and call RecommendationAgent with preferences', async () => {
-    const message = { userId: 'test-user', input: { preferences: { wineType: "red", priceRange: [20, 50] } }, conversationHistory: [] };
+    const message = { userId: 'test-user', input: { preferences: { wineType: "red", priceRange: [20, 50] }, recommendationSource: 'knowledgeGraph' }, conversationHistory: [] }; // Added recommendationSource
     const mockRecommendationResult = { recommendedWines: [{ id: 'wine-1', name: 'Test Red', type: 'red', price: 30, region: 'Test Region', rating: 4 }] }; // Updated mock result structure
 
     // Mock the RecommendationAgent's handleMessage to return a specific result
@@ -126,7 +131,7 @@ describe('SommelierCoordinator Unit Tests', () => {
   });
 
   it('should send a message to the dead letter queue when InputValidationAgent fails', async () => {
-    const invalidMessage = { userId: 'test-user', input: { message: 'invalid input' }, conversationHistory: [] };
+    const invalidMessage = { userId: 'test-user', input: { message: 'invalid input', recommendationSource: 'knowledgeGraph' }, conversationHistory: [] }; // Added recommendationSource
     const validationError = new Error('Validation failed');
     // Mock InputValidationAgent to return an object matching its new signature
     mockInputValidationAgent.handleMessage.mockResolvedValue({ isValid: false, error: validationError.message });
@@ -145,7 +150,7 @@ describe('SommelierCoordinator Unit Tests', () => {
   });
 
   it('should send a message to the dead letter queue when RecommendationAgent fails', async () => {
-    const validMessage = { userId: 'test-user', input: { preferences: { wineType: 'red' } }, conversationHistory: [] };
+    const validMessage = { userId: 'test-user', input: { preferences: { wineType: 'red' }, recommendationSource: 'knowledgeGraph' }, conversationHistory: [] }; // Added recommendationSource
     const recommendationError = new Error('Recommendation failed');
     // Mock InputValidationAgent to return an object matching its new signature
     mockInputValidationAgent.handleMessage.mockResolvedValue({ isValid: true, processedInput: { ingredients: [] } }); // Mock successful validation
@@ -172,7 +177,7 @@ describe('SommelierCoordinator Unit Tests', () => {
 
   // Add more unit test cases for SommelierCoordinator here...
   it('should process a message with both message and preferences, prioritizing message for ingredient extraction', async () => {
-    const message = { userId: 'test-user', input: { message: 'wine with cheese', preferences: { wineType: "red" } }, conversationHistory: [] };
+    const message = { userId: 'test-user', input: { message: 'wine with cheese', preferences: { wineType: "red" }, recommendationSource: 'knowledgeGraph' }, conversationHistory: [] }; // Added recommendationSource
     const mockValidationResult = { isValid: true, processedInput: { ingredients: ['cheese'], preferences: {} } }; // Validation extracts ingredients
     const mockRecommendationResult = { recommendedWines: [{ id: 'wine-2', name: 'Test White', type: 'white', price: 25, region: 'Test Region', rating: 4.5 }] };
 
@@ -189,7 +194,7 @@ describe('SommelierCoordinator Unit Tests', () => {
   });
 
   it('should process a message with message but no extractable info, falling back to preferences', async () => {
-    const message = { userId: 'test-user', input: { message: 'general query', preferences: { wineType: "white" } }, conversationHistory: [] };
+    const message = { userId: 'test-user', input: { message: 'general query', preferences: { wineType: "white" }, recommendationSource: 'knowledgeGraph' }, conversationHistory: [] }; // Added recommendationSource
     const mockValidationResult = { isValid: true, processedInput: { ingredients: [], preferences: {} } }; // Validation finds no ingredients/preferences
     const mockRecommendationResult = { recommendedWines: [{ id: 'wine-3', name: 'Test Rose', type: 'rose', price: 15, region: 'Test Region', rating: 3.5 }] };
 
@@ -206,7 +211,7 @@ describe('SommelierCoordinator Unit Tests', () => {
   });
 
   it('should use FallbackAgent when neither message nor preferences are provided', async () => {
-    const message = { userId: 'test-user', input: {}, conversationHistory: [] }; // No message or preferences in input
+    const message = { userId: 'test-user', input: { recommendationSource: 'knowledgeGraph' }, conversationHistory: [] }; // Added recommendationSource
     const mockFallbackResult = { recommendation: 'Fallback recommendation for no input' };
 
     mockFallbackAgent.handleMessage.mockResolvedValue(mockFallbackResult);
@@ -225,7 +230,7 @@ describe('SommelierCoordinator Unit Tests', () => {
   });
 
   it('should catch and log errors from ValueAnalysisAgent and continue orchestration', async () => {
-    const message = { userId: 'test-user', input: { preferences: { wineType: 'red' } }, conversationHistory: [] };
+    const message = { userId: 'test-user', input: { preferences: { wineType: 'red' }, recommendationSource: 'knowledgeGraph' }, conversationHistory: [] }; // Added recommendationSource
     const vaError = new Error('Value analysis failed');
     const mockRecommendationResult = { recommendedWines: [] };
 
@@ -247,7 +252,7 @@ describe('SommelierCoordinator Unit Tests', () => {
   });
 
   it('should catch and log errors from UserPreferenceAgent and continue orchestration', async () => {
-    const message = { userId: 'test-user', input: { preferences: { wineType: 'red' } }, conversationHistory: [] };
+    const message = { userId: 'test-user', input: { preferences: { wineType: 'red' }, recommendationSource: 'knowledgeGraph' }, conversationHistory: [] }; // Added recommendationSource
     const upError = new Error('User preference failed');
     const mockRecommendationResult = { recommendedWines: [] };
 
@@ -269,7 +274,7 @@ describe('SommelierCoordinator Unit Tests', () => {
   });
 
   it('should catch and log errors from MCPAdapterAgent and continue orchestration', async () => {
-    const message = { userId: 'test-user', input: { preferences: { wineType: 'red' } }, conversationHistory: [] };
+    const message = { userId: 'test-user', input: { preferences: { wineType: 'red' }, recommendationSource: 'knowledgeGraph' }, conversationHistory: [] }; // Added recommendationSource
     const mcpError = new Error('MCP adapter failed');
     const mockRecommendationResult = { recommendedWines: [] };
 
@@ -291,7 +296,7 @@ describe('SommelierCoordinator Unit Tests', () => {
   });
 
   it('should catch and log errors from ExplanationAgent and continue orchestration', async () => {
-    const message = { userId: 'test-user', input: { preferences: { wineType: 'red' } }, conversationHistory: [] };
+    const message = { userId: 'test-user', input: { preferences: { wineType: 'red' }, recommendationSource: 'knowledgeGraph' }, conversationHistory: [] }; // Added recommendationSource
     const expError = new Error('Explanation failed');
     const mockRecommendationResult = { recommendedWines: [] };
 
@@ -313,7 +318,7 @@ describe('SommelierCoordinator Unit Tests', () => {
   });
 
   it('should catch RecommendationAgent error returned within result and send to dead letter queue', async () => {
-    const message = { userId: 'test-user', input: { preferences: { wineType: 'red' } }, conversationHistory: [] };
+    const message = { userId: 'test-user', input: { preferences: { wineType: 'red' }, recommendationSource: 'knowledgeGraph' }, conversationHistory: [] }; // Added recommendationSource
     const recommendationErrorResult = { error: 'No wines found for preferences' }; // Error within result
 
     mockRecommendationAgent.handleMessage.mockResolvedValue(recommendationErrorResult);
@@ -330,5 +335,82 @@ describe('SommelierCoordinator Unit Tests', () => {
       expect.any(Error), // Expecting an Error object
       { source: 'SommelierCoordinator', stage: 'RecommendationAgent' }
     );
+  });
+
+  it('should route recommendation requests based on recommendationSource', async () => {
+    const knowledgeGraphMessage = { userId: 'test-user', input: { preferences: { wineType: 'red' }, recommendationSource: 'knowledgeGraph' }, conversationHistory: [] };
+    const llmMessage = { userId: 'test-user', input: { message: 'recommend a wine', preferences: { wineType: 'red' }, recommendationSource: 'llm' }, conversationHistory: [] };
+
+    // Mock handleMessage for both agents
+    mockRecommendationAgent.handleMessage.mockResolvedValue({ recommendedWines: [] });
+
+    // Need to mock LLMRecommendationAgent as well
+    const MockLLMRecommendationAgent = require('../LLMRecommendationAgent').LLMRecommendationAgent as jest.Mock<any>;
+    const mockLLMRecommendationAgent = { handleMessage: jest.fn().mockResolvedValue({ recommendation: 'LLM recommendation' }), getName: () => 'MockLLMRecommendationAgent' } as any;
+
+    // Test with knowledgeGraph source
+    // Register LLMRecommendationAgent mock before resolving the coordinator for this test
+    container.registerInstance(MockLLMRecommendationAgent, mockLLMRecommendationAgent);
+    // Re-resolve the coordinator to pick up the new mock
+    sommelierCoordinator = container.resolve(SommelierCoordinator);
+
+    await sommelierCoordinator.handleMessage(knowledgeGraphMessage as any);
+    expect(mockRecommendationAgent.handleMessage).toHaveBeenCalled();
+    expect(mockLLMRecommendationAgent.handleMessage).not.toHaveBeenCalled();
+
+    // Clear mocks and test with llm source
+    jest.clearAllMocks();
+
+    // Re-mock handleMessage for LLMRecommendationAgent after clearing mocks
+    mockLLMRecommendationAgent.handleMessage.mockResolvedValue({ recommendation: 'LLM recommendation' });
+
+    // Reset and re-register all mocks to ensure container state is correct
+    container.clearInstances();
+    container.reset();
+    container.registerInstance(InputValidationAgent, mockInputValidationAgent);
+    container.registerInstance(RecommendationAgent, mockRecommendationAgent);
+    container.registerInstance(ValueAnalysisAgent, mockValueAnalysisAgent);
+    container.registerInstance(UserPreferenceAgent, mockUserPreferenceAgent);
+    container.registerInstance(ExplanationAgent, mockExplanationAgent);
+    container.registerInstance(MCPAdapterAgent, mockMCPAdapterAgent);
+    container.registerInstance(FallbackAgent, mockFallbackAgent);
+    container.registerInstance(BasicDeadLetterProcessor, mockDeadLetterProcessor);
+    container.registerInstance(KnowledgeGraphService, mockKnowledgeGraphService);
+    container.registerInstance(AgentCommunicationBus, mockCommunicationBusInstance);
+    container.registerInstance(MockLLMRecommendationAgent, mockLLMRecommendationAgent);
+    // Register mock logger
+    const mockLogger = {
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+    } as any;
+    container.registerInstance('logger', mockLogger);
+
+    sommelierCoordinator = container.resolve(SommelierCoordinator);
+
+    await sommelierCoordinator.handleMessage(llmMessage as any);
+    expect(mockRecommendationAgent.handleMessage).not.toHaveBeenCalled();
+    expect(mockLLMRecommendationAgent.handleMessage).toHaveBeenCalled();
+  });
+
+  it('should default to RecommendationAgent when recommendationSource is not provided', async () => {
+    const defaultMessage = { userId: 'test-user', input: { preferences: { wineType: 'red' } }, conversationHistory: [] }; // Omitted recommendationSource
+    const mockRecommendationResult = { recommendedWines: [{ id: 'wine-default', name: 'Default Red', type: 'red', price: 40, region: 'Default Region', rating: 4.2 }] };
+
+    mockRecommendationAgent.handleMessage.mockResolvedValue(mockRecommendationResult);
+    // Ensure LLMRecommendationAgent is not called
+    const MockLLMRecommendationAgent = require('../LLMRecommendationAgent').LLMRecommendationAgent as jest.Mock<any>;
+    const mockLLMRecommendationAgent = { handleMessage: jest.fn().mockResolvedValue({ recommendation: 'LLM recommendation' }), getName: () => 'MockLLMRecommendationAgent' } as any;
+    container.registerInstance(MockLLMRecommendationAgent, mockLLMRecommendationAgent);
+    // Re-resolve the coordinator to pick up the new mock
+    sommelierCoordinator = container.resolve(SommelierCoordinator);
+
+
+    await sommelierCoordinator.handleMessage(defaultMessage as any);
+
+    // Expect RecommendationAgent to have been called
+    expect(mockRecommendationAgent.handleMessage).toHaveBeenCalledWith({ input: { preferences: defaultMessage.input.preferences }, conversationHistory: defaultMessage.conversationHistory });
+    // Expect LLMRecommendationAgent NOT to have been called
+    expect(mockLLMRecommendationAgent.handleMessage).not.toHaveBeenCalled();
   });
 });

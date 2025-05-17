@@ -75,6 +75,10 @@ export const createServer = () => {
   app.use(cors()); // Enable CORS for all origins
   app.use(express.json());
 
+  // Instantiate and register LLMService with actual values for the test environment
+  const llmService = new LLMService('http://localhost:11434', 'llama3.1:latest', 'your-api-key');
+  container.registerInstance(LLMService, llmService); // Register with class token
+
   app.use('/api', apiRateLimiter, createRouter());
 
   return app;

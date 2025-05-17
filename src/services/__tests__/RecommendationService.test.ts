@@ -42,7 +42,8 @@ const validRecommendationRequest: RecommendationRequest = {
       foodPairing: 'pasta',
       excludeAllergens: ['sulfites']
     },
-    message: 'Looking for a nice red wine.'
+    message: 'Looking for a nice red wine.',
+    recommendationSource: 'knowledgeGraph' // Added recommendationSource
   },
   conversationHistory: [] // Add empty conversation history for type compatibility
 };
@@ -86,7 +87,8 @@ test('should return placeholder recommendations for minimal request', async () =
         foodPairing: '', // Keep as empty string
         excludeAllergens: [] // Keep as empty array
       },
-      message: ''
+      message: '',
+      recommendationSource: 'knowledgeGraph' // Added recommendationSource
     },
     conversationHistory: [] // Add empty conversation history for type compatibility
   };

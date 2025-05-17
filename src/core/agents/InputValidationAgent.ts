@@ -42,25 +42,30 @@ export class InputValidationAgent implements Agent {
     try {
       console.log('InputValidationAgent: Sending input to LLM for validation and extraction.');
       // Formulate a prompt for the LLM to validate and extract structured data
-      let llmPrompt = `Analyze the following user input for a wine recommendation request. Determine if it's a valid request and extract key information like ingredients or wine preferences. Provide the output strictly in JSON format with the following structure:
+      let llmPrompt = `Analyze the following user input for a wine recommendation request. Determine if it's a valid request and extract all mentioned ingredients and wine preferences. Focus on identifying specific ingredients and any details about them (e.g., how they are prepared). Provide the output strictly in JSON format with the following structure:
 {
 "isValid": boolean, // true if the input is valid and contains recognizable ingredients or preferences, false otherwise.
-"ingredients"?: string[], // An array of extracted ingredients if applicable.
-"preferences"?: { [key: string]: any }, // An object containing extracted wine preferences if applicable.
+"ingredients"?: string[], // An array of extracted ingredients (e.g., ["beef", "roasted potatoes", "asparagus"]). Be as specific as possible.
+"preferences"?: { [key: string]: any }, // An object containing extracted wine preferences (e.g., { "wineType": "red", "sweetness": "dry" }).
 "error"?: string // A descriptive error message if isValid is false.
 }
 
-If the input is invalid, set "isValid" to false and provide a clear "error" message. Do not include any other text in the response.
+If the input is invalid (not related to wine or food pairing for wine), set "isValid" to false and provide a clear "error" message.
+
+Process the LAST "User Input" provided below and return ONLY the JSON output for that input. Do NOT include any examples, extra text, or comments in the response.
 
 Examples:
 User Input: "I need a red wine for pasta with tomato sauce"
-Output: { "isValid": true, "preferences": { "foodPairing": "pasta with tomato sauce", "wineType": "red" } }
+Output: {"isValid": true, "preferences": {"foodPairing": "pasta with tomato sauce", "wineType": "red"}}
 
 User Input: "What's a good sweet white wine under $20?"
-Output: { "isValid": true, "preferences": { "sweetness": "sweet", "wineType": "white", "priceRange": [null, 20] } }
+Output: {"isValid": true, "preferences": {"sweetness": "sweet", "wineType": "white", "priceRange": [null, 20]}}
+
+User Input: "I'm making roasted chicken with herbs and root vegetables."
+Output: {"isValid": true, "ingredients": ["roasted chicken", "herbs", "root vegetables"]}
 
 User Input: "Tell me about cars"
-Output: { "isValid": false, "error": "Input is not related to wine." }
+Output: {"isValid": false, "error": "Input is not related to wine or food pairing for wine."}
 
 `;
 
@@ -110,12 +115,7 @@ Output: { "isValid": false, "error": "Input is not related to wine." }
             return { isValid: false, error: 'Invalid structure in LLM validation response: "ingredients" is not an array.' };
           }
 
-          if (
-            validationOutput.preferences !== undefined &&
-            (validationOutput.preferences === null ||
-              typeof validationOutput.preferences !== 'object' ||
-              Array.isArray(validationOutput.preferences))
-          ) {
+          if (validationOutput.preferences !== undefined && (validationOutput.preferences === null || typeof validationOutput.preferences !== 'object' || Array.isArray(validationOutput.preferences))) {
             console.error('InputValidationAgent: LLM response "preferences" field is not an object.');
             return { isValid: false, error: 'Invalid structure in LLM validation response: "preferences" is not an object.' };
           }
@@ -156,7 +156,6 @@ Output: { "isValid": false, "error": "Input is not related to wine." }
       await this.deadLetterProcessor.process(message, llmError instanceof Error ? llmError : new Error(llmError), { source: this.getName(), stage: 'LLMValidation' });
       return { isValid: false, error: 'Error communicating with LLM for validation.' };
     }
-   // --- End LLM Integration ---
  }
 }
 

@@ -1,3 +1,4 @@
+import { injectable } from 'tsyringe';
 import { logger } from '../utils/logger';
 /**
  * Service for interacting with the Language Model (LLM).
@@ -12,6 +13,7 @@ interface LLMResponse {
     // Add other fields if you expect them and need to use them
 }
 
+@injectable()
 export class LLMService {
     private apiUrl: string;
     private model: string;

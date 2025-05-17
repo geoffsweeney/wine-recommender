@@ -7,6 +7,7 @@ import { UserPreferenceAgent } from './UserPreferenceAgent';
 import { ExplanationAgent } from './ExplanationAgent';
 import { MCPAdapterAgent } from './MCPAdapterAgent';
 import { FallbackAgent } from './FallbackAgent';
+import { LLMRecommendationAgent } from './LLMRecommendationAgent'; // Import LLMRecommendationAgent
 import { RecommendationRequest } from '@src/api/dtos/RecommendationRequest.dto'; // Import DTO
 import { BasicDeadLetterProcessor } from '../BasicDeadLetterProcessor'; // Import BasicDeadLetterProcessor
 import { ConversationHistoryService } from '../ConversationHistoryService'; // Import ConversationHistoryService
@@ -21,6 +22,7 @@ export class SommelierCoordinator implements Agent {
   constructor(
     @inject(InputValidationAgent) private readonly inputValidationAgent: InputValidationAgent,
     @inject(RecommendationAgent) private readonly recommendationAgent: RecommendationAgent,
+    @inject(LLMRecommendationAgent) private readonly llmRecommendationAgent: LLMRecommendationAgent, // Inject LLMRecommendationAgent
     @inject(ValueAnalysisAgent) private readonly valueAnalysisAgent: ValueAnalysisAgent,
     @inject(UserPreferenceAgent) private readonly userPreferenceAgent: UserPreferenceAgent,
     @inject(ExplanationAgent) private readonly explanationAgent: ExplanationAgent,
@@ -34,6 +36,7 @@ export class SommelierCoordinator implements Agent {
     // Register agents with the communication bus
     this.communicationBus.registerAgent(this.inputValidationAgent.getName(), { name: this.inputValidationAgent.getName(), capabilities: ['input-validation'] });
     this.communicationBus.registerAgent(this.recommendationAgent.getName(), { name: this.recommendationAgent.getName(), capabilities: ['recommendation'] });
+    this.communicationBus.registerAgent(this.llmRecommendationAgent.getName(), { name: this.llmRecommendationAgent.getName(), capabilities: ['llm-recommendation'] }); // Register LLMRecommendationAgent
     this.communicationBus.registerAgent(this.valueAnalysisAgent.getName(), { name: this.valueAnalysisAgent.getName(), capabilities: ['value-analysis'] });
     this.communicationBus.registerAgent(this.userPreferenceAgent.getName(), { name: this.userPreferenceAgent.getName(), capabilities: ['user-preferences'] });
     this.communicationBus.registerAgent(this.explanationAgent.getName(), { name: this.explanationAgent.getName(), capabilities: ['explanation'] });
@@ -55,7 +58,7 @@ export class SommelierCoordinator implements Agent {
 
       let recommendationInput: any;
 
-      // Prioritize message content for ingredient parsing
+      // Prioritize message content for input validation and extraction
       if (message.input.message !== undefined) {
         this.logger.info('SommelierCoordinator: Processing message content for input validation.'); // Use logger
         // Use SharedContextMemory to pass input to InputValidationAgent
@@ -76,22 +79,24 @@ export class SommelierCoordinator implements Agent {
           return this.fallbackAgent.handleMessage({ error: validationResult?.error || 'Invalid input provided.', preferences: { wineType: 'Unknown' } });
         }
 
-        if (validationResult.processedInput && validationResult.processedInput.ingredients && validationResult.processedInput.ingredients.length > 0) {
-          this.logger.info('SommelierCoordinator: Detected ingredient-based request from message.'); // Use logger
-          // Use ingredients from validation result, and include preferences if also extracted
-          recommendationInput = { ingredients: validationResult.processedInput.ingredients };
-          if (validationResult.processedInput.preferences) {
-              recommendationInput.preferences = validationResult.processedInput.preferences;
+        if (validationResult.processedInput) {
+          if (validationResult.processedInput.ingredients && validationResult.processedInput.ingredients.length > 0) {
+            this.logger.info('SommelierCoordinator: Detected ingredient-based request from message.'); // Use logger
+            // Use ingredients from validation result, and include preferences if also extracted
+            recommendationInput = { ingredients: validationResult.processedInput.ingredients };
+            if (validationResult.processedInput.preferences) {
+                recommendationInput.preferences = validationResult.processedInput.preferences;
+            }
+          } else if (validationResult.processedInput.preferences && Object.keys(validationResult.processedInput.preferences).length > 0) {
+             this.logger.info('SommelierCoordinator: Detected preference-based request from message validation.'); // Use logger
+             recommendationInput = { preferences: validationResult.processedInput.preferences };
           }
-        } else {
-           this.logger.info('SommelierCoordinator: Message processed, but no ingredients found. Checking preferences.'); // Use logger
-           // Fall through to check preferences if no ingredients were found in the message
-         }
-       }
+        }
+      }
 
-       // If no ingredient-based input from message, check preferences
+       // If no input determined from message validation, check original preferences object
        if (!recommendationInput && message.input.preferences) {
-          this.logger.info('SommelierCoordinator: Detected preference-based request from preferences object.'); // Use logger
+          this.logger.info('SommelierCoordinator: Detected preference-based request from original preferences object.'); // Use logger
           recommendationInput = { preferences: message.input.preferences };
        }
        this.logger.info('SommelierCoordinator: Determined recommendation input:', recommendationInput); // Log determined input
@@ -153,75 +158,79 @@ export class SommelierCoordinator implements Agent {
        }
 
 
-       this.logger.info('SommelierCoordinator: Passing input to RecommendationAgent'); // Use logger
-        let recommendationResult;
-        try {
-          // Use SharedContextMemory to pass input to RecommendationAgent
-          this.communicationBus.setContext(this.getName(), 'recommendationInput', recommendationInput);
-          recommendationResult = await this.recommendationAgent.handleMessage({ input: recommendationInput, conversationHistory: conversationHistory });
-         // Use SharedContextMemory to retrieve result from RecommendationAgent (assuming agent sets it)
-          // recommendationResult = this.communicationBus.getContext(this.recommendationAgent.getName(), 'recommendationResult'); // This would be the pattern if agents set context
-          this.logger.info('SommelierCoordinator: Received recommendation result:', recommendationResult); // Use logger
+       let recommendationResult;
+       const recommendationSource = message.input.recommendationSource;
+       this.logger.info(`SommelierCoordinator: Recommendation source selected: ${recommendationSource}`);
 
-         // Check if the RecommendationAgent returned an error
-         if (recommendationResult && recommendationResult.error) {
-           this.logger.error('SommelierCoordinator: RecommendationAgent reported an error:', recommendationResult.error); // Use logger
-           // Throw an error to propagate the failure upstream
-           throw new Error(`Recommendation Agent Error: ${recommendationResult.error}`);
-         }
+       try {
+           // Use SharedContextMemory to pass input to the selected Recommendation Agent
+           this.communicationBus.setContext(this.getName(), 'recommendationInput', recommendationInput);
 
+           if (recommendationSource === 'llm') {
+               this.logger.info('SommelierCoordinator: Routing to LLMRecommendationAgent');
+               recommendationResult = await this.llmRecommendationAgent.handleMessage({ input: recommendationInput, conversationHistory: conversationHistory });
+           } else { // Default to knowledgeGraph if not 'llm' or if source is 'knowledgeGraph'
+               this.logger.info('SommelierCoordinator: Routing to RecommendationAgent (Knowledge Graph)');
+               recommendationResult = await this.recommendationAgent.handleMessage({ input: recommendationInput, conversationHistory: conversationHistory });
+           }
 
-         // Basic call to ExplanationAgent after recommendation
-         this.logger.info('SommelierCoordinator: Passing recommendation result to ExplanationAgent (Basic)'); // Use logger
-         this.logger.info('SommelierCoordinator: Calling ExplanationAgent with result:', recommendationResult); // Use logger
-        try {
-          // Use SharedContextMemory to pass input to ExplanationAgent
-          this.communicationBus.setContext(this.getName(), 'recommendationResult', recommendationResult);
-          const explanationResult = await this.explanationAgent.handleMessage(recommendationResult); // Basic call
-          // Use SharedContextMemory to retrieve result from ExplanationAgent (assuming agent sets it)
-          // const explanationResult = this.communicationBus.getContext(this.explanationAgent.getName(), 'explanationResult'); // This would be the pattern if agents set context
-          this.logger.info('SommelierCoordinator: ExplanationAgent call completed. Result:', explanationResult); // Log completion and result
-          // TODO: Integrate explanationResult into the final response if needed
-        } catch (error) {
-           this.logger.error('Error calling ExplanationAgent:', error); // Use logger
-           await this.deadLetterProcessor.process(message, error instanceof Error ? error : new Error('Error in ExplanationAgent.'), { source: this.getName(), stage: 'ExplanationAgent' });
-           // Decide how to handle this error - maybe continue or return a partial result?
-           // For now, we'll just log and continue, assuming subsequent agents might still provide value.
-         }
+           this.logger.info('SommelierCoordinator: Received recommendation result:', recommendationResult);
 
-         // Return the final result from the RecommendationAgent
-         this.logger.info('SommelierCoordinator: Returning final recommendation result:', recommendationResult); // Added log
+           // Check if the selected Recommendation Agent returned an error
+           if (recommendationResult && recommendationResult.error) {
+               this.logger.error(`SommelierCoordinator: ${recommendationSource === 'llm' ? 'LLMRecommendationAgent' : 'RecommendationAgent'} reported an error:`, recommendationResult.error);
+               // Throw an error to propagate the failure upstream
+               throw new Error(`${recommendationSource === 'llm' ? 'LLM Recommendation Agent' : 'Recommendation Agent'} Error: ${recommendationResult.error}`);
+           }
 
-         // Add user message and assistant response to history
-         if (message.input.message) {
-           this.conversationHistoryService.addConversationTurn(message.userId, { role: 'user', content: message.input.message });
-         }
-         // Assuming recommendationResult has a 'response' field with the assistant's message
-         if (recommendationResult && recommendationResult.response) {
-            this.conversationHistoryService.addConversationTurn(message.userId, { role: 'assistant', content: recommendationResult.response });
-         }
+           // Basic call to ExplanationAgent after recommendation
+           this.logger.info('SommelierCoordinator: Passing recommendation result to ExplanationAgent (Basic)');
+           this.logger.info('SommelierCoordinator: Calling ExplanationAgent with result:', recommendationResult);
+           try {
+               // Use SharedContextMemory to pass input to ExplanationAgent
+               this.communicationBus.setContext(this.getName(), 'recommendationResult', recommendationResult);
+               const explanationResult = await this.explanationAgent.handleMessage(recommendationResult); // Basic call
+               this.logger.info('SommelierCoordinator: ExplanationAgent call completed. Result:', explanationResult);
+               // TODO: Integrate explanationResult into the final response if needed
+           } catch (error) {
+               this.logger.error('Error calling ExplanationAgent:', error);
+               await this.deadLetterProcessor.process(message, error instanceof Error ? error : new Error('Error in ExplanationAgent.'), { source: this.getName(), stage: 'ExplanationAgent' });
+               // Decide how to handle this error - maybe continue or return a partial result?
+               // For now, we'll just log and continue, assuming subsequent agents might still provide value.
+           }
 
+           // Return the final result from the selected Recommendation Agent
+           this.logger.info('SommelierCoordinator: Returning final recommendation result:', recommendationResult);
 
-         return recommendationResult;
+           // Add user message and assistant response to history
+           if (message.input.message) {
+               this.conversationHistoryService.addConversationTurn(message.userId, { role: 'user', content: message.input.message });
+           }
+           // Assuming recommendationResult has a 'response' field with the assistant's message
+           if (recommendationResult && recommendationResult.response) {
+               this.conversationHistoryService.addConversationTurn(message.userId, { role: 'assistant', content: recommendationResult.response });
+           }
+
+           return recommendationResult;
 
        } catch (error) {
-         this.logger.error('Error calling RecommendationAgent:', error); // Use logger
-         // If RecommendationAgent fails, send to DLQ and re-throw the error
-         await this.deadLetterProcessor.process(message, error instanceof Error ? error : new Error('Error in RecommendationAgent.'), { source: this.getName(), stage: 'RecommendationAgent' });
-         this.logger.error('SommelierCoordinator: Re-throwing RecommendationAgent error.'); // Added log
-         throw error; // Re-throw the original error caught from RecommendationAgent
+           this.logger.error(`Error calling ${recommendationSource === 'llm' ? 'LLMRecommendationAgent' : 'RecommendationAgent'}:`, error);
+           // If the selected Recommendation Agent fails, send to DLQ and re-throw the error
+           await this.deadLetterProcessor.process(message, error instanceof Error ? error : new Error(`Error in ${recommendationSource === 'llm' ? 'LLMRecommendationAgent' : 'RecommendationAgent'}.`), { source: this.getName(), stage: recommendationSource === 'llm' ? 'LLMRecommendationAgent' : 'RecommendationAgent' });
+           this.logger.error('SommelierCoordinator: Re-throwing Recommendation Agent error.');
+           throw error; // Re-throw the original error caught from the Recommendation Agent
        }
- 
-     } catch (error: any) { // Added type annotation
-       this.logger.error('Error during SommelierCoordinator orchestration:', error); // Use logger
-       this.logger.error('SommelierCoordinator: Caught orchestration error type:', typeof error, 'message:', error.message); // Added detailed log
-       // On error during orchestration (excluding RecommendationAgent's handled error), send to dead letter queue
-       await this.deadLetterProcessor.process(message, error instanceof Error ? error : new Error('Unknown error during orchestration.'), { source: this.getName(), stage: 'Orchestration' });
-       this.logger.error('SommelierCoordinator: Re-throwing orchestration error.'); // Added log
-       // Re-throw the error to be caught by the route handler
-       throw error;
-     }
-   }
- }
 
- // TODO: Implement more sophisticated orchestration logic involving other agents
+      } catch (error: any) { // Added type annotation
+        this.logger.error('Error during SommelierCoordinator orchestration:', error); // Use logger
+        this.logger.error('SommelierCoordinator: Caught orchestration error type:', typeof error, 'message:', error.message); // Added detailed log
+        // On error during orchestration (excluding RecommendationAgent's handled error), send to dead letter queue
+        await this.deadLetterProcessor.process(message, error instanceof Error ? error : new Error('Unknown error during orchestration.'), { source: this.getName(), stage: 'Orchestration' });
+        this.logger.error('SommelierCoordinator: Re-throwing orchestration error.'); // Added log
+        // Re-throw the error to be caught by the route handler
+        throw error;
+      }
+    }
+  }
+
+  // TODO: Implement more sophisticated orchestration logic involving other agents

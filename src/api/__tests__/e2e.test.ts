@@ -29,8 +29,10 @@ it('should return a successful response for a valid recommendation request', asy
           priceRange: [10, 30],
           foodPairing: 'salmon',
           excludeAllergens: []
-        }
+        },
+        message: 'Recommend a wine for salmon' // Added message field
       },
+      recommendationSource: 'knowledgeGraph', // Added recommendationSource
       conversationHistory: [] // Include an empty conversation history array
     });
     console.log('Test response:', response.body); // Log the response body for debugging
@@ -41,11 +43,24 @@ it('should return a successful response for a valid recommendation request', asy
     const response = await request(app).post('/api/recommendations').send({
       userId: 'test-user-ingredient',
       input: { // Wrap ingredients in the 'input' property
-        ingredients: ['beef']
+        ingredients: ['beef'],
+        recommendationSource: 'knowledgeGraph' // Added recommendationSource
       },
       conversationHistory: [] // Include an empty conversation history array
     });
     console.log('Test response (ingredient-based):', response.body); // Log the response body for debugging
+    expect(response.body).toHaveProperty('recommendation'); // Check for the recommendation property
+  }, 30000); // Increased timeout to 30 seconds
+  it('should return a successful response for an LLM-based recommendation request', async () => {
+    const response = await request(app).post('/api/recommendations').send({
+      userId: 'test-user-llm',
+      input: { // Wrap message in the 'input' property
+        message: 'Recommend a sweet white wine',
+        recommendationSource: 'llm' // Set recommendationSource to 'llm'
+      },
+      conversationHistory: [] // Include an empty conversation history array
+    });
+    console.log('Test response (LLM-based):', response.body); // Log the response body for debugging
     expect(response.body).toHaveProperty('recommendation'); // Check for the recommendation property
   }, 30000); // Increased timeout to 30 seconds
 });

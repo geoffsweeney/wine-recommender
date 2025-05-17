@@ -83,11 +83,17 @@ export class KnowledgeGraphService {
       parameters.wineType = preferences.wineType;
     }
 
+    if (preferences.sweetness) {
+      conditions.push('w.sweetness = $sweetness');
+      parameters.sweetness = preferences.sweetness;
+    }
+
     if (preferences.priceRange) {
       conditions.push('w.price >= $minPrice AND w.price <= $maxPrice');
       parameters.minPrice = preferences.priceRange[0];
       parameters.maxPrice = preferences.priceRange[1];
     }
+
 
     // Assuming a relationship between Wine and Food nodes for foodPairing preference
     if (preferences.foodPairing) {

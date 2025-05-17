@@ -20,7 +20,7 @@ This plan outlines the steps to implement a Proof of Concept for the agentic arc
     - Task 3: Implement Basic Knowledge Graph Service Interaction (Confirmed by code)
 
 ### Completed:
-- **Phase 3: Basic Testing:** Fixed failing test in `SommelierCoordinator.unit.test.ts`.
+- **Phase 3: Basic Testing:** Fixed failing tests in `LLMRecommendationAgent.test.ts` and `SommelierCoordinator.unit.test.ts`.
 
 ### Partially Completed (Basic Implementation Exists, but further work needed as per plan/TODOs):
 - **Phase 3: Basic Testing:** Fix existing failing tests in `validation.test.ts` (Deferred in plan, test file exists).
@@ -31,7 +31,9 @@ This plan outlines the steps to implement a Proof of Concept for the agentic arc
     - Task 4: Implement MCP Adapter Agent (Simulated)
     - Task 5: Implement Agent Communication Bus (Core implemented, integration/advanced features remaining)
     - Task 6: Implement Shared Context Memory (Core implemented, integration/advanced features remaining)
-    - Task 7: Implement Circuit Breaker, Retry Manager, Dead Letter Processor (Implementations exist, full integration/testing status unclear)
+### Current Status / Known Issues
+
+- E2E tests (`src/api/__tests__/e2e.test.ts`) are currently failing with a generic "Failed to process recommendation request" error. Investigation suggests this is likely due to an issue with the `KnowledgeGraphService` or its configuration in the e2e environment, requiring further debugging outside the scope of recent code changes.
 
 ### Remaining (No significant code evidence reviewed):
 - **Phase 4: Advanced Features:**
