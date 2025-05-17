@@ -30,15 +30,16 @@ export class RecommendationService {
   async getRecommendations(request: RecommendationRequest): Promise<any[]> {
     this.logger.info('RecommendationService: Getting recommendations for request:', request); // Log start
 
-    // Basic validation: Check if preferences are provided
-    const hasPreferences = request.preferences && (
-      request.preferences.wineType ||
-      (request.preferences.priceRange && (request.preferences.priceRange[0] > 0 || request.preferences.priceRange[1] < Infinity)) || // Check if price range is meaningful
-      request.preferences.foodPairing ||
-      (request.preferences.excludeAllergens && request.preferences.excludeAllergens.length > 0)
+    // Basic validation: Check if preferences are provided in the input
+    const hasPreferences = request.input.preferences && (
+      request.input.preferences.wineType ||
+      (request.input.preferences.priceRange && (request.input.preferences.priceRange[0] > 0 || request.input.preferences.priceRange[1] < Infinity)) || // Check if price range is meaningful
+      request.input.preferences.foodPairing ||
+      (request.input.preferences.excludeAllergens && request.input.preferences.excludeAllergens.length > 0)
     );
 
-    if (!hasPreferences && !request.message) { // Also consider if there's a message
+    // Also consider if there's a message in the input
+    if (!hasPreferences && !request.input.message) {
        this.logger.warn('RecommendationService: Received empty or invalid recommendation request.');
        throw new Error('Invalid request: Please provide some preferences or a message.');
     }
@@ -63,37 +64,37 @@ export class RecommendationService {
       // Build search query dynamically
       let cypher = 'MATCH (w:Wine) WHERE ';
       const queryParams: Record<string, any> = {};
-      
+
       if (params.query) {
         cypher += 'w.name CONTAINS $query ';
         queryParams.query = params.query;
       }
-      
+
       if (params.region) {
         cypher += (params.query ? 'AND ' : '') + 'w.region = $region ';
         queryParams.region = params.region;
       }
-      
+
       if (params.minPrice || params.maxPrice) {
         cypher += (params.query || params.region ? 'AND ' : '') +
           'w.price >= $minPrice AND w.price <= $maxPrice ';
         queryParams.minPrice = params.minPrice || 0;
         queryParams.maxPrice = params.maxPrice || 1000;
       }
-      
+
       // Validate pagination params
       const pageNum = Math.max(1, params.page || 1);
       const limitNum = Math.min(50, Math.max(1, params.limit || 10));
       const skip = (pageNum - 1) * limitNum;
-      
+
       cypher += 'RETURN w SKIP $skip LIMIT $limit';
       queryParams.skip = skip;
       queryParams.limit = limitNum;
-      
+
       this.logger.info('RecommendationService: Executing search query:', cypher, 'with params:', queryParams); // Log query
       const results = await this.neo4jService.executeQuery(cypher, queryParams);
       this.logger.info('RecommendationService: Search query executed successfully, results count:', results.length); // Log results count
-      
+
       return {
         data: results,
         pagination: {
@@ -121,13 +122,13 @@ export class RecommendationService {
   private async rankRecommendations(wines: any[]): Promise<any[]> {
     this.logger.info('RecommendationService: Ranking recommendations, input count:', wines.length); // Log start
     const wineScores = new Map<string, { wine: any, score: number }>();
-    
+
     // First pass - count basic frequency
     wines.forEach(wine => {
       // Extract wine object based on strategy format
       let wineObj = wine;
       let wineId = wine.id;
-      
+
       if (wine.w) {
         wineObj = wine.w;
         wineId = wine.w.id;
@@ -135,7 +136,7 @@ export class RecommendationService {
         wineObj = wine.rec;
         wineId = wine.rec.id;
       }
-      
+
       const existing = wineScores.get(wineId) || { wine: wineObj, score: 0 };
       existing.score += 1;
       wineScores.set(wineId, existing);
@@ -164,7 +165,7 @@ export class RecommendationService {
     const sortedWines = scoredWines
       .sort((a, b) => b.score - a.score)
       .map(item => item.wine);
-    
+
     this.logger.info('RecommendationService: Recommendations ranked and sorted.'); // Log end of ranking
     return sortedWines;
   }
@@ -203,15 +204,16 @@ class PopularWinesStrategy implements IRecommendationStrategy {
   ) {}
 
   async getRecommendations(request: RecommendationRequest): Promise<any[]> {
-    // Basic validation: Check if preferences are provided (similar to main service)
-    const hasPreferences = request.preferences && (
-      request.preferences.wineType ||
-      (request.preferences.priceRange && (request.preferences.priceRange[0] > 0 || request.preferences.priceRange[1] < Infinity)) ||
-      request.preferences.foodPairing ||
-      (request.preferences.excludeAllergens && request.preferences.excludeAllergens.length > 0)
+    // Basic validation: Check if preferences are provided in the input (similar to main service)
+    const hasPreferences = request.input.preferences && (
+      request.input.preferences.wineType ||
+      (request.input.preferences.priceRange && (request.input.preferences.priceRange[0] > 0 || request.input.preferences.priceRange[1] < Infinity)) ||
+      request.input.preferences.foodPairing ||
+      (request.input.preferences.excludeAllergens && request.input.preferences.excludeAllergens.length > 0)
     );
 
-    if (!hasPreferences && !request.message) {
+    // Also consider if there's a message in the input
+    if (!hasPreferences && !request.input.message) {
        this.logger.warn('PopularWinesStrategy: Received empty or invalid recommendation request.');
        throw new Error('Invalid request: Please provide some preferences or a message.'); // Throw error for invalid requests
     }

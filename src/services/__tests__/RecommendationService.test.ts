@@ -34,14 +34,17 @@ let recommendationService: RecommendationService;
 
 // Valid mock data for requests
 const validRecommendationRequest: RecommendationRequest = {
-  preferences: {
-    wineType: 'red',
-    priceRange: [10, 50],
-    foodPairing: 'pasta',
-    excludeAllergens: ['sulfites']
-  },
   userId: 'user-123',
-  message: 'Looking for a nice red wine.'
+  input: {
+    preferences: {
+      wineType: 'red',
+      priceRange: [10, 50],
+      foodPairing: 'pasta',
+      excludeAllergens: ['sulfites']
+    },
+    message: 'Looking for a nice red wine.'
+  },
+  conversationHistory: [] // Add empty conversation history for type compatibility
 };
 
 const validSearchRequest: SearchRequest = {
@@ -75,14 +78,17 @@ test('should return recommendations for valid request', async () => {
 // Test for handling empty recommendation request
 test('should return placeholder recommendations for minimal request', async () => {
   const request: RecommendationRequest = {
-    preferences: {
-      wineType: 'red', // Add a default wineType to satisfy the type
-      priceRange: undefined, // Set priceRange to undefined
-      foodPairing: '', // Keep as empty string
-      excludeAllergens: [] // Keep as empty array
-    },
     userId: '',
-    message: ''
+    input: {
+      preferences: {
+        wineType: 'red', // Add a default wineType to satisfy the type
+        priceRange: undefined, // Set priceRange to undefined
+        foodPairing: '', // Keep as empty string
+        excludeAllergens: [] // Keep as empty array
+      },
+      message: ''
+    },
+    conversationHistory: [] // Add empty conversation history for type compatibility
   };
 
   // Expect the hardcoded popular wine from the placeholder strategy

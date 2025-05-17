@@ -20,7 +20,7 @@ export class UserPreferenceAgent implements Agent {
     return 'UserPreferenceAgent';
   }
 
-  async handleMessage(message: any): Promise<{ preferences?: { [key: string]: any }; error?: string }> {
+  async handleMessage(message: { input: any; conversationHistory?: { role: string; content: string }[] }): Promise<{ preferences?: { [key: string]: any }; error?: string }> {
     // console.log('UserPreferenceAgent received message:', message);
 
     if (!this.communicationBus) {
@@ -30,16 +30,23 @@ export class UserPreferenceAgent implements Agent {
 
     // Determine the input to send to the LLM. Could be raw message or processed input.
     // For now, assuming the raw message or a relevant part of it is passed.
-    const inputForLLM = typeof message === 'string' ? message : JSON.stringify(message);
+    // Determine the input to send to the LLM. Could be raw message or processed input.
+    // For now, assuming the raw message or a relevant part of it is passed.
+    const inputForLLM = typeof message.input === 'string' ? message.input : JSON.stringify(message.input);
+
+    // Format conversation history for the prompt
+    const historyForLLM = message.conversationHistory
+      ? message.conversationHistory.map(turn => `${turn.role}: ${turn.content}`).join('\n') + '\n'
+      : '';
 
     // --- LLM Integration for User Preference Extraction ---
     try {
       // console.log('UserPreferenceAgent: Sending input to LLM for preference extraction.');
       // Formulate a prompt for the LLM to extract user preferences
       // TODO: Refine the prompt to guide the LLM on the expected output format (e.g., JSON)
-      const llmPrompt = `Analyze the following user input for a wine recommendation request. Determine if it's a valid request and extract key information like ingredients or wine preferences. Provide the output in a JSON format with the following structure: { "isValid": boolean, "ingredients"?: string[], "preferences"?: { [key: string]: any }, "error"?: string }. If the input is invalid, set isValid to false and provide an error message.
+      const llmPrompt = `Analyze the following user input for a wine recommendation request, considering the conversation history provided. Determine if it's a valid request and extract key information like ingredients or wine preferences. Provide the output in a JSON format with the following structure: { "isValid": boolean, "ingredients"?: string[], "preferences"?: { [key: string]: any }, "error"?: string }. If the input is invalid, set isValid to false and provide an error message.
 
-User Input: "${inputForLLM}"`;
+${historyForLLM}User Input: "${inputForLLM}"`;
 
       const llmResponse = await this.communicationBus.sendLLMPrompt(llmPrompt);
 

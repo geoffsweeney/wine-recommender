@@ -25,7 +25,7 @@ describe('RecommendationAgent', () => {
   });
 
   it('should handle ingredient-based requests', async () => {
-    const message = { ingredients: ['chocolate', 'vanilla'] };
+    const message = { input: { ingredients: ['chocolate', 'vanilla'] } };
     const wines = [{ id: '1', name: 'Wine A', region: 'Region A', type: 'Red' }];
     mockKnowledgeGraphService.findWinesByIngredients.mockResolvedValue(wines);
     mockLLMService.sendPrompt.mockResolvedValue(JSON.stringify({ recommendedWines: wines }));
@@ -35,7 +35,7 @@ describe('RecommendationAgent', () => {
   });
 
   it('should handle preference-based requests', async () => {
-    const message = { preferences: ['sweet', 'fruity'] };
+    const message = { input: { preferences: ['sweet', 'fruity'] } };
     const wines = [{ id: '2', name: 'Wine B', region: 'Region B', type: 'White' }];
     mockKnowledgeGraphService.findWinesByPreferences.mockResolvedValue(wines);
     mockLLMService.sendPrompt.mockResolvedValue(JSON.stringify({ recommendedWines: wines }));
@@ -45,7 +45,7 @@ describe('RecommendationAgent', () => {
   });
 
   it('should return a message when no wines are found', async () => {
-    const message = { ingredients: ['unknown'] };
+    const message = { input: { ingredients: ['unknown'] } };
     mockKnowledgeGraphService.findWinesByIngredients.mockResolvedValue([]);
 
     const result = await recommendationAgent.handleMessage(message);
@@ -53,7 +53,7 @@ describe('RecommendationAgent', () => {
   });
 
   it('should handle errors gracefully', async () => {
-    const message = { ingredients: ['chocolate'] };
+    const message = { input: { ingredients: ['chocolate'] } };
     const error = new Error('Test error');
     mockKnowledgeGraphService.findWinesByIngredients.mockRejectedValue(error);
 

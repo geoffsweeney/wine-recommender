@@ -40,7 +40,7 @@ describe('UserPreferenceAgent', () => {
   // TODO: Add tests for LLM interaction in handleMessage
   it('should process the received message and extract preferences via LLM', async () => {
     const consoleSpy = jest.spyOn(console, 'log');
-    const testMessage = { preferences: { wineType: 'red' } };
+    const testMessage = { input: { preferences: { wineType: 'red' } }, conversationHistory: [] };
 
     // Mock the sendLLMPrompt method to return a predefined preference output
     const mockLlmPreferenceOutput = { preferences: { wineType: 'red', sweetness: 'dry' } };
@@ -61,7 +61,7 @@ describe('UserPreferenceAgent', () => {
 
   it('should handle invalid JSON response from LLM', async () => {
     const consoleSpy = jest.spyOn(console, 'error');
-    const testMessage = { preferences: { wineType: 'red' } };
+    const testMessage = { input: { preferences: { wineType: 'red' } }, conversationHistory: [] };
     const invalidJsonResponse = 'This is not JSON';
 
     mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(invalidJsonResponse);
@@ -77,7 +77,7 @@ describe('UserPreferenceAgent', () => {
 
   it('should handle LLM communication errors', async () => {
     const consoleSpy = jest.spyOn(console, 'error');
-    const testMessage = { preferences: { wineType: 'red' } };
+    const testMessage = { input: { preferences: { wineType: 'red' } }, conversationHistory: [] };
     const mockError = new Error('LLM communication failed');
 
     mockCommunicationBusInstance.sendLLMPrompt.mockRejectedValue(mockError);
@@ -125,7 +125,7 @@ describe('UserPreferenceAgent Integration with AgentCommunicationBus', () => {
   });
 
   it('should send the user input to the LLMService via the communication bus and return extracted preferences', async () => {
-    const testMessage = { userInput: 'I prefer dry red wine' };
+    const testMessage = { input: { userInput: 'I prefer dry red wine' }, conversationHistory: [] };
     const mockLlmResponse = '{"preferences": {"wineType": "red", "sweetness": "dry"}}'; // Mock LLM response as a JSON string
     const mockExtractedPreferences = { wineType: 'red', sweetness: 'dry' }; // Expected parsed preferences
 
@@ -137,7 +137,7 @@ describe('UserPreferenceAgent Integration with AgentCommunicationBus', () => {
     // Expect AgentCommunicationBus.sendLLMPrompt to have been called with a prompt based on the user input
     expect(mockCommunicationBusInstance.sendLLMPrompt).toHaveBeenCalled();
     const sentPrompt = mockCommunicationBusInstance.sendLLMPrompt.mock.calls[0][0];
-    expect(sentPrompt).toContain(testMessage.userInput);
+    expect(sentPrompt).toContain(testMessage.input.userInput);
 
     // Expect the result to contain the extracted preferences
     expect(result).toEqual({ preferences: mockExtractedPreferences });
@@ -149,7 +149,7 @@ describe('UserPreferenceAgent Integration with AgentCommunicationBus', () => {
     // Mock the sendLLMPrompt method to return undefined
     mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(undefined);
 
-    const result = await agent.handleMessage(testUserInput);
+    const result = await agent.handleMessage({ input: testUserInput, conversationHistory: [] });
 
     expect(mockCommunicationBusInstance.sendLLMPrompt).toHaveBeenCalled();
 
@@ -163,7 +163,7 @@ describe('UserPreferenceAgent Integration with AgentCommunicationBus', () => {
     // Mock the sendLLMPrompt method to throw an error
     mockCommunicationBusInstance.sendLLMPrompt.mockRejectedValue(mockError);
 
-    const result = await agent.handleMessage(testUserInput);
+    const result = await agent.handleMessage({ input: testUserInput, conversationHistory: [] });
 
     expect(mockCommunicationBusInstance.sendLLMPrompt).toHaveBeenCalled();
 
@@ -177,7 +177,7 @@ describe('UserPreferenceAgent Integration with AgentCommunicationBus', () => {
     // Mock the sendLLMPrompt method to return invalid JSON
     mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(invalidJsonResponse);
 
-    const result = await agent.handleMessage(testUserInput);
+    const result = await agent.handleMessage({ input: testUserInput, conversationHistory: [] });
 
     expect(mockCommunicationBusInstance.sendLLMPrompt).toHaveBeenCalled();
 
@@ -191,7 +191,7 @@ describe('UserPreferenceAgent Integration with AgentCommunicationBus', () => {
     // Mock the sendLLMPrompt method to return a JSON string with invalid structure
     mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(invalidPreferenceResponse);
 
-    const result = await agent.handleMessage(testUserInput);
+    const result = await agent.handleMessage({ input: testUserInput, conversationHistory: [] });
 
     expect(mockCommunicationBusInstance.sendLLMPrompt).toHaveBeenCalled();
 

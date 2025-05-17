@@ -49,7 +49,7 @@ describe('UserPreferenceAgent Integration with LLMService', () => {
     // Mock the sendPrompt method of the mocked LLMService to return a JSON string
     mockLlmServiceInstance.sendPrompt.mockResolvedValue(mockLlmResponse);
 
-    const result = await agent.handleMessage(testUserInput);
+    const result = await agent.handleMessage({ input: testUserInput, conversationHistory: [] });
 
     // Expect LLMService.sendPrompt to have been called with a prompt based on the user input
     expect(mockLlmServiceInstance.sendPrompt).toHaveBeenCalled();
@@ -69,7 +69,7 @@ describe('UserPreferenceAgent Integration with LLMService', () => {
     // Mock the sendPrompt method to return undefined
     mockLlmServiceInstance.sendPrompt.mockResolvedValue(undefined);
 
-    const result = await agent.handleMessage(testUserInput);
+    const result = await agent.handleMessage({ input: testUserInput, conversationHistory: [] });
 
     expect(mockLlmServiceInstance.sendPrompt).toHaveBeenCalled();
 
@@ -83,7 +83,7 @@ describe('UserPreferenceAgent Integration with LLMService', () => {
     // Mock the sendPrompt method to throw an error
     mockLlmServiceInstance.sendPrompt.mockRejectedValue(mockError);
 
-    const result = await agent.handleMessage(testUserInput);
+    const result = await agent.handleMessage({ input: testUserInput, conversationHistory: [] });
 
     expect(mockLlmServiceInstance.sendPrompt).toHaveBeenCalled();
 
@@ -97,7 +97,7 @@ describe('UserPreferenceAgent Integration with LLMService', () => {
     // Mock the sendPrompt method to return invalid JSON
     mockLlmServiceInstance.sendPrompt.mockResolvedValue(invalidJsonResponse);
 
-    const result = await agent.handleMessage(testUserInput);
+    const result = await agent.handleMessage({ input: testUserInput, conversationHistory: [] });
 
     expect(mockLlmServiceInstance.sendPrompt).toHaveBeenCalled();
 
@@ -111,7 +111,7 @@ describe('UserPreferenceAgent Integration with LLMService', () => {
     // Mock the sendPrompt method to return a JSON string with invalid structure
     mockLlmServiceInstance.sendPrompt.mockResolvedValue(invalidPreferenceResponse);
 
-    const result = await agent.handleMessage(testUserInput);
+    const result = await agent.handleMessage({ input: testUserInput, conversationHistory: [] });
     expect(mockLlmServiceInstance.sendPrompt).toHaveBeenCalled();
 
     expect(result).toEqual({ error: "Invalid structure in LLM preference response.", preferences: {} });

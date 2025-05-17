@@ -69,10 +69,13 @@ export class KnowledgeGraphService {
     return wines;
   }
 
-  async findWinesByPreferences(preferences: RecommendationRequest['preferences']): Promise<WineNode[]> {
+  async findWinesByPreferences(preferences: RecommendationRequest['input']['preferences']): Promise<WineNode[]> {
     // console.log('KnowledgeGraphService: Finding wines by preferences:', preferences);
-    let query = 'MATCH (w:Wine)';
-    const parameters: any = {};
+      if (!preferences) {
+        return []; // Return empty array if preferences is undefined
+      }
+      let query = 'MATCH (w:Wine)';
+      const parameters: any = {};
     const conditions: string[] = [];
 
     if (preferences.wineType) {

@@ -12,6 +12,7 @@ import { BasicDeadLetterProcessor, LoggingDeadLetterHandler } from '../../BasicD
 import { InMemoryDeadLetterQueue } from '../../InMemoryDeadLetterQueue';
 import { BasicRetryManager } from '../../BasicRetryManager';
 import { AgentCommunicationBus } from '../../AgentCommunicationBus'; // Import AgentCommunicationBus
+import { ConversationHistoryService } from '../../ConversationHistoryService'; // Import ConversationHistoryService
 import winston from 'winston'; // Import winston for mocking
 
 // Create a proper mock of the logger
@@ -38,6 +39,7 @@ describe('SommelierCoordinator', () => {
     let mockFallbackAgent: jest.Mocked<FallbackAgent>;
     let mockDeadLetterProcessor: jest.Mocked<BasicDeadLetterProcessor>;
     let mockCommunicationBus: jest.Mocked<AgentCommunicationBus>; // Mock instance type
+    let mockConversationHistoryService: jest.Mocked<ConversationHistoryService>; // Mock ConversationHistoryService
     let dlq: InMemoryDeadLetterQueue;
 
     beforeAll(() => {
@@ -56,7 +58,16 @@ describe('SommelierCoordinator', () => {
         // ... rest of the code remains the same ...
     });
 
-    test('should create an instance of SommelierCoordinator', () => {
+   beforeEach(() => {
+       // Create a new mock instance for ConversationHistoryService before each test
+       mockConversationHistoryService = {
+           addConversationTurn: jest.fn(),
+           getConversationHistory: jest.fn().mockReturnValue([]), // Default to returning empty history
+           clearConversationHistory: jest.fn(),
+       } as any; // Use 'any' to avoid strict type checking for the mock
+   });
+
+   test('should create an instance of SommelierCoordinator', () => {
         const mockInputValidationAgent = { handleMessage: jest.fn(), getName: () => 'MockInputValidationAgent' } as any;
         const mockRecommendationAgent = { handleMessage: jest.fn(), getName: () => 'MockRecommendationAgent' } as any;
         const mockValueAnalysisAgent = { handleMessage: jest.fn(), getName: () => 'MockValueAnalysisAgent' } as any;
@@ -77,6 +88,7 @@ describe('SommelierCoordinator', () => {
             mockFallbackAgent,
             mockDeadLetterProcessor,
             mockCommunicationBus,
+            mockConversationHistoryService, // Provide mock ConversationHistoryService
             mockLogger
         ); // Create an instance with mocked dependencies
 

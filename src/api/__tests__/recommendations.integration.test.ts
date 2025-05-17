@@ -140,7 +140,7 @@ describe('Recommendations Integration', () => {
 
     const requestBody = {
       userId: 'test-user',
-      preferences: { wineType: 'red' },
+      input: { preferences: { wineType: 'red' } }, // Wrap preferences in input
     };
 
     const response = await request(app)
@@ -178,7 +178,7 @@ describe('Recommendations Integration', () => {
 
     const requestBody = {
       userId: 'test-user',
-      preferences: {}
+      input: { preferences: {} } // Wrap preferences in input
     };
 
     const response = await request(app)
@@ -203,7 +203,7 @@ describe('Recommendations Integration', () => {
 
     const requestBody = {
       userId: 'test-user',
-      preferences: { priceRange: [10, 30] },
+      input: { preferences: { priceRange: [10, 30] } }, // Wrap preferences in input
     };
 
     const response = await request(app)
@@ -228,8 +228,10 @@ describe('Recommendations Integration', () => {
 
     const foodPairingRequestBody = {
       userId: 'test-user-012',
-      preferences: {
-        foodPairing: 'salmon' // Preference for food pairing
+      input: { // Wrap preferences in input
+        preferences: {
+          foodPairing: 'salmon' // Preference for food pairing
+        },
       },
     };
 

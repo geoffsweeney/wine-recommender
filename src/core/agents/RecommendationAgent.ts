@@ -24,7 +24,7 @@ export class RecommendationAgent implements Agent {
     @inject('logger') private logger: winston.Logger // Change injection token to lowercase 'logger'
   ) {}
 
-  async handleMessage(message: any): Promise<any> {
+  async handleMessage(message: { input: any; conversationHistory?: { role: string; content: string }[] }): Promise<any> {
     this.logger.info('RecommendationAgent.handleMessage entered.');
     this.logger.debug('Received message:', message); // Debug log for input
 
@@ -32,14 +32,14 @@ export class RecommendationAgent implements Agent {
     let recommendationType: 'ingredients' | 'preferences' = 'preferences';
 
     try {
-        if (message.ingredients && message.ingredients.length > 0) {
-            this.logger.info('Handling ingredient-based request.');
-            recommendedWines = await this.knowledgeGraphService.findWinesByIngredients(message.ingredients);
-            recommendationType = 'ingredients';
-        } else if (message.preferences) {
-            this.logger.info('Handling preference-based request.');
-            recommendedWines = await this.knowledgeGraphService.findWinesByPreferences(message.preferences);
-            recommendationType = 'preferences'; // Ensure this is set correctly
+        if (message.input.ingredients && message.input.ingredients.length > 0) {
+          this.logger.info('Handling ingredient-based request.');
+          recommendedWines = await this.knowledgeGraphService.findWinesByIngredients(message.input.ingredients);
+          recommendationType = 'ingredients';
+        } else if (message.input.preferences) {
+          this.logger.info('Handling preference-based request.');
+          recommendedWines = await this.knowledgeGraphService.findWinesByPreferences(message.input.preferences);
+          recommendationType = 'preferences'; // Ensure this is set correctly
         }
 
         // Check if recommendedWines is defined and has a length
@@ -96,7 +96,7 @@ Recommended Wines: ${JSON.stringify(recommendedWines)}`;
       } catch (parseError: any) { // Catch for parsing errors
         this.logger.error('Failed to parse LLM enhancement response as JSON:', parseError);
         // Add to Dead Letter Queue for parsing errors
-        await this.deadLetterProcessor.process({ recommendedWines, message, recommendationType, llmResponse }, parseError instanceof Error ? parseError : new Error(parseError), { source: this.getName(), stage: 'LLMEnhancementParsing' });
+        await this.deadLetterProcessor.process({ recommendedWines, userInput: message.input, recommendationType, conversationHistory: message.conversationHistory, llmResponse }, parseError instanceof Error ? parseError : new Error(parseError), { source: this.getName(), stage: 'LLMEnhancementParsing' });
         // Return original recommendations and the raw LLM response for debugging
         return {
           recommendedWines,
@@ -108,7 +108,7 @@ Recommended Wines: ${JSON.stringify(recommendedWines)}`;
     } catch (llmCallError: any) { // Catch for LLM call errors
       this.logger.error('Error calling LLM service for enhancement:', llmCallError);
       // Add to Dead Letter Queue for LLM call errors
-      await this.deadLetterProcessor.process({ recommendedWines, message, recommendationType }, llmCallError instanceof Error ? llmCallError : new Error(llmCallError), { source: this.getName(), stage: 'LLMEnhancementCall' });
+      await this.deadLetterProcessor.process({ recommendedWines, userInput: message.input, recommendationType, conversationHistory: message.conversationHistory }, llmCallError instanceof Error ? llmCallError : new Error(llmCallError), { source: this.getName(), stage: 'LLMEnhancementCall' });
       // Return original recommendations and an error message
       return {
         recommendedWines,

@@ -2,6 +2,10 @@
 
 This plan outlines the essential features and steps required to implement a Minimum Viable Product (MVP) for the Wine Recommendation App, focusing on a functional end-to-end recommendation flow based on user preferences or ingredients.
 
+## Related Plans
+
+- **Conversation History Implementation Plan:** A separate plan detailing the implementation of conversation history support, including backend, API, and frontend modifications. See [`memory-bank/conversation_history_plan.md`](memory-bank/conversation_history_plan.md).
+
 ## MVP Features and Implementation Steps
 
 Here are the features required for the MVP, ordered for optimal implementation flow:
@@ -55,9 +59,9 @@ Here are the features required for the MVP, ordered for optimal implementation f
 - Ensured tests are passing in `src/api/middleware/__tests__/validation.test.ts` ([`src/api/middleware/__tests__/validation.test.ts`](src/api/middleware/__tests__/validation.test.ts)).
 - Implemented basic rate limiting for the `/api` endpoints as outlined in the `Rate Limiter Refinement Plan` ([`memory-bank/rate_limiter_refinement_plan.md`](memory-bank/rate_limiter_refinement_plan.md)), focusing on applying it to the `/api` path and basic error handling for exceeding the limit. Associated tests are passing.
 
-### 5. Implement Basic User Interface
+### 5. Implement Basic User Interface (Without Conversation History)
 
-**Goal:** Provide a simple interface for users to interact with the recommendation system.
+**Goal:** Provide a simple interface for users to interact with the recommendation system, focusing on a single request/response cycle. Conversation history is planned separately.
 
 **Status:** Remaining
 

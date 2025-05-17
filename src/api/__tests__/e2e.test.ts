@@ -23,12 +23,15 @@ describe('E2E Tests', () => {
 it('should return a successful response for a valid recommendation request', async () => {
     const response = await request(app).post('/api/recommendations').send({
       userId: 'test-user',
-      preferences: {
-        wineType: 'red',
-        priceRange: [10, 30],
-        foodPairing: 'salmon',
-        excludeAllergens: []
-      }
+      input: { // Wrap preferences in the 'input' property
+        preferences: {
+          wineType: 'red',
+          priceRange: [10, 30],
+          foodPairing: 'salmon',
+          excludeAllergens: []
+        }
+      },
+      conversationHistory: [] // Include an empty conversation history array
     });
     console.log('Test response:', response.body); // Log the response body for debugging
     expect(response.body).toHaveProperty('recommendation'); // Check for the recommendation property
