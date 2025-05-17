@@ -1,4 +1,4 @@
-import { injectable } from 'tsyringe';
+import { injectable, inject } from 'tsyringe';
 import { logger } from '../utils/logger';
 /**
  * Service for interacting with the Language Model (LLM).
@@ -19,7 +19,11 @@ export class LLMService {
     private model: string;
     private apiKey?: string;
 
-    constructor(apiUrl: string, model: string, apiKey?: string) {
+    constructor(
+        @inject('llmApiUrl') apiUrl: string,
+        @inject('llmModel') model: string,
+        @inject('llmApiKey') apiKey: string = ''
+    ) {
         this.apiUrl = apiUrl;
         this.model = model;
         this.apiKey = apiKey;

@@ -7,52 +7,56 @@ import { AgentCommunicationBus } from './core/AgentCommunicationBus'; // Adjust 
 import { Neo4jService } from './services/Neo4jService'; // Import Neo4jService
 import { KnowledgeGraphService } from './services/KnowledgeGraphService'; // Import KnowledgeGraphService
 
-import { createRouter } from './api/routes'; // Import the API router
-import apiRateLimiter from './api/middleware/rateLimiter'; // Import rate limiter middleware
-
-// Instantiate LLMService with actual values
-const llmService = new LLMService('http://localhost:11434', 'llama3.1:latest', 'your-api-key');
-
-// Register LLMService
-container.registerInstance('LLMService', llmService);
-
-// Instantiate and register AgentCommunicationBus
-// Resolve LLMService from the container to ensure mock is used in tests
-const agentCommunicationBus = new AgentCommunicationBus(container.resolve('LLMService'));
-container.registerInstance(AgentCommunicationBus, agentCommunicationBus);
-
-// Instantiate and register Neo4jService
-const neo4jService = new Neo4jService(); // Assuming Neo4jService has no dependencies
-container.registerInstance(Neo4jService, neo4jService); // Register with the class token
-
-// Instantiate and register KnowledgeGraphService
-const knowledgeGraphService = new KnowledgeGraphService(neo4jService); // Pass Neo4jService instance
-container.registerInstance('KnowledgeGraphService', knowledgeGraphService);
-
 import { InMemoryDeadLetterQueue } from './core/InMemoryDeadLetterQueue'; // Import InMemoryDeadLetterQueue
 import { BasicDeadLetterProcessor, LoggingDeadLetterHandler } from './core/BasicDeadLetterProcessor'; // Import BasicDeadLetterProcessor and LoggingDeadLetterHandler
 import { BasicRetryManager } from './core/BasicRetryManager'; // Import BasicRetryManager
-
-// Instantiate and register InMemoryDeadLetterQueue
-const deadLetterQueue = new InMemoryDeadLetterQueue();
-container.registerInstance('DeadLetterQueue', deadLetterQueue); // Assuming it's registered with a string token
-
-// Instantiate and register LoggingDeadLetterHandler
-const loggingDeadLetterHandler = new LoggingDeadLetterHandler();
-container.registerInstance(LoggingDeadLetterHandler, loggingDeadLetterHandler); // Register with the class token
-
-// Instantiate and register BasicRetryManager
-const retryManager = new BasicRetryManager();
-container.registerInstance(BasicRetryManager, retryManager); // Register with the class token
-
-// Instantiate and register DeadLetterProcessor (using BasicDeadLetterProcessor implementation)
-const deadLetterProcessor = new BasicDeadLetterProcessor(deadLetterQueue, loggingDeadLetterHandler, retryManager); // Pass all three dependencies
-container.registerInstance('DeadLetterProcessor', deadLetterProcessor); // Register with the string token
-
 import { logger } from './utils/logger'; // Import the logger
 
-// Register the logger
-container.registerInstance('logger', logger);
+// Function to register dependencies with the tsyringe container
+const registerDependencies = () => {
+  // Register LLM API URL and Model as injectable values
+  container.registerInstance('llmApiUrl', 'http://localhost:11434');
+  container.registerInstance('llmModel', 'llama3.1:latest');
+  container.registerInstance('llmApiKey', '');
+  container.registerSingleton('LLMService', LLMService);
+  // Note: apiKey is not registered here as it's an optional parameter in LLMService constructor
+
+  // Instantiate and register AgentCommunicationBus
+  // Resolve LLMService by its type, which will now be constructed by tsyringe
+  const agentCommunicationBus = new AgentCommunicationBus(container.resolve(LLMService));
+  container.registerInstance(AgentCommunicationBus, agentCommunicationBus);
+
+  // Instantiate and register Neo4jService
+  const neo4jService = new Neo4jService(); // Assuming Neo4jService has no dependencies
+  container.registerInstance(Neo4jService, neo4jService); // Register with the class token
+
+  // Instantiate and register KnowledgeGraphService
+  const knowledgeGraphService = new KnowledgeGraphService(neo4jService); // Pass Neo4jService instance
+  container.registerInstance('KnowledgeGraphService', knowledgeGraphService);
+
+  const deadLetterQueue = new InMemoryDeadLetterQueue();
+  container.registerInstance('DeadLetterQueue', deadLetterQueue); // Assuming it's registered with a string token
+
+  const loggingDeadLetterHandler = new LoggingDeadLetterHandler();
+  container.registerInstance(LoggingDeadLetterHandler, loggingDeadLetterHandler); // Register with the class token
+
+  const retryManager = new BasicRetryManager();
+  container.registerInstance(BasicRetryManager, retryManager); // Register with the class token
+
+  // Instantiate and register DeadLetterProcessor (using BasicDeadLetterProcessor implementation)
+  const deadLetterProcessor = new BasicDeadLetterProcessor(deadLetterQueue, loggingDeadLetterHandler, retryManager); // Pass all three dependencies
+  container.registerInstance('DeadLetterProcessor', deadLetterProcessor); // Register with the string token
+
+  // Register the logger
+  container.registerInstance('logger', logger);
+};
+
+// Register dependencies before importing the router
+registerDependencies();
+
+import { createRouter } from './api/routes'; // Import the API router
+import apiRateLimiter from './api/middleware/rateLimiter'; // Import rate limiter middleware
+
 
 // Create and configure the Express application
 const app = express();
@@ -75,9 +79,8 @@ export const createServer = () => {
   app.use(cors()); // Enable CORS for all origins
   app.use(express.json());
 
-  // Instantiate and register LLMService with actual values for the test environment
-  const llmService = new LLMService('http://localhost:11434', 'llama3.1:latest', 'your-api-key');
-  container.registerInstance(LLMService, llmService); // Register with class token
+  // Register dependencies for the test environment
+  registerDependencies();
 
   app.use('/api', apiRateLimiter, createRouter());
 
