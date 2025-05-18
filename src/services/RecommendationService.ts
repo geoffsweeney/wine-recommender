@@ -29,17 +29,19 @@ export class RecommendationService {
 
   async getRecommendations(request: RecommendationRequest): Promise<any[]> {
     this.logger.info('RecommendationService: Getting recommendations for request:', request); // Log start
-
-    // Basic validation: Check if preferences are provided in the input
-    const hasPreferences = request.input.preferences && (
+     this.logger.info('RecommendationService: Request input:', request.input); // Add logging for request input
+ 
+     // Basic validation: Check if preferences are provided in the input
+     const hasPreferences = request.input.preferences && (
       request.input.preferences.wineType ||
       (request.input.preferences.priceRange && (request.input.preferences.priceRange[0] > 0 || request.input.preferences.priceRange[1] < Infinity)) || // Check if price range is meaningful
       request.input.preferences.foodPairing ||
       (request.input.preferences.excludeAllergens && request.input.preferences.excludeAllergens.length > 0)
     );
+   this.logger.info('RecommendationService: hasPreferences:', hasPreferences); // Add logging for hasPreferences
 
-    // Also consider if there's a message in the input
-    if (!hasPreferences && !request.input.message) {
+   // Also consider if there's a message in the input
+   if (!hasPreferences && !request.input.message) {
        this.logger.warn('RecommendationService: Received empty or invalid recommendation request.');
        throw new Error('Invalid request: Please provide some preferences or a message.');
     }

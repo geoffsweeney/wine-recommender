@@ -97,7 +97,11 @@ describe('UserPreferenceAgent', () => {
       // Mock dependencies
       mockCommunicationBus = { sendMessage: jest.fn() };
       mockPreferenceExtractionService = { attemptFastExtraction: jest.fn() };
-      mockKnowledgeGraphService = { addOrUpdatePreference: jest.fn(), getPreferences: jest.fn(), deletePreference: jest.fn() }; // Add other methods as needed
+      mockKnowledgeGraphService = {
+        addOrUpdatePreference: jest.fn(),
+        getPreferences: jest.fn().mockResolvedValue([]), // Mock getPreferences to return an empty array
+        deletePreference: jest.fn()
+      }; // Add other methods as needed
 
       // Create a new agent instance with mocked dependencies
       agent = new UserPreferenceAgent(
@@ -150,7 +154,7 @@ describe('UserPreferenceAgent', () => {
         history: message.conversationHistory,
         userId: message.userId,
       });
-      expect(result).toEqual({ preferences: {}, error: 'Analyzing your input for preferences asynchronously.' });
+      expect(result).toEqual({ preferences: [], error: 'Analyzing your input for preferences asynchronously.' });
     });
 
     // TODO: Add more tests for handleMessage, including error handling

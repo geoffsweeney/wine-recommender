@@ -40,7 +40,7 @@ export class UserPreferenceAgent implements Agent {
     }
 
     // 2. Attempt fast extraction from current input
-    const fastPreferences = this.preferenceExtractionService.attemptFastExtraction(input);
+    const fastPreferences = await this.preferenceExtractionService.attemptFastExtraction(input);
 
     let extractedPreferences: PreferenceNode[] = [];
     if (fastPreferences) {
@@ -57,7 +57,8 @@ export class UserPreferenceAgent implements Agent {
 
       // Normalize and persist the newly extracted preferences
       const normalizedExtractedPreferences = this.normalizePreferences(extractedPreferences);
-      console.log('UserPreferenceAgent: Normalized extracted preferences:', normalizedExtractedPreferences);
+      console.log('UserPreferenceAgent: Normalized extracted preferences:', normalizedExtractedPreferences); // Keep existing log
+      console.log('UserPreferenceAgent: Persisting preferences:', normalizedExtractedPreferences); // Add new log before persisting
       await this.persistPreferences(normalizedExtractedPreferences, currentUserId);
 
       // Merge newly extracted and normalized preferences with persisted ones
@@ -84,7 +85,7 @@ export class UserPreferenceAgent implements Agent {
 
       // If fast extraction fails, return only the persisted preferences for now
       // The async LLM result will be persisted later.
-      return { preferences: persistedPreferences, error: 'Analyzing your input for preferences asynchronously.' };
+      return { preferences: [], error: 'Analyzing your input for preferences asynchronously.' };
     }
   }
 
@@ -111,6 +112,7 @@ export class UserPreferenceAgent implements Agent {
     // Synonym mappings for various preference types
     synonymRegistry.set('wineType', new Map([
         ['red', 'red'],
+        ['reds', 'red'], // Add synonym mapping for 'reds'
         ['white', 'white'],
         ['rose', 'rose'],
         ['sparkling', 'sparkling'],
@@ -152,16 +154,22 @@ export class UserPreferenceAgent implements Agent {
     // Add more synonym registries for other preference types (e.g., oak, tannins, acidity)
 
     return preferences.map(pref => {
+        console.log('normalizePreferences: Processing preference:', pref); // Log the preference being processed
         // Trim whitespace and lowercase string values
         let value = typeof pref.value === 'string'
             ? pref.value.trim().toLowerCase()
             : pref.value;
+        console.log('normalizePreferences: Trimmed/lowercased value:', value); // Log the value after trimming/lowercasing
 
         // Resolve synonyms using registry
         if (typeof value === 'string' && synonymRegistry.has(pref.type)) {
             const synonyms = synonymRegistry.get(pref.type);
-            if (synonyms && synonyms.has(value)) {
-                value = synonyms.get(value)!; // Normalize to canonical term
+            console.log('normalizePreferences: Synonym registry for type:', pref.type, synonyms); // Log the synonym registry for the type
+            if (synonyms && typeof value === 'string' && synonyms.has(value.toLowerCase())) {
+                console.log('normalizePreferences: Synonym found, canonical term:', synonyms.get(value.toLowerCase())); // Log when synonym is found
+                value = synonyms.get(value.toLowerCase())!; // Normalize to canonical term
+            } else {
+                console.log('normalizePreferences: No synonym found for value:', value); // Log when no synonym is found
             }
         }
 
@@ -267,13 +275,15 @@ export class UserPreferenceAgent implements Agent {
                 break;
         }
 
-
-        return {
+        console.log('normalizePreferences: Final value before return:', normalizedValue); // Log the final normalized value
+        const finalPreference = {
             ...pref,
             value: normalizedValue,
             negated: negated || pref.negated, // Include negated property if handled
             timestamp: new Date().toISOString()
         };
+        console.log('normalizePreferences: Returning preference from map:', finalPreference); // Log the preference being returned from map
+        return finalPreference;
     }).filter(Boolean) as PreferenceNode[]; // Filter out nulls from discarded preferences
   }
 

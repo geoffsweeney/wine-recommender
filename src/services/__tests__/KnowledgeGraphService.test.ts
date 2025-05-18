@@ -83,7 +83,7 @@ describe('KnowledgeGraphService', () => {
       mockNeo4j.executeQuery.mockResolvedValue(mockResults);
 
       const results = await service.findSimilarWines('w1');
-      
+
       expect(results).toEqual([{
         similar: {
           id: 'w2',
@@ -124,7 +124,7 @@ describe('KnowledgeGraphService', () => {
       mockNeo4j.executeQuery.mockResolvedValue(mockResults);
 
       const results = await service.getWinePairings('w1');
-      
+
       expect(results).toEqual([{
         pairing: {
           id: 'w3',
@@ -156,7 +156,7 @@ describe('KnowledgeGraphService', () => {
       mockNeo4j.executeQuery.mockResolvedValue(mockResults);
 
       const result = await service.getWineById('w1');
-      
+
       expect(result).toEqual({
         w: {
           id: 'w1',
@@ -214,20 +214,24 @@ describe('KnowledgeGraphService', () => {
         { p: { type: 'wineType', value: 'red', active: true } },
         { p: { type: 'sweetness', value: 'dry', active: false } },
       ];
-      mockNeo4j.executeQuery.mockResolvedValue(mockResults);
+      mockNeo4j.executeQuery.mockImplementation(async (query: string) => {
+        if (query.includes('WHERE p.active = true')) {
+          return mockResults.filter(record => record.p.active);
+        }
+        return mockResults;
+      });
 
       const preferences = await service.getPreferences(userId);
 
       expect(mockNeo4j.executeQuery).toHaveBeenCalledWith(
         `
       MATCH (u:User {id: $userId})-[:HAS_PREFERENCE]->(p:Preference)
-       WHERE p.active = true RETURN p`,
+     WHERE p.active = true RETURN p`,
         { userId }
       );
-      // Expect the result to be mapped to PreferenceNode objects
+      // Expect the result to be mapped to PreferenceNode objects and filtered for active preferences
       expect(preferences).toEqual([
         { type: 'wineType', value: 'red', active: true },
-        { type: 'sweetness', value: 'dry', active: false }, // The mapping logic in service.getPreferences returns all properties, filtering is done by the query
       ]);
     });
 
@@ -244,7 +248,7 @@ describe('KnowledgeGraphService', () => {
       expect(mockNeo4j.executeQuery).toHaveBeenCalledWith(
         `
       MATCH (u:User {id: $userId})-[:HAS_PREFERENCE]->(p:Preference)
-       RETURN p`,
+     RETURN p`,
         { userId }
       );
       // Expect the result to include both active and inactive preferences
@@ -263,7 +267,7 @@ describe('KnowledgeGraphService', () => {
       expect(mockNeo4j.executeQuery).toHaveBeenCalledWith(
         `
       MATCH (u:User {id: $userId})-[:HAS_PREFERENCE]->(p:Preference)
-       WHERE p.active = true RETURN p`,
+     WHERE p.active = true RETURN p`,
         { userId }
       );
       expect(preferences).toEqual([]);

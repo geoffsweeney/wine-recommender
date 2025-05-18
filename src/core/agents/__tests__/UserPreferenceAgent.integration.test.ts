@@ -53,6 +53,9 @@ describe('UserPreferenceAgent Integration with LLMService', () => {
     mockNeo4jServiceInstance = new MockNeo4jService() as jest.Mocked<Neo4jService>;
     // Provide the mock Neo4jService instance to the KnowledgeGraphService constructor
     mockKnowledgeGraphServiceInstance = new MockKnowledgeGraphService(mockNeo4jServiceInstance) as jest.Mocked<KnowledgeGraphService>;
+    // Explicitly mock getPreferences to return a resolved empty array
+    mockKnowledgeGraphServiceInstance.getPreferences = jest.fn().mockResolvedValue([]);
+
 
     // Manually create mock AgentCommunicationBus instance
     mockCommunicationBusInstance = MockAgentCommunicationBus as any; // Changed type assertion to any

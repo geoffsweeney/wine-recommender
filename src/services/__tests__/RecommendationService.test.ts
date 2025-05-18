@@ -93,6 +93,9 @@ test('should return placeholder recommendations for minimal request', async () =
     conversationHistory: [] // Add empty conversation history for type compatibility
   };
 
+  // Mock findWinesByPreferences to return an empty array for this minimal request
+  mockKnowledgeGraph.findWinesByPreferences.mockResolvedValue([]);
+
   // Expect the hardcoded popular wine from the placeholder strategy
   await expect(recommendationService.getRecommendations(request)).resolves.toEqual([{ id: 'wine-123', name: 'Popular Red Wine', region: 'Bordeaux', price: 25 }]);
 });

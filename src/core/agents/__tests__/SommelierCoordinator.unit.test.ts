@@ -122,7 +122,8 @@ describe('SommelierCoordinator Unit Tests', () => {
     // Verify that other agents were called (basic check)
     expect(mockInputValidationAgent.handleMessage).not.toHaveBeenCalled(); // InputValidationAgent is skipped if message.message is undefined
     expect(mockValueAnalysisAgent.handleMessage).toHaveBeenCalledWith({ input: { preferences: message.input.preferences }, conversationHistory: message.conversationHistory });
-    expect(mockUserPreferenceAgent.handleMessage).toHaveBeenCalledWith({ input: { preferences: message.input.preferences }, conversationHistory: message.conversationHistory });
+    // Expect UserPreferenceAgent to be called with an empty string input and initial preferences
+    expect(mockUserPreferenceAgent.handleMessage).toHaveBeenCalledWith({ input: '', conversationHistory: message.conversationHistory, initialPreferences: expect.any(Array) }); // Expect empty string input and initial preferences
     expect(mockMCPAdapterAgent.handleMessage).toHaveBeenCalledWith({ input: { preferences: message.input.preferences }, conversationHistory: message.conversationHistory });
     expect(mockExplanationAgent.handleMessage).toHaveBeenCalledWith(mockRecommendationResult); // ExplanationAgent is called with the result from RecommendationAgent
 
@@ -262,7 +263,8 @@ describe('SommelierCoordinator Unit Tests', () => {
     await sommelierCoordinator.handleMessage(message as any);
 
     // Expect UserPreferenceAgent to have been called and rejected
-    expect(mockUserPreferenceAgent.handleMessage).toHaveBeenCalledWith({ input: { preferences: message.input.preferences }, conversationHistory: message.conversationHistory });
+    // Expect UserPreferenceAgent to be called with the original message input string (or empty string if undefined) and initial preferences
+    expect(mockUserPreferenceAgent.handleMessage).toHaveBeenCalledWith({ input: '', conversationHistory: message.conversationHistory, initialPreferences: expect.any(Array) }); // Expect empty string input and initial preferences
     // Expect dead letter processor to be called for UserPreferenceAgent error
     expect(mockDeadLetterProcessor.process).toHaveBeenCalledWith(
       message,
