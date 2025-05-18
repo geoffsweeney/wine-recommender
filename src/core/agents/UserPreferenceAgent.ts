@@ -1,107 +1,295 @@
 import { inject, injectable } from 'tsyringe';
 import { Agent } from './Agent';
-import { AgentCommunicationBus } from '../AgentCommunicationBus'; // Import AgentCommunicationBus
-
-// Define a type for the expected structured output from the LLM for preferences
-interface LLMPreferenceOutput {
-  preferences: { [key: string]: any }; // Flexible for various preferences
-  // Add other fields if needed, e.g., confidence score
-}
+import { AgentCommunicationBus } from '../AgentCommunicationBus';
+import { PreferenceExtractionService } from '../../services/PreferenceExtractionService';
+import { KnowledgeGraphService } from '../../services/KnowledgeGraphService';
+import { PreferenceNode } from '../../types';
 
 @injectable()
 export class UserPreferenceAgent implements Agent {
   constructor(
-    @inject(AgentCommunicationBus) private readonly communicationBus: AgentCommunicationBus // Inject AgentCommunicationBus
-  ) {
-    // console.log('UserPreferenceAgent constructor entered.');
-  }
+    @inject("AgentCommunicationBus") private communicationBus: AgentCommunicationBus,
+    @inject('PreferenceExtractionService') private preferenceExtractionService: PreferenceExtractionService,
+    @inject('KnowledgeGraphService') private knowledgeGraphService: KnowledgeGraphService
+  ) {}
 
   getName(): string {
     return 'UserPreferenceAgent';
   }
 
-  async handleMessage(message: { input: any; conversationHistory?: { role: string; content: string }[] }): Promise<{ preferences?: { [key: string]: any }; error?: string }> {
-    // console.log('UserPreferenceAgent received message:', message);
+  async handleMessage(message: { input: string; conversationHistory: { role: string; content: string }[], userId?: string, initialPreferences?: PreferenceNode[] }): Promise<{ preferences?: PreferenceNode[], error?: string }> {
+    console.log('UserPreferenceAgent received message:', message);
 
-    if (!this.communicationBus) {
-      // console.error('UserPreferenceAgent: AgentCommunicationBus not available.');
-      return { error: 'Communication bus not available' };
+    const { input, conversationHistory, userId, initialPreferences } = message;
+    const currentUserId = userId || 'current_user_id'; // Use a default or handle missing user ID
+
+    // 1. Use initial preferences if provided, otherwise fetch from knowledge graph
+    let persistedPreferences: PreferenceNode[] = [];
+    if (initialPreferences) {
+      persistedPreferences = initialPreferences;
+      console.log('UserPreferenceAgent: Using initial preferences provided.');
+    } else if (currentUserId) {
+      try {
+        // Fetch only active preferences
+        persistedPreferences = await this.knowledgeGraphService.getPreferences(currentUserId, false);
+        console.log('UserPreferenceAgent: Fetched active persisted preferences:', persistedPreferences);
+      } catch (error) {
+        console.error('UserPreferenceAgent: Error fetching persisted preferences:', error);
+        // Continue without persisted preferences if fetching fails
+      }
     }
 
-    // Determine the input to send to the LLM. Could be raw message or processed input.
-    // For now, assuming the raw message or a relevant part of it is passed.
-    // Determine the input to send to the LLM. Could be raw message or processed input.
-    // For now, assuming the raw message or a relevant part of it is passed.
-    const inputForLLM = typeof message.input === 'string' ? message.input : JSON.stringify(message.input);
+    // 2. Attempt fast extraction from current input
+    const fastPreferences = this.preferenceExtractionService.attemptFastExtraction(input);
 
-    // Format conversation history for the prompt
-    const historyForLLM = message.conversationHistory
-      ? message.conversationHistory.map(turn => `${turn.role}: ${turn.content}`).join('\n') + '\n'
-      : '';
+    let extractedPreferences: PreferenceNode[] = [];
+    if (fastPreferences) {
+      console.log('UserPreferenceAgent: Result of fast extraction:', fastPreferences);
+      // Convert the fastPreferences object to an array of PreferenceNode
+      extractedPreferences = Object.entries(fastPreferences).map(([type, value]) => ({
+        type,
+        value: value, // Keep original value for normalization
+        source: 'fast-extraction', // Indicate source
+        confidence: 1, // Placeholder confidence, refine later
+        timestamp: new Date().toISOString(),
+        active: true, // Default to active for newly extracted
+      }));
 
-    // --- LLM Integration for User Preference Extraction ---
-    try {
-      // console.log('UserPreferenceAgent: Sending input to LLM for preference extraction.');
-      // Formulate a prompt for the LLM to extract user preferences
-      // TODO: Refine the prompt to guide the LLM on the expected output format (e.g., JSON)
-      const llmPrompt = `Analyze the following user input for a wine recommendation request, considering the conversation history provided. Determine if it's a valid request and extract key information like ingredients or wine preferences. Provide the output in a JSON format with the following structure: { "isValid": boolean, "ingredients"?: string[], "preferences"?: { [key: string]: any }, "error"?: string }. If the input is invalid, set isValid to false and provide an error message.
+      // Normalize and persist the newly extracted preferences
+      const normalizedExtractedPreferences = this.normalizePreferences(extractedPreferences);
+      console.log('UserPreferenceAgent: Normalized extracted preferences:', normalizedExtractedPreferences);
+      await this.persistPreferences(normalizedExtractedPreferences, currentUserId);
 
-${historyForLLM}User Input: "${inputForLLM}"`;
+      // Merge newly extracted and normalized preferences with persisted ones
+      // Prioritize newly extracted preferences in case of conflicts
+      const mergedPreferences = this.mergePreferences(persistedPreferences, normalizedExtractedPreferences);
+      console.log('UserPreferenceAgent: Merged preferences (persisted + extracted):', mergedPreferences);
 
-      const llmResponse = await this.communicationBus.sendLLMPrompt(llmPrompt);
+      // Send merged preferences to the SommelierCoordinator for recommendation
+      this.communicationBus.sendMessage('SommelierCoordinator', {
+        userId: currentUserId,
+        input: {
+          preferences: mergedPreferences,
+          message: input, // Include the original user input
+        },
+        conversationHistory: conversationHistory,
+      });
 
-      if (llmResponse) {
-        // console.log('UserPreferenceAgent: Received LLM response for preferences.');
-        // console.log('UserPreferenceAgent: LLM response content:', llmResponse); // Add this line to log the LLM response
-        // Extract the JSON string from the LLM response
-        const jsonMatch = llmResponse.match(/```json\n([\s\S]*?)\n```/);
-        let jsonString = llmResponse;
+      // Return the merged preferences so the UI can display them immediately
+      return { preferences: mergedPreferences };
 
-        if (jsonMatch && jsonMatch[1]) {
-            jsonString = jsonMatch[1];
-        } else {
-            // Fallback if the ```json block is not found, try to find the first { and last }
-            const firstBracket = llmResponse.indexOf('{');
-            const lastBracket = llmResponse.lastIndexOf('}');
-            if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
-                jsonString = llmResponse.substring(firstBracket, lastBracket + 1);
+    } else {
+      console.log('UserPreferenceAgent: Fast extraction failed, queuing for async LLM.');
+      this.queueAsyncLLMExtraction(input, conversationHistory, currentUserId);
+
+      // If fast extraction fails, return only the persisted preferences for now
+      // The async LLM result will be persisted later.
+      return { preferences: persistedPreferences, error: 'Analyzing your input for preferences asynchronously.' };
+    }
+  }
+
+  // Helper method to merge preferences, prioritizing later sources
+  private mergePreferences(existing: PreferenceNode[], incoming: PreferenceNode[]): PreferenceNode[] {
+    const merged: { [key: string]: PreferenceNode } = {};
+
+    // Add existing preferences
+    existing.forEach(pref => {
+      merged[pref.type] = pref;
+    });
+
+    // Add or overwrite with incoming preferences
+    incoming.forEach(pref => {
+      merged[pref.type] = pref;
+    });
+
+    return Object.values(merged);
+  }
+
+  public normalizePreferences(preferences: PreferenceNode[]): PreferenceNode[] {
+    const synonymRegistry = new Map<string, Map<string, string>>();
+
+    // Synonym mappings for various preference types
+    synonymRegistry.set('wineType', new Map([
+        ['red', 'red'],
+        ['white', 'white'],
+        ['rose', 'rose'],
+        ['sparkling', 'sparkling'],
+        ['cabernet sauvignon', 'cabernet sauvignon'],
+        ['merlot', 'merlot'],
+        ['chardonnay', 'chardonnay'],
+        ['sauvignon blanc', 'sauvignon blanc'],
+        // Add more wine type synonyms as needed
+    ]));
+
+    synonymRegistry.set('sweetness', new Map([
+        ['dry', 'dry'],
+        ['sweet', 'sweet'],
+        ['off-dry', 'off-dry'],
+        ['bone dry', 'dry'],
+        ['very sweet', 'sweet'],
+        // Add more sweetness synonyms
+    ]));
+
+    synonymRegistry.set('body', new Map([
+        ['light', 'light'],
+        ['medium', 'medium'],
+        ['full', 'full'],
+        ['light-bodied', 'light'],
+        ['medium-bodied', 'medium'],
+        ['full-bodied', 'full'],
+        // Add more body synonyms
+    ]));
+
+    synonymRegistry.set('region', new Map([
+        ['france', 'France'],
+        ['italy', 'Italy'],
+        ['spain', 'Spain'],
+        ['usa', 'USA'],
+        ['australia', 'Australia'],
+        // Add more region synonyms
+    ]));
+
+    // Add more synonym registries for other preference types (e.g., oak, tannins, acidity)
+
+    return preferences.map(pref => {
+        // Trim whitespace and lowercase string values
+        let value = typeof pref.value === 'string'
+            ? pref.value.trim().toLowerCase()
+            : pref.value;
+
+        // Resolve synonyms using registry
+        if (typeof value === 'string' && synonymRegistry.has(pref.type)) {
+            const synonyms = synonymRegistry.get(pref.type);
+            if (synonyms && synonyms.has(value)) {
+                value = synonyms.get(value)!; // Normalize to canonical term
             }
         }
 
-        // console.log('UserPreferenceAgent: Extracted JSON string:', jsonString);
-
-        // TODO: Implement more robust parsing and validation of the LLM's JSON response
-        try {
-          const preferenceOutput: LLMPreferenceOutput = JSON.parse(jsonString);
-
-          // Basic validation of the parsed structure
-          if (typeof preferenceOutput.preferences !== 'object' || preferenceOutput.preferences === null) {
-             // console.error('UserPreferenceAgent: LLM response missing or invalid "preferences" field.');
-             return { preferences: {}, error: 'Invalid structure in LLM preference response.' };
-          }
-
-          // console.log('UserPreferenceAgent: Extracted preferences from LLM.');
-          return { preferences: preferenceOutput.preferences };
-
-        } catch (parseError: any) { // Explicitly type error as any
-          // console.error('UserPreferenceAgent: Error parsing or validating LLM response:', parseError);
-          return { error: `Error processing LLM preference response: ${parseError.message || String(parseError)}` };
+        // Handle negations
+        const negated = typeof value === 'string' && value.startsWith('not ');
+        if (negated) {
+            if (typeof value === 'string') {
+                value = value.slice(4); // Remove 'not ' prefix
+            } else if (Array.isArray(value) && value.every(item => typeof item === 'string')) {
+                value = value.map(item => item.slice(4)); // Remove 'not ' prefix from each string in the array
+            } else {
+                // Handle other types (number, boolean) as needed, e.g., throw an error or log a warning
+                console.warn('Value is not a string or string array, cannot apply slice.');
+            }
         }
 
-      } else {
-        // console.warn('UserPreferenceAgent: LLM did not return a preference response.');
-        // Return empty preferences if LLM doesn't respond
-        return { preferences: {} };
-      }
+        // Handle value ranges and type conversions
+        let normalizedValue: PreferenceNode['value'];
+        switch (pref.type) {
+            case 'priceRange':
+                // Assuming value is an array [min, max] or a single number
+                if (Array.isArray(value) && value.length <= 2 && value.every(v => typeof v === 'number')) {
+                    normalizedValue = value;
+                } else if (typeof value === 'number') {
+                    normalizedValue = [value, value]; // Treat single number as a range
+                } else {
+                    console.warn(`UserPreferenceAgent: Invalid value type for priceRange:`, value);
+                    return null; // Discard invalid preference
+                }
+                break;
+            case 'alcoholContent':
+                const numericAlcohol = Number(value);
+                if (!isNaN(numericAlcohol) && numericAlcohol >= 0 && numericAlcohol <= 25) { // Assuming alcohol content is between 0 and 25%
+                    normalizedValue = numericAlcohol;
+                } else {
+                    console.warn(`UserPreferenceAgent: Invalid value for alcoholContent:`, value);
+                    return null; // Discard invalid preference
+                }
+                break;
+            case 'aging':
+                // Assuming value is a duration object from Duckling or a number of years
+                if (typeof value === 'object' && value !== null && 'value' in value && 'unit' in value) {
+                     normalizedValue = `${value.value} ${value.unit}`; // Convert to string
+                } else if (typeof value === 'number' && value >= 0) {
+                     normalizedValue = `${value} years`; // Assume number is in years, convert to string
+                }
+                else {
+                    console.warn(`UserPreferenceAgent: Invalid value for aging:`, value);
+                    return null; // Discard invalid preference
+                }
+                break;
+            case 'servingTemperature':
+                 const numericTemperature = Number(value);
+                 if (!isNaN(numericTemperature)) {
+                     normalizedValue = numericTemperature;
+                 } else {
+                     console.warn(`UserPreferenceAgent: Invalid value for servingTemperature:`, value);
+                     return null; // Discard invalid preference
+                 }
+                 break;
+            case 'volume':
+                 // Assuming value is a volume object from Duckling or a number in ml/l
+                 if (typeof value === 'object' && value !== null && 'value' in value && 'unit' in value) {
+                      normalizedValue = `${value.value} ${value.unit}`; // Convert to string
+                 } else if (typeof value === 'number' && value > 0) {
+                      normalizedValue = `${value} ml`; // Assume number is in ml, convert to string
+                 } else {
+                     console.warn(`UserPreferenceAgent: Invalid value for volume:`, value);
+                     return null; // Discard invalid preference
+                 }
+                 break;
+            case 'location':
+                 // Assuming value is a string or location object from Duckling
+                 if (typeof value === 'object' && value !== null && 'value' in value) {
+                      normalizedValue = String(value.value); // Extract value if object and cast to string
+                 } else if (typeof value === 'string') {
+                      normalizedValue = value; // Use string value directly
+                 }
+                 else {
+                     console.warn(`UserPreferenceAgent: Invalid value for location:`, value);
+                     return null; // Discard invalid preference
+                 }
+                 break;
+            case 'distance':
+                 // Assuming value is a distance object from Duckling or a number
+                 if (typeof value === 'object' && value !== null && 'value' in value && 'unit' in value) {
+                      normalizedValue = `${value.value} ${value.unit}`; // Convert to string
+                 } else if (typeof value === 'number' && value >= 0) {
+                      normalizedValue = `${value} km`; // Assume number is in km, convert to string
+                 } else {
+                     console.warn(`UserPreferenceAgent: Invalid value for distance:`, value);
+                     return null; // Discard invalid preference
+                 }
+                 break;
+            default:
+                // For other types, ensure value is one of the allowed types in PreferenceNode
+                if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' || Array.isArray(value)) {
+                    normalizedValue = value;
+                } else {
+                    console.warn(`UserPreferenceAgent: Skipping normalization for unsupported value type for preference type "${pref.type}":`, value);
+                    return null; // Discard unsupported value types
+                }
+                break;
+        }
 
-    } catch (llmError) {
-      // console.error('UserPreferenceAgent: Error during LLM preference extraction:', llmError);
-      // Log LLM error and return empty preferences
-      // TODO: Add to Dead Letter Queue if necessary
-      return { error: 'Error communicating with LLM for preference extraction.' };
+
+        return {
+            ...pref,
+            value: normalizedValue,
+            negated: negated || pref.negated, // Include negated property if handled
+            timestamp: new Date().toISOString()
+        };
+    }).filter(Boolean) as PreferenceNode[]; // Filter out nulls from discarded preferences
+  }
+
+  private async persistPreferences(preferences: PreferenceNode[], userId?: string): Promise<void> {
+    const persistenceUserId = userId || 'current_user_id';
+    for (const preferenceNode of preferences) {
+      await this.knowledgeGraphService.addOrUpdatePreference(persistenceUserId, preferenceNode);
     }
-    // --- End LLM Integration ---
+  }
+
+  private queueAsyncLLMExtraction(userInput: string, conversationHistory?: { role: string; content: string }[], userId?: string): void {
+    const messageUserId = userId || 'placeholder_user_id';
+    this.communicationBus.sendMessage('LLMPreferenceExtractorAgent', {
+      input: userInput,
+      history: conversationHistory,
+      userId: messageUserId,
+    });
   }
 }
-
-// TODO: Implement more sophisticated user preference processing logic (now using LLM)

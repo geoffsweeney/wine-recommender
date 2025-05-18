@@ -1,3 +1,4 @@
+import { injectable } from 'tsyringe';
 import { EventEmitter } from 'events';
 import { SharedContextMemory, type ContextEntry, type ContextMetadata } from './SharedContextMemory';
 import { LLMService } from '../services/LLMService';
@@ -22,6 +23,7 @@ export interface AgentMessage<T = unknown> {
   type: string;
 }
 
+@injectable()
 export class AgentCommunicationBus {
   private emitter: EventEmitter;
   private agents: Map<string, AgentInfo>;
@@ -135,5 +137,17 @@ console.log('AgentCommunicationBus constructor entered.');
       return undefined;
     }
     return this.llmService.sendPrompt(prompt);
+  }
+
+  /**
+   * Sends a message to a specific agent.
+   * @param recipientAgentId The ID of the recipient agent.
+   * @param payload The message payload.
+   */
+  sendMessage<T>(recipientAgentId: string, payload: T): void {
+    console.log(`AgentCommunicationBus: Sending message to ${recipientAgentId} with payload:`, payload);
+    // In a real implementation, this would involve routing the message
+    // to the appropriate agent instance. For now, we'll just emit an event.
+    this.emitter.emit(`agentMessage:${recipientAgentId}`, payload);
   }
 }

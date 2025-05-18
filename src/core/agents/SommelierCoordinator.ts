@@ -14,6 +14,7 @@ import { ConversationHistoryService } from '../ConversationHistoryService'; // I
 import { AgentCommunicationBus } from '../AgentCommunicationBus'; // Import AgentCommunicationBus
 import { logger } from '../../utils/logger'; // Import the logger
 import winston from 'winston'; // Import winston for logger type
+import { UserProfileService } from '../../services/UserProfileService'; // Import UserProfileService
 
 @injectable()
 export class SommelierCoordinator implements Agent {
@@ -31,7 +32,8 @@ export class SommelierCoordinator implements Agent {
     @inject(BasicDeadLetterProcessor) private readonly deadLetterProcessor: BasicDeadLetterProcessor, // Inject BasicDeadLetterProcessor
     @inject(AgentCommunicationBus) private readonly communicationBus: AgentCommunicationBus, // Inject AgentCommunicationBus
     @inject(ConversationHistoryService) private readonly conversationHistoryService: ConversationHistoryService, // Inject ConversationHistoryService
-    @inject('logger') private logger: winston.Logger // Inject the logger
+    @inject('logger') private logger: winston.Logger, // Inject the logger
+    @inject(UserProfileService) private readonly userProfileService: UserProfileService // Inject UserProfileService
   ) {
     // Register agents with the communication bus
     this.communicationBus.registerAgent(this.inputValidationAgent.getName(), { name: this.inputValidationAgent.getName(), capabilities: ['input-validation'] });
@@ -52,6 +54,10 @@ export class SommelierCoordinator implements Agent {
     this.logger.info('SommelierCoordinator received message:', message); // Use logger
 
     try {
+      // Load user preferences at the start of the session
+      const userPreferences = await this.userProfileService.loadPreferences(message.userId);
+      this.logger.info(`SommelierCoordinator: Loaded ${userPreferences.length} preferences for user ${message.userId} at session start.`);
+
       // Retrieve existing conversation history
       const conversationHistory = this.conversationHistoryService.getConversationHistory(message.userId);
       this.logger.info(`SommelierCoordinator: Retrieved history for user ${message.userId}:`, conversationHistory);
@@ -131,7 +137,8 @@ export class SommelierCoordinator implements Agent {
        try {
          // Use SharedContextMemory to pass input to UserPreferenceAgent
          this.communicationBus.setContext(this.getName(), 'recommendationInput', recommendationInput);
-         await this.userPreferenceAgent.handleMessage({ input: recommendationInput, conversationHistory: conversationHistory }); // Basic call
+         // Pass loaded preferences from UserProfileService to UserPreferenceAgent
+         await this.userPreferenceAgent.handleMessage({ input: message.input.message || '', conversationHistory: conversationHistory, initialPreferences: userPreferences }); // Pass original message input, default to empty string if undefined
          // Use SharedContextMemory to retrieve result from UserPreferenceAgent (assuming agent sets it)
          // const userPreferenceResult = this.communicationBus.getContext(this.userPreferenceAgent.getName(), 'preferencesResult'); // This would be the pattern if agents set context
          this.logger.info('SommelierCoordinator: UserPreferenceAgent call completed.'); // Log completion

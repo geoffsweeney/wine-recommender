@@ -6,8 +6,9 @@
     <title>Wine Recommendation App</title>
     <style>
         body { font-family: sans-serif; margin: 20px; }
-        #recommendation-output { margin-top: 20px; border: 1px solid #ccc; padding: 10px; }
+        #recommendation-output { margin-top: 20px; border: 1px solid #ccc; padding: 10px; white-space: pre-wrap; }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
     <h1>Get a Wine Recommendation</h1>
@@ -55,7 +56,10 @@
 
             history.forEach(turn => {
                 const p = document.createElement('p');
-                p.innerHTML = `<strong>${turn.role}:</strong> ${turn.content}`;
+                const content = turn.role === 'assistant'
+                    ? marked.parse(turn.content.replace(/\\n/g, '<br>'))
+                    : turn.content;
+                p.innerHTML = `<strong>${turn.role}:</strong><br>${content}`;
                 recommendationOutput.appendChild(p);
             });
         }
@@ -105,7 +109,7 @@
                 const data = await response.json();
 
                 if (response.ok) {
-                    const assistantResponse = data.recommendation ? JSON.stringify(data.recommendation, null, 2) : (data.error || 'No recommendation provided.');
+                    const assistantResponse = data.recommendation ? data.recommendation : (data.error || 'No recommendation provided.');
                      saveConversationTurn('assistant', assistantResponse); // Save assistant turn
                 } else {
                     const errorResponse = data.error || 'Unknown error';

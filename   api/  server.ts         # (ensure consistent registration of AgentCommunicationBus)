@@ -1,0 +1,19 @@
+const express = require('express');
+const { container } = require('tsyringe');
+const { AgentCommunicationBus } = require('./core/AgentCommunicationBus');
+
+const app = express();
+const PORT = process.env.PORT || 3001;
+
+const registerDependencies = () => {
+    container.register('AgentCommunicationBus', { useClass: AgentCommunicationBus });
+};
+
+const createServer = () => {
+    registerDependencies();
+    app.listen(PORT, () => {
+        console.log(`Server is running on port ${PORT}`);
+    });
+};
+
+createServer();

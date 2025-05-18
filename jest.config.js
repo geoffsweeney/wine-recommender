@@ -11,7 +11,9 @@ module.exports = {
   },
   moduleNameMapper: {
     '^@src/(.*)$': '<rootDir>/src/$1',
-    '^@tests/(.*)$': '<rootDir>/src/__tests__/$1'
+    '^@tests/(.*)$': '<rootDir>/src/__tests__/$1',
+    '^spacy$': '<rootDir>/__mocks__/spacy.js', // Map spacy to a mock file
+    '^spacy/matcher$': '<rootDir>/__mocks__/spacy.js', // Map spacy/matcher to the base mock file
   },
   testMatch: [
     '**/__tests__/**/*.test.ts'

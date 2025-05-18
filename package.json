@@ -8,7 +8,7 @@
     "lint": "eslint . --ext .ts",
     "dev": "node -r tsconfig-paths/register -r ts-node/register src/server.ts",
     "build": "tsc",
-    "start": "node dist/server.js"
+    "start": "npm run build && node dist/server.js"
   },
   "husky": {
     "hooks": {
@@ -17,6 +17,7 @@
     }
   },
   "devDependencies": {
+    "@types/axios": "^0.9.36",
     "@types/cors": "^2.8.18",
     "@types/express": "^5.0.1",
     "@types/jest": "^29.5.14",
@@ -43,8 +44,10 @@
     "express-rate-limit": "^7.5.0",
     "neo4j-driver": "^5.28.1",
     "rate-limiter-flexible": "^7.1.0",
+    "spacy": "^0.0.4",
     "tsyringe": "^4.10.0",
-    "winston": "^3.17.0"
+    "winston": "^3.17.0",
+    "axios": "^1.7.2"
   },
   "ts-node": {
     "files": true

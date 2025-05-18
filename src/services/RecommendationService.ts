@@ -179,8 +179,12 @@ class UserPreferencesStrategy implements IRecommendationStrategy {
   ) {}
 
   async getRecommendations(request: RecommendationRequest): Promise<any[]> {
-    // Implementation...
-    return []; // Placeholder
+    // Use preferences from the request to find wines in the knowledge graph
+    if (!request.input.preferences) {
+      return []; // Return empty if no preferences are provided
+    }
+    // Assuming findWinesByPreferences can handle the structure of request.input.preferences
+    return this.knowledgeGraph.findWinesByPreferences(request.input.preferences);
   }
 }
 

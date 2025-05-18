@@ -96,10 +96,10 @@ Output: {"isValid": false, "error": "Input is not related to wine or food pairin
             jsonString = jsonMatch[1];
             console.log('InputValidationAgent: Extracted JSON string:', jsonString); // Added logging
           } else {
-             console.warn('InputValidationAgent: Could not find ```json\n...\n``` markers in LLM response. Attempting to parse full response.'); // Added logging
-          }
-
-          const validationOutput: LLMValidationOutput = JSON.parse(jsonString);
+             console.warn('InputValidationAgent: Could not find ```json\\n``` markers in LLM response. Attempting to parse full response.'); // Corrected logging
+           }
+ 
+           const validationOutput: LLMValidationOutput = JSON.parse(jsonString);
           console.log('InputValidationAgent: Parsed validation output:', validationOutput); // Added logging
 
 

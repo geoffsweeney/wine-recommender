@@ -2,6 +2,7 @@ import { inject, injectable } from 'tsyringe';
 import { Neo4jService } from './Neo4jService';
 import { RecommendationRequest } from '@src/api/dtos/RecommendationRequest.dto'; // Import DTO
 import { WineNode } from '@src/types'; // Import WineNode from types
+import { PreferenceNode } from '@src/types'; // Import PreferenceNode from types
 
 @injectable()
 export class KnowledgeGraphService {
@@ -163,5 +164,45 @@ export class KnowledgeGraphService {
       RETURN w
     `, { wineId });
     return results[0] || null;
+  }
+async addOrUpdatePreference(userId: string, preference: PreferenceNode): Promise<void> {
+    const query = `
+      MERGE (u:User {id: $userId})
+      MERGE (p:Preference {type: $type, value: $value})
+      ON CREATE SET p.source = $source, p.confidence = $confidence, p.timestamp = $timestamp, p.active = $active
+      ON MATCH SET p.source = $source, p.confidence = $confidence, p.timestamp = $timestamp, p.active = $active
+      MERGE (u)-[:HAS_PREFERENCE]->(p)
+    `;
+    await this.neo4j.executeQuery(query, {
+      userId,
+      type: preference.type,
+      value: preference.value,
+      source: preference.source,
+      confidence: preference.confidence,
+      timestamp: preference.timestamp,
+      active: preference.active,
+    });
+  }
+
+  async getPreferences(userId: string, includeInactive: boolean = false): Promise<PreferenceNode[]> {
+    let query = `
+      MATCH (u:User {id: $userId})-[:HAS_PREFERENCE]->(p:Preference)
+    `;
+    if (!includeInactive) {
+      query += ` WHERE p.active = true`;
+    }
+    query += ` RETURN p`;
+
+    const results = await this.neo4j.executeQuery<PreferenceNode>(query, { userId });
+    return results.map((record: any) => record.p as PreferenceNode);
+  }
+
+  async deletePreference(userId: string, preferenceId: string): Promise<void> {
+    const query = `
+      MATCH (u:User {id: $userId})-[r:HAS_PREFERENCE]->(p:Preference)
+      WHERE p.id = $preferenceId
+      DELETE r, p
+    `;
+    await this.neo4j.executeQuery(query, { userId, preferenceId });
   }
 }

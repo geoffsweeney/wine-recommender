@@ -173,4 +173,117 @@ describe('KnowledgeGraphService', () => {
       expect(result).toBeNull();
     });
   });
+
+  describe('Preference Management', () => {
+    it('should add or update a preference', async () => {
+      const userId = 'test-user';
+      const preference = {
+        type: 'wineType',
+        value: 'red',
+        source: 'manual',
+        confidence: 1.0,
+        timestamp: new Date().toISOString(),
+        active: true,
+      };
+
+      await service.addOrUpdatePreference(userId, preference);
+
+      expect(mockNeo4j.executeQuery).toHaveBeenCalledWith(
+        `
+      MERGE (u:User {id: $userId})
+      MERGE (p:Preference {type: $type, value: $value})
+      ON CREATE SET p.source = $source, p.confidence = $confidence, p.timestamp = $timestamp, p.active = $active
+      ON MATCH SET p.source = $source, p.confidence = $confidence, p.timestamp = $timestamp, p.active = $active
+      MERGE (u)-[:HAS_PREFERENCE]->(p)
+    `,
+        {
+          userId,
+          type: preference.type,
+          value: preference.value,
+          source: preference.source,
+          confidence: preference.confidence,
+          timestamp: preference.timestamp,
+          active: preference.active,
+        }
+      );
+    });
+
+    it('should get only active preferences by default', async () => {
+      const userId = 'test-user';
+      const mockResults = [
+        { p: { type: 'wineType', value: 'red', active: true } },
+        { p: { type: 'sweetness', value: 'dry', active: false } },
+      ];
+      mockNeo4j.executeQuery.mockResolvedValue(mockResults);
+
+      const preferences = await service.getPreferences(userId);
+
+      expect(mockNeo4j.executeQuery).toHaveBeenCalledWith(
+        `
+      MATCH (u:User {id: $userId})-[:HAS_PREFERENCE]->(p:Preference)
+       WHERE p.active = true RETURN p`,
+        { userId }
+      );
+      // Expect the result to be mapped to PreferenceNode objects
+      expect(preferences).toEqual([
+        { type: 'wineType', value: 'red', active: true },
+        { type: 'sweetness', value: 'dry', active: false }, // The mapping logic in service.getPreferences returns all properties, filtering is done by the query
+      ]);
+    });
+
+    it('should get all preferences when includeInactive is true', async () => {
+      const userId = 'test-user';
+      const mockResults = [
+        { p: { type: 'wineType', value: 'red', active: true } },
+        { p: { type: 'sweetness', value: 'dry', active: false } },
+      ];
+      mockNeo4j.executeQuery.mockResolvedValue(mockResults);
+
+      const preferences = await service.getPreferences(userId, true);
+
+      expect(mockNeo4j.executeQuery).toHaveBeenCalledWith(
+        `
+      MATCH (u:User {id: $userId})-[:HAS_PREFERENCE]->(p:Preference)
+       RETURN p`,
+        { userId }
+      );
+      // Expect the result to include both active and inactive preferences
+      expect(preferences).toEqual([
+        { type: 'wineType', value: 'red', active: true },
+        { type: 'sweetness', value: 'dry', active: false },
+      ]);
+    });
+
+    it('should return an empty array when no preferences are found', async () => {
+      const userId = 'test-user';
+      mockNeo4j.executeQuery.mockResolvedValue([]);
+
+      const preferences = await service.getPreferences(userId);
+
+      expect(mockNeo4j.executeQuery).toHaveBeenCalledWith(
+        `
+      MATCH (u:User {id: $userId})-[:HAS_PREFERENCE]->(p:Preference)
+       WHERE p.active = true RETURN p`,
+        { userId }
+      );
+      expect(preferences).toEqual([]);
+    });
+
+    it('should delete a preference', async () => {
+      const userId = 'test-user';
+      const preferenceId = 'pref-123';
+
+      await service.deletePreference(userId, preferenceId);
+
+      expect(mockNeo4j.executeQuery).toHaveBeenCalledWith(
+        `
+      MATCH (u:User {id: $userId})-[r:HAS_PREFERENCE]->(p:Preference)
+      WHERE p.id = $preferenceId
+      DELETE r, p
+    `,
+        { userId, preferenceId }
+      );
+    });
+
+  });
 });
