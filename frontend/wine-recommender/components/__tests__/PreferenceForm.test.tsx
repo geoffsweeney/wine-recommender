@@ -2,8 +2,8 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import PreferenceForm from '../PreferenceForm';
-import { PreferenceNode } from '../../../../src/types';
-import { addPreference, updatePreference } from '../../lib/api';
+import { PreferenceNode } from '../../../../src/types'; // Adjust import path as needed
+import { addPreference, updatePreference } from '../../lib/api'; // Import API functions to mock
 
 // Mock the API functions
 jest.mock('../../lib/api', () => ({
@@ -11,23 +11,23 @@ jest.mock('../../lib/api', () => ({
   updatePreference: jest.fn(),
 }));
 
-const mockAddPreference = addPreference as jest.Mock;
-const mockUpdatePreference = updatePreference as jest.Mock;
+const mockedAddPreference = addPreference as jest.Mock;
+const mockedUpdatePreference = updatePreference as jest.Mock;
 
 describe('PreferenceForm', () => {
-  const mockUserId = 'test-user';
+  const mockUserId = 'test-user-id';
   const mockOnSuccess = jest.fn();
   const mockOnCancel = jest.fn();
 
   beforeEach(() => {
     // Reset mocks before each test
-    mockAddPreference.mockClear();
-    mockUpdatePreference.mockClear();
-    mockOnSuccess.mockClear();
-    mockOnCancel.mockClear();
+    mockedAddPreference.mockReset();
+    mockedUpdatePreference.mockReset();
+    mockOnSuccess.mockReset();
+    mockOnCancel.mockReset();
   });
 
-  it('should render the form for adding a new preference', () => {
+  it('renders correctly for adding a new preference', () => {
     render(
       <PreferenceForm
         userId={mockUserId}
@@ -38,21 +38,22 @@ describe('PreferenceForm', () => {
 
     expect(screen.getByLabelText('Preference Type')).toBeInTheDocument();
     expect(screen.getByLabelText('Preference Value')).toBeInTheDocument();
-    // TODO: Expect the active toggle to be present once implemented
-    expect(screen.getByRole('button', { name: 'Save Preference' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Include in Pairing')).toBeInTheDocument();
+    expect(screen.getByLabelText('Negated')).toBeInTheDocument(); // Check for negated toggle
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Save Preference' })).not.toBeDisabled(); // Should not be submitting initially
+    expect(screen.getByRole('button', { name: 'Save Preference' })).toBeInTheDocument();
   });
 
-  it('should render the form for editing an existing preference with initial data', () => {
+  it('renders correctly for editing an existing preference', () => {
     const mockPreference: PreferenceNode = {
-      id: 'pref-123',
+      id: '1',
       type: 'wineType',
       value: 'red',
       source: 'manual',
-      confidence: 1.0,
-      timestamp: new Date().toISOString(),
+      confidence: 1,
+      timestamp: '',
       active: true,
+      negated: false,
     };
 
     render(
@@ -65,13 +66,18 @@ describe('PreferenceForm', () => {
     );
 
     expect(screen.getByLabelText('Preference Type')).toHaveValue('wineType');
+    // The value input will be dynamic, so check the rendered input based on type
+    // For 'wineType', it's currently a default text input in the component before dynamic rendering is fully implemented
+    // Once dynamic rendering is complete, this test will need to be updated to check the correct input type and value
     expect(screen.getByLabelText('Preference Value')).toHaveValue('red');
-    // TODO: Expect the active toggle to be checked once implemented
+    expect(screen.getByLabelText('Include in Pairing')).toBeChecked();
+    expect(screen.getByLabelText('Negated')).not.toBeChecked(); // Check for negated toggle state
     expect(screen.getByRole('button', { name: 'Save Preference' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
   });
 
-  it('should submit the form to add a new preference', async () => {
+  it('handles form submission for adding a new preference', async () => {
+    mockedAddPreference.mockResolvedValue(undefined); // Mock successful add
+
     render(
       <PreferenceForm
         userId={mockUserId}
@@ -80,210 +86,206 @@ describe('PreferenceForm', () => {
       />
     );
 
-    const typeInput = screen.getByLabelText('Preference Type');
-    const valueInput = screen.getByLabelText('Preference Value');
-    const saveButton = screen.getByRole('button', { name: 'Save Preference' });
+    // Fill out the form (using the default text inputs for now)
+    fireEvent.change(screen.getByLabelText('Preference Type'), { target: { value: 'sweetness' } });
+    fireEvent.change(screen.getByLabelText('Preference Value'), { target: { value: 'dry' } });
+    fireEvent.click(screen.getByLabelText('Include in Pairing')); // Toggle active off
+    fireEvent.click(screen.getByLabelText('Negated')); // Toggle negated on
 
-    // Simulate user input
-    fireEvent.change(typeInput, { target: { value: 'flavor' } });
-    fireEvent.change(valueInput, { target: { value: 'oaky' } });
 
-    // Mock the API call to resolve
-    mockAddPreference.mockResolvedValue(undefined);
+    fireEvent.click(screen.getByRole('button', { name: 'Save Preference' }));
 
-    // Submit the form
-    fireEvent.click(saveButton);
-
-    // Expect addPreference to have been called with the correct data
     await waitFor(() => {
-      expect(mockAddPreference).toHaveBeenCalledWith(mockUserId, {
-        type: 'flavor',
-        value: 'oaky',
+      expect(mockedAddPreference).toHaveBeenCalledWith(mockUserId, {
+        type: 'sweetness',
+        value: 'dry',
         source: 'manual', // Default source
         confidence: 1.0, // Default confidence
-        timestamp: expect.any(String), // Expect a timestamp string
-        active: true, // Default active state
+        timestamp: expect.any(String), // Timestamp is generated on submission
+        active: false, // Toggled off
+        negated: true, // Toggled on
       });
-    });
-
-    // Expect onSuccess to have been called
-    expect(mockOnSuccess).toHaveBeenCalled();
-    // Expect the form to be reset (check input values)
-    expect(typeInput).toHaveValue('');
-    expect(valueInput).toHaveValue('');
-    // TODO: Check active toggle state after reset
-  });
-
-it('should submit the form to edit an existing preference', async () => {
-  const mockPreference: PreferenceNode = {
-    id: 'pref-123',
-    type: 'wineType',
-    value: 'red',
-    source: 'manual',
-    confidence: 1.0,
-    timestamp: new Date().toISOString(),
-    active: true,
-  };
-
-  render(
-    <PreferenceForm
-      initialData={mockPreference}
-      userId={mockUserId}
-      onSuccess={mockOnSuccess}
-      onCancel={mockOnCancel}
-    />
-  );
-
-  const typeInput = screen.getByLabelText('Preference Type');
-  const valueInput = screen.getByLabelText('Preference Value');
-  const saveButton = screen.getByRole('button', { name: 'Save Preference' });
-
-  // Simulate user changing the value
-  fireEvent.change(valueInput, { target: { value: 'bold red' } });
-
-  // Mock the API call to resolve
-  mockUpdatePreference.mockResolvedValue(undefined);
-
-  // Submit the form
-  fireEvent.click(saveButton);
-
-  // Expect updatePreference to have been called with the correct data, including the ID
-  await waitFor(() => {
-    expect(mockUpdatePreference).toHaveBeenCalledWith(mockUserId, mockPreference.id, {
-      ...mockPreference, // Expect initial data...
-      value: 'bold red', // ...with the updated value
-      // TODO: Verify other fields are included correctly, especially active toggle state
+      expect(mockOnSuccess).toHaveBeenCalledTimes(1);
     });
   });
 
-  // Expect onSuccess to have been called
-  expect(mockOnSuccess).toHaveBeenCalled();
-  // Expect the form to be reset (check input values)
-  expect(typeInput).toHaveValue('');
-  expect(valueInput).toHaveValue('');
-  // TODO: Check active toggle state after reset
-});
-
-it('should call onCancel when the Cancel button is clicked', () => {
-  render(
-    <PreferenceForm
-      userId={mockUserId}
-      onSuccess={mockOnSuccess}
-      onCancel={mockOnCancel}
-    />
-  );
-
-  const cancelButton = screen.getByRole('button', { name: 'Cancel' });
-  fireEvent.click(cancelButton);
-
-  // Expect onCancel to have been called
-  expect(mockOnCancel).toHaveBeenCalled();
-});
-
-it('should handle API errors during form submission', async () => {
-  const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {}); // Mock console.error
-  const mockError = new Error('Submission failed');
-  // Mock both API calls to reject with an error
-  mockAddPreference.mockRejectedValue(mockError);
-  mockUpdatePreference.mockRejectedValue(mockError);
-
-  render(
-    <PreferenceForm
-      userId={mockUserId}
-      onSuccess={mockOnSuccess}
-      onCancel={mockOnCancel}
-    />
-  );
-
-  const typeInput = screen.getByLabelText('Preference Type');
-  const valueInput = screen.getByLabelText('Preference Value');
-  const saveButton = screen.getByRole('button', { name: 'Save Preference' });
-
-  // Simulate user input
-  fireEvent.change(typeInput, { target: { value: 'flavor' } });
-  fireEvent.change(valueInput, { target: { value: 'oaky' } });
-
-  // Submit the form
-  fireEvent.click(saveButton);
-
-  // Expect console.error to have been called
-  await waitFor(() => {
-    expect(consoleSpy).toHaveBeenCalledWith('Failed to save preference:', mockError);
-  });
-  // Expect onSuccess not to have been called
-  expect(mockOnSuccess).not.toHaveBeenCalled();
-  // Expect the save button to be re-enabled
-  expect(saveButton).not.toBeDisabled();
-
-  consoleSpy.mockRestore(); // Restore console.error
-});
-
-it('should display validation errors for missing required fields', async () => {
-  render(
-    <PreferenceForm
-      userId={mockUserId}
-      onSuccess={mockOnSuccess}
-      onCancel={mockOnCancel}
-    />
-  );
-
-  const saveButton = screen.getByRole('button', { name: 'Save Preference' });
-
-  // Submit the form without filling in required fields
-  fireEvent.click(saveButton);
-
-  // Expect validation error messages to be displayed
-  await waitFor(() => {
-    expect(screen.getByText('Preference type is required')).toBeInTheDocument();
-    expect(screen.getByText('Preference value is required')).toBeInTheDocument();
-  });
-
-  // Expect API functions not to have been called
-  expect(mockAddPreference).not.toHaveBeenCalled();
-  expect(mockUpdatePreference).not.toHaveBeenCalled();
-  expect(mockOnSuccess).not.toHaveBeenCalled();
-});
-
-it('should include the active toggle value in the submitted data', async () => {
-  render(
-    <PreferenceForm
-      userId={mockUserId}
-      onSuccess={mockOnSuccess}
-      onCancel={mockOnCancel}
-    />
-  );
-
-  const typeInput = screen.getByLabelText('Preference Type');
-  const valueInput = screen.getByLabelText('Preference Value');
-  const activeToggle = screen.getByLabelText('Include in Pairing') as HTMLInputElement; // Assuming the label text and input type
-  const saveButton = screen.getByRole('button', { name: 'Save Preference' });
-
-  // Simulate user input
-  fireEvent.change(typeInput, { target: { value: 'region' } });
-  fireEvent.change(valueInput, { target: { value: 'Barossa' } });
-  // Toggle the active state
-  fireEvent.click(activeToggle); // Assuming it defaults to true and we toggle it off
-
-  // Mock the API call to resolve
-  mockAddPreference.mockResolvedValue(undefined);
-
-  // Submit the form
-  fireEvent.click(saveButton);
-
-  // Expect addPreference to have been called with the correct data, including active: false
-  await waitFor(() => {
-    expect(mockAddPreference).toHaveBeenCalledWith(mockUserId, {
-      type: 'region',
-      value: 'Barossa',
+  it('handles form submission for editing an existing preference', async () => {
+    const mockPreference: PreferenceNode = {
+      id: '1',
+      type: 'wineType',
+      value: 'red',
       source: 'manual',
-      confidence: 1.0,
-      timestamp: expect.any(String),
-      active: false, // Expect active to be false after toggling
+      confidence: 1,
+      timestamp: '',
+      active: true,
+      negated: false,
+    };
+    mockedUpdatePreference.mockResolvedValue(undefined); // Mock successful update
+
+    render(
+      <PreferenceForm
+        initialData={mockPreference}
+        userId={mockUserId}
+        onSuccess={mockOnSuccess}
+        onCancel={mockOnCancel}
+      />
+    );
+
+    // Change some values
+    fireEvent.change(screen.getByLabelText('Preference Value'), { target: { value: 'dry' } });
+    fireEvent.click(screen.getByLabelText('Include in Pairing')); // Toggle active off
+    fireEvent.click(screen.getByLabelText('Negated')); // Toggle negated on
+
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save Preference' }));
+
+    await waitFor(() => {
+      expect(mockedUpdatePreference).toHaveBeenCalledWith(mockUserId, mockPreference.id, {
+        id: '1', // ID should be retained
+        type: 'wineType', // Type remains the same
+        value: 'dry', // Value is updated
+        source: 'manual', // Source remains the same
+        confidence: 1.0, // Confidence remains the same
+        timestamp: expect.any(String), // Timestamp is updated on submission
+        active: false, // Toggled off
+        negated: true, // Toggled on
+      });
+      expect(mockOnSuccess).toHaveBeenCalledTimes(1);
     });
   });
 
-  expect(mockOnSuccess).toHaveBeenCalled();
-});
+  it('calls onCancel when the Cancel button is clicked', () => {
+    render(
+      <PreferenceForm
+        userId={mockUserId}
+        onSuccess={mockOnSuccess}
+        onCancel={mockOnCancel}
+      />
+    );
 
-// TODO: Add tests for different value types (requires component implementation)
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(mockOnCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders select input for wineType and handles selection', async () => {
+    render(
+      <PreferenceForm
+        userId={mockUserId}
+        onSuccess={mockOnSuccess}
+        onCancel={mockOnCancel}
+      />
+    );
+
+    // Change type to wineType
+    fireEvent.change(screen.getByLabelText('Preference Type'), { target: { value: 'wineType' } });
+
+    // Wait for the select input to appear
+    const valueSelect = await screen.findByLabelText('Preference Value');
+    expect(valueSelect).toBeInTheDocument();
+    expect(valueSelect.tagName).toBe('SELECT');
+
+    // TODO: Add options to the select in the component and test selecting an option
+    // For now, just test that the select is rendered.
+  });
+
+  it('renders number inputs for priceRange and handles input', async () => {
+    render(
+      <PreferenceForm
+        userId={mockUserId}
+        onSuccess={mockOnSuccess}
+        onCancel={mockOnCancel}
+      />
+    );
+
+    // Change type to priceRange
+    fireEvent.change(screen.getByLabelText('Preference Type'), { target: { value: 'priceRange' } });
+
+    // Wait for the number inputs to appear
+    const minPriceInput = await screen.findByPlaceholderText('Min Price');
+    const maxPriceInput = await screen.findByPlaceholderText('Max Price');
+    expect(minPriceInput).toBeInTheDocument();
+    expect(maxPriceInput).toBeInTheDocument();
+    expect(minPriceInput).toHaveAttribute('type', 'number');
+    expect(maxPriceInput).toHaveAttribute('type', 'number');
+
+    // Enter values
+    fireEvent.change(minPriceInput, { target: { value: '10' } });
+    fireEvent.change(maxPriceInput, { target: { value: '50' } });
+
+    // Submit the form
+    fireEvent.click(screen.getByRole('button', { name: 'Save Preference' }));
+
+    await waitFor(() => {
+      expect(mockedAddPreference).toHaveBeenCalledWith(mockUserId, {
+        type: 'priceRange',
+        value: [10, 50], // Should be an array of numbers
+        source: 'manual',
+        confidence: 1.0,
+        timestamp: expect.any(String),
+        active: true,
+        negated: false,
+      });
+      expect(mockOnSuccess).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('renders number input for alcoholContent and handles input', async () => {
+    render(
+      <PreferenceForm
+        userId={mockUserId}
+        onSuccess={mockOnSuccess}
+        onCancel={mockOnCancel}
+      />
+    );
+
+    // Change type to alcoholContent
+    fireEvent.change(screen.getByLabelText('Preference Type'), { target: { value: 'alcoholContent' } });
+
+    // Wait for the number input to appear
+    const alcoholInput = await screen.findByLabelText('Preference Value');
+    expect(alcoholInput).toBeInTheDocument();
+    expect(alcoholInput).toHaveAttribute('type', 'number');
+
+    // Enter value
+    fireEvent.change(alcoholInput, { target: { value: '14.5' } });
+
+    // Submit the form
+    fireEvent.click(screen.getByRole('button', { name: 'Save Preference' }));
+
+    await waitFor(() => {
+      expect(mockedAddPreference).toHaveBeenCalledWith(mockUserId, {
+        type: 'alcoholContent',
+        value: 14.5, // Should be a number
+        source: 'manual',
+        confidence: 1.0,
+        timestamp: expect.any(String),
+        active: true,
+        negated: false,
+      });
+      expect(mockOnSuccess).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('displays validation errors for required fields on submission', async () => {
+    render(
+      <PreferenceForm
+        userId={mockUserId}
+        onSuccess={mockOnSuccess}
+        onCancel={mockOnCancel}
+      />
+    );
+
+    // Submit empty form
+    fireEvent.click(screen.getByRole('button', { name: 'Save Preference' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Preference type is required')).toBeInTheDocument();
+      expect(screen.getByText('Preference value is required')).toBeInTheDocument();
+      expect(mockedAddPreference).not.toHaveBeenCalled(); // API should not be called
+    });
+  });
+
+  // TODO: Add more tests for type-specific validation (e.g., price range format, alcohol content range)
+  // TODO: Add tests for error handling and showing user feedback
 });

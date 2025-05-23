@@ -23,14 +23,14 @@ export class RecommendationService {
     this.strategies = [
       new UserPreferencesStrategy(neo4jService, knowledgeGraph),
       new CollaborativeFilteringStrategy(neo4jService, knowledgeGraph),
-      new PopularWinesStrategy(neo4jService, knowledgeGraph, this.logger)
+      new PopularWinesStrategy(neo4jService, knowledgeGraph, this.logger) // Pass logger to PopularWinesStrategy
     ];
   }
 
   async getRecommendations(request: RecommendationRequest): Promise<any[]> {
     this.logger.info('RecommendationService: Getting recommendations for request:', request); // Log start
      this.logger.info('RecommendationService: Request input:', request.input); // Add logging for request input
- 
+
      // Basic validation: Check if preferences are provided in the input
      const hasPreferences = request.input.preferences && (
       request.input.preferences.wineType ||
@@ -47,12 +47,25 @@ export class RecommendationService {
     }
 
     try {
+      this.logger.info('RecommendationService: Executing strategies...'); // Log before executing strategies
       const allResults = await Promise.all(
-        this.strategies.map(strategy => strategy.getRecommendations(request))
+        this.strategies.map(strategy => {
+          this.logger.info(`RecommendationService: Executing strategy: ${strategy.constructor.name}`); // Log strategy name
+          return strategy.getRecommendations(request);
+        })
       );
       this.logger.info('RecommendationService: Received results from all strategies.'); // Log after strategies
-      const rankedResults = await this.rankRecommendations(allResults.flat());
+      this.logger.debug('RecommendationService: Raw results from strategies:', allResults); // Log raw results
+
+      const flattenedResults = allResults.flat();
+      this.logger.info('RecommendationService: Flattened results count:', flattenedResults.length); // Log flattened count
+      this.logger.debug('RecommendationService: Flattened results:', flattenedResults); // Log flattened results
+
+
+      const rankedResults = await this.rankRecommendations(flattenedResults);
       this.logger.info('RecommendationService: Recommendations ranked successfully.'); // Log after ranking
+      this.logger.debug('RecommendationService: Ranked results:', rankedResults); // Log ranked results
+
       return rankedResults;
     } catch (error) {
       this.logger.error('RecommendationService: Error getting recommendations:', error); // Log error
@@ -210,6 +223,8 @@ class PopularWinesStrategy implements IRecommendationStrategy {
   ) {}
 
   async getRecommendations(request: RecommendationRequest): Promise<any[]> {
+    this.logger.info('PopularWinesStrategy: Getting recommendations for request:', request); // Log start
+
     // Basic validation: Check if preferences are provided in the input (similar to main service)
     const hasPreferences = request.input.preferences && (
       request.input.preferences.wineType ||

@@ -6,16 +6,18 @@ import { LLMService } from '../../../services/LLMService'; // Import LLMService
 import { PreferenceExtractionService } from '../../../services/PreferenceExtractionService'; // Import PreferenceExtractionService
 import { KnowledgeGraphService } from '../../../services/KnowledgeGraphService'; // Import KnowledgeGraphService
 import { Neo4jService } from '../../../services/Neo4jService'; // Import Neo4jService
+import { PreferenceNormalizationService } from '../../../services/PreferenceNormalizationService'; // Import PreferenceNormalizationService
 
 
 // Mock the AgentCommunicationBus module
 jest.mock('../../AgentCommunicationBus');
 
-// Mock the LLMService, PreferenceExtractionService, KnowledgeGraphService, and Neo4jService modules for integration tests
+// Mock the LLMService, PreferenceExtractionService, KnowledgeGraphService, Neo4jService, and PreferenceNormalizationService modules for integration tests
 jest.mock('../../../services/LLMService');
 jest.mock('../../../services/PreferenceExtractionService');
 jest.mock('../../../services/KnowledgeGraphService');
 jest.mock('../../../services/Neo4jService');
+jest.mock('../../../services/PreferenceNormalizationService'); // Mock PreferenceNormalizationService
 
 
 // Explicitly mock AgentCommunicationBus to have Jest mock functions for the methods used by UserPreferenceAgent
@@ -28,6 +30,7 @@ const MockLLMService = LLMService as jest.MockedClass<typeof LLMService>;
 const MockPreferenceExtractionService = PreferenceExtractionService as jest.MockedClass<typeof PreferenceExtractionService>;
 const MockKnowledgeGraphService = KnowledgeGraphService as jest.MockedClass<typeof KnowledgeGraphService>;
 const MockNeo4jService = Neo4jService as jest.MockedClass<typeof Neo4jService>;
+const MockPreferenceNormalizationService = PreferenceNormalizationService as jest.MockedClass<typeof PreferenceNormalizationService>; // Mocked class
 
 
 describe('UserPreferenceAgent Integration with LLMService', () => {
@@ -36,6 +39,7 @@ describe('UserPreferenceAgent Integration with LLMService', () => {
   let mockPreferenceExtractionServiceInstance: jest.Mocked<PreferenceExtractionService>; // Mock instance
   let mockKnowledgeGraphServiceInstance: jest.Mocked<KnowledgeGraphService>; // Mock instance
   let mockNeo4jServiceInstance: jest.Mocked<Neo4jService>; // Mock instance
+  let mockPreferenceNormalizationServiceInstance: jest.Mocked<PreferenceNormalizationService>; // Mock instance
 
 
   beforeEach(() => {
@@ -44,6 +48,7 @@ describe('UserPreferenceAgent Integration with LLMService', () => {
     MockPreferenceExtractionService.mockClear(); // Clear mock
     MockKnowledgeGraphService.mockClear(); // Clear mock
     MockNeo4jService.mockClear(); // Clear mock
+    MockPreferenceNormalizationService.mockClear(); // Clear mock
     // container.clearInstances(); // No longer using container for agent
 
     // Create mock instances of services
@@ -53,6 +58,7 @@ describe('UserPreferenceAgent Integration with LLMService', () => {
     mockNeo4jServiceInstance = new MockNeo4jService() as jest.Mocked<Neo4jService>;
     // Provide the mock Neo4jService instance to the KnowledgeGraphService constructor
     mockKnowledgeGraphServiceInstance = new MockKnowledgeGraphService(mockNeo4jServiceInstance) as jest.Mocked<KnowledgeGraphService>;
+    mockPreferenceNormalizationServiceInstance = new MockPreferenceNormalizationService() as jest.Mocked<PreferenceNormalizationService>; // Create and cast normalization service mock instance
     // Explicitly mock getPreferences to return a resolved empty array
     mockKnowledgeGraphServiceInstance.getPreferences = jest.fn().mockResolvedValue([]);
 
@@ -80,11 +86,17 @@ describe('UserPreferenceAgent Integration with LLMService', () => {
     // Mock persistPreferences to resolve immediately
     mockKnowledgeGraphServiceInstance.addOrUpdatePreference.mockResolvedValue(undefined);
 
+    // Mock normalization service to return a predictable output, including timestamp
+    const mockNormalizedPreferences = [{ type: 'wineType', value: 'red', source: 'fast-extraction', active: true, timestamp: expect.any(String) }];
+    mockPreferenceNormalizationServiceInstance.normalizePreferences.mockReturnValue(mockNormalizedPreferences);
+
+
     // Manually create agent instance with mocked dependencies
     const agent = new UserPreferenceAgent(
       mockCommunicationBusInstance,
       mockPreferenceExtractionServiceInstance,
-      mockKnowledgeGraphServiceInstance
+      mockKnowledgeGraphServiceInstance,
+      mockPreferenceNormalizationServiceInstance // Provide the mock normalization service
     );
 
     const result = await agent.handleMessage({ input: testUserInput, conversationHistory: [] });
@@ -95,16 +107,20 @@ describe('UserPreferenceAgent Integration with LLMService', () => {
     // Expect LLMService.sendPrompt not to have been called
     expect(mockLlmServiceInstance.sendPrompt).not.toHaveBeenCalled();
 
+    // Expect normalization service to have been called
+    expect(mockPreferenceNormalizationServiceInstance.normalizePreferences).toHaveBeenCalled();
+
     // Expect persistPreferences to have been called with normalized preferences
-    // TODO: Add proper normalization tests
-    expect(mockKnowledgeGraphServiceInstance.addOrUpdatePreference).toHaveBeenCalled();
+    expect(mockKnowledgeGraphServiceInstance.addOrUpdatePreference).toHaveBeenCalledWith(
+        expect.any(String), // userId
+        expect.objectContaining({ type: 'wineType', value: 'red', timestamp: expect.any(String) }) // Normalized preference including timestamp
+    );
 
 
-    // Expect the result to contain the normalized preferences (assuming basic normalization for now)
-    // The agent now returns normalized PreferenceNode array
+    // Expect the result to contain the normalized preferences
     expect(result.preferences).toBeDefined();
     expect(result.preferences).toEqual(expect.arrayContaining([
-        expect.objectContaining({ type: 'wineType', value: 'red', source: 'fast-extraction', active: true })
+        expect.objectContaining({ type: 'wineType', value: 'red', source: 'fast-extraction', active: true, timestamp: expect.any(String) })
     ]));
   });
 
@@ -124,7 +140,8 @@ describe('UserPreferenceAgent Integration with LLMService', () => {
     const agent = new UserPreferenceAgent(
       mockCommunicationBusInstance,
       mockPreferenceExtractionServiceInstance,
-      mockKnowledgeGraphServiceInstance
+      mockKnowledgeGraphServiceInstance,
+      mockPreferenceNormalizationServiceInstance // Provide the mock normalization service
     );
 
     const result = await agent.handleMessage(testMessage);
@@ -161,7 +178,8 @@ describe('UserPreferenceAgent Integration with LLMService', () => {
     const agent = new UserPreferenceAgent(
       mockCommunicationBusInstance,
       mockPreferenceExtractionServiceInstance,
-      mockKnowledgeGraphServiceInstance
+      mockKnowledgeGraphServiceInstance,
+      mockPreferenceNormalizationServiceInstance // Provide the mock normalization service
     );
 
     // Mock AgentCommunicationBus.sendMessage
@@ -201,7 +219,8 @@ describe('UserPreferenceAgent Integration with LLMService', () => {
     const agent = new UserPreferenceAgent(
       mockCommunicationBusInstance,
       mockPreferenceExtractionServiceInstance,
-      mockKnowledgeGraphServiceInstance
+      mockKnowledgeGraphServiceInstance,
+      mockPreferenceNormalizationServiceInstance // Provide the mock normalization service
     );
 
     // Mock AgentCommunicationBus.sendMessage
@@ -242,7 +261,8 @@ describe('UserPreferenceAgent Integration with LLMService', () => {
     const agent = new UserPreferenceAgent(
       mockCommunicationBusInstance,
       mockPreferenceExtractionServiceInstance, // Corrected typo
-      mockKnowledgeGraphServiceInstance
+      mockKnowledgeGraphServiceInstance,
+      mockPreferenceNormalizationServiceInstance // Provide the mock normalization service
     );
 
     // Mock AgentCommunicationBus.sendMessage
@@ -282,7 +302,8 @@ describe('UserPreferenceAgent Integration with LLMService', () => {
     const agent = new UserPreferenceAgent(
       mockCommunicationBusInstance,
       mockPreferenceExtractionServiceInstance,
-      mockKnowledgeGraphServiceInstance
+      mockKnowledgeGraphServiceInstance,
+      mockPreferenceNormalizationServiceInstance // Provide the mock normalization service
     );
 
     // Mock AgentCommunicationBus.sendMessage
@@ -325,7 +346,8 @@ describe('UserPreferenceAgent Integration with LLMService', () => {
     const agent = new UserPreferenceAgent(
       mockCommunicationBusInstance,
       mockPreferenceExtractionServiceInstance,
-      mockKnowledgeGraphServiceInstance
+      mockKnowledgeGraphServiceInstance,
+      mockPreferenceNormalizationServiceInstance // Provide the mock normalization service
     );
 
     // Mock AgentCommunicationBus.sendMessage

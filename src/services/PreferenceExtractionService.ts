@@ -7,6 +7,9 @@ interface DucklingEntity {
   value: {
     value: any; // The extracted value (can be number, string, etc.)
     unit?: string; // Optional unit (e.g., "EUR" for price, "%" for alcohol)
+    type?: string; // Optional type for interval entities (e.g., 'interval')
+    from?: { value: any; unit?: string }; // Optional 'from' for interval entities
+    to?: { value: any; unit?: string }; // Optional 'to' for interval entities
   };
   text: string;
   start: number;
@@ -116,6 +119,18 @@ export class PreferenceExtractionService {
             case 'volume':
                  preferences.volume = entity.value.value;
                  break;
+            case 'wineType': // Add case for wineType
+                 preferences.wineType = entity.value.value;
+                 break;
+            case 'interval':
+              // Handle price ranges or other intervals
+              if (entity.value.type === 'interval' && entity.value.from && entity.value.to) {
+                if ((entity.value.from.unit === 'EUR' || entity.value.from.unit === 'USD') &&
+                    (entity.value.to.unit === 'EUR' || entity.value.to.unit === 'USD')) {
+                  preferences.priceRange = [entity.value.from.value, entity.value.to.value];
+                }
+              }
+              break;
             default:
               console.warn(`PreferenceExtractionService: Unhandled Duckling dimension: ${entity.dim}`);
               break;

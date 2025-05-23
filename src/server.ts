@@ -3,6 +3,7 @@ import express, { Express } from 'express';
 import cors from 'cors';
 import { LLMService } from './services/LLMService';
 import { PreferenceExtractionService } from './services/PreferenceExtractionService';
+import { PreferenceNormalizationService } from './services/PreferenceNormalizationService'; // Import PreferenceNormalizationService
 import { container } from 'tsyringe';
 import { AgentCommunicationBus } from './core/AgentCommunicationBus';
 import { Neo4jService } from './services/Neo4jService';
@@ -10,7 +11,9 @@ import { KnowledgeGraphService } from './services/KnowledgeGraphService';
 import { InMemoryDeadLetterQueue } from './core/InMemoryDeadLetterQueue';
 import { BasicDeadLetterProcessor, LoggingDeadLetterHandler } from './core/BasicDeadLetterProcessor';
 import { BasicRetryManager } from './core/BasicRetryManager';
+import { ConversationHistoryService } from './core/ConversationHistoryService'; // Import ConversationHistoryService
 import { logger } from './utils/logger';
+
 
 const registerDependencies = () => {
   container.registerInstance('llmApiUrl', 'http://localhost:11434');
@@ -18,6 +21,7 @@ const registerDependencies = () => {
   container.registerInstance('llmApiKey', '');
   container.registerSingleton('LLMService', LLMService);
   container.registerSingleton('PreferenceExtractionService', PreferenceExtractionService);
+  container.registerSingleton('PreferenceNormalizationService', PreferenceNormalizationService); // Register PreferenceNormalizationService
   container.registerSingleton("AgentCommunicationBus", AgentCommunicationBus);
 
   const neo4jService = new Neo4jService();
@@ -37,6 +41,10 @@ const registerDependencies = () => {
 
   const deadLetterProcessor = new BasicDeadLetterProcessor(deadLetterQueue, loggingDeadLetterHandler, retryManager);
   container.registerInstance('DeadLetterProcessor', deadLetterProcessor);
+
+  const conversationHistoryService = new ConversationHistoryService(); // Instantiate ConversationHistoryService
+  container.registerInstance(ConversationHistoryService, conversationHistoryService); // Register ConversationHistoryService
+
 
   container.registerInstance('logger', logger);
 };
@@ -60,7 +68,8 @@ export const createServer = () => {
   const app = express();
   app.use(cors());
   app.use(express.json());
-  registerDependencies();
+  // Dependencies are registered globally, so no need to call registerDependencies here again
+  // registerDependencies(); // Removed duplicate registration call
   app.use('/api', apiRateLimiter, createRouter());
   return app;
 };
@@ -70,4 +79,3 @@ export function closeServer(app: Express): void {
     testServer.close();
   });
 }
-

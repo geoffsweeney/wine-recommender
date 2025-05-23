@@ -29,16 +29,17 @@
 - **Completed API endpoint logic for managing preferences**: Filled in the logic within the methods of `src/api/controllers/UserPreferenceController.ts` to handle GET, POST, PUT, and DELETE requests for user preferences, interacting with the `KnowledgeGraphService`.
 - **Confirmed comprehensive tests**: Verified the presence of unit, integration, and end-to-end tests for the newly implemented logic in both the backend and frontend.
 - Implemented `UserProfileService` and integrated it into `SommelierCoordinator` and `UserPreferenceAgent` for cross-session persistence.
+- **Fixed failing tests**: Addressed and fixed failing tests in `src/services/__tests__/KnowledgeGraphService.test.ts`, `src/services/__tests__/RecommendationService.test.ts`, `src/core/agents/__tests__/UserPreferenceAgent.test.ts`, and `src/core/agents/__tests__/UserPreferenceAgent.integration.test.ts` by correcting mock implementations, updating test expectations, fixing logic in `UserPreferenceAgent.ts` related to Promise evaluation and synonym resolution, and removing malformed content from the integration test file.
 
 ---
 
 ## Next Steps
 
-1.  **Implement full Duckling extraction logic**: Enhance `src/services/PreferenceExtractionService.ts` with detailed extraction rules using Duckling for structured entity extraction.
-2.  **Refine fast extraction result merging**: Implement a robust strategy in `PreferenceExtractionService.attemptFastExtraction` to handle conflicts and confidence scores when merging results from different extraction methods.
-3.  **Implement normalization logic**: Complete the `UserPreferenceAgent.normalizePreferences` method to map extracted values to a canonical schema, handling synonyms, negations, and value ranges.
-4.  **Implement API endpoint logic for managing preferences**: Fill in the logic within the methods of `src/api/controllers/UserPreferenceController.ts` to handle GET, POST, PUT, and DELETE requests for user preferences, interacting with the `KnowledgeGraphService`.
-5.  **Implement UI features for viewing, editing, and deleting preferences**: Develop the frontend logic in the components (`PreferenceList.tsx`, `PreferenceItem.tsx`, `PreferenceForm.tsx`) and page (`preferences.tsx`) to fetch, display, edit, and delete user preferences by interacting with the backend API endpoints.
+1.  **Implement full Duckling extraction logic**: Enhance `src/services/PreferenceExtractionService.ts` with detailed extraction rules.
+2.  **Refine fast extraction result merging**: Implement a robust strategy in `PreferenceExtractionService.attemptFastExtraction` to handle conflicts and confidence scores.
+3.  **Implement normalization logic**: Complete the `UserPreferenceAgent.normalizePreferences` method to map extracted values to a canonical schema.
+4.  **Implement the asynchronous LLM preference extraction agent/process**: Create a new agent or service to handle LLM calls for complex preferences asynchronously.
+5.  **Implement UI features for viewing, editing, and deleting preferences**: Develop frontend components to interact with user preferences.
 6.  **Implement Preference Inclusion Toggle**: Add the `active` property to the `Preference` node in the Neo4j model and implement the UI toggle and backend logic to filter active preferences for recommendations.
 7.  **Add comprehensive tests**: Write unit, integration, and end-to-end tests for all newly implemented logic in both the backend and frontend.
 
@@ -81,6 +82,7 @@ Based on your request to use Next.js and Tailwind CSS for the UI, here is a deta
     *   Apply utility classes directly in JSX for styling components.
     *   Use `@apply` for extracting common patterns into custom CSS classes if necessary.
     *   Organize complex or reusable styles using component-specific CSS modules or utility-first patterns.
+    *   Ensure consistent styling across components.
 
 8.  **Testing**:
     *   Write unit tests for individual React components (e.g., using Jest and React Testing Library).
@@ -143,7 +145,7 @@ Currently, the system only uses preferences provided in the current message. Thi
 6. **Implement API endpoints for managing preferences**:
    - Create new controllers and routes to expose preference management functionality.
 7. **Add comprehensive tests**:
-   - Write unit, integration, and end-to-end tests for all new components and features.
+   - Write unit, integration, and end-to-end tests for all newly implemented logic in both the backend and frontend.
 
 ---
 

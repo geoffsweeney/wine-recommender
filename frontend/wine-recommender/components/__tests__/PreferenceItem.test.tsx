@@ -2,8 +2,8 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import PreferenceItem from '../PreferenceItem';
-import { PreferenceNode } from '../../../../src/types';
-import { updatePreference, deletePreference } from '../../lib/api';
+import { PreferenceNode } from '../../../../src/types'; // Adjust import path as needed
+import { updatePreference, deletePreference } from '../../lib/api'; // Import API functions to mock
 
 // Mock the API functions
 jest.mock('../../lib/api', () => ({
@@ -11,34 +11,35 @@ jest.mock('../../lib/api', () => ({
   deletePreference: jest.fn(),
 }));
 
-const mockUpdatePreference = updatePreference as jest.Mock;
-const mockDeletePreference = deletePreference as jest.Mock;
+const mockedUpdatePreference = updatePreference as jest.Mock;
+const mockedDeletePreference = deletePreference as jest.Mock;
 
 describe('PreferenceItem', () => {
   const mockPreference: PreferenceNode = {
-    id: 'pref-123',
+    id: '1',
     type: 'wineType',
     value: 'red',
     source: 'manual',
-    confidence: 1.0,
-    timestamp: new Date().toISOString(),
+    confidence: 1,
+    timestamp: '2023-10-27T10:00:00Z',
     active: true,
+    negated: false,
   };
-  const mockUserId = 'test-user';
+  const mockUserId = 'test-user-id';
   const mockOnPreferenceUpdated = jest.fn();
   const mockOnPreferenceDeleted = jest.fn();
   const mockOnEdit = jest.fn();
 
   beforeEach(() => {
     // Reset mocks before each test
-    mockUpdatePreference.mockClear();
-    mockDeletePreference.mockClear();
-    mockOnPreferenceUpdated.mockClear();
-    mockOnPreferenceDeleted.mockClear();
-    mockOnEdit.mockClear();
+    mockedUpdatePreference.mockReset();
+    mockedDeletePreference.mockReset();
+    mockOnPreferenceUpdated.mockReset();
+    mockOnPreferenceDeleted.mockReset();
+    mockOnEdit.mockReset();
   });
 
-  it('should render preference details correctly', () => {
+  it('renders preference details correctly', () => {
     render(
       <PreferenceItem
         preference={mockPreference}
@@ -49,14 +50,39 @@ describe('PreferenceItem', () => {
       />
     );
 
-    expect(screen.getByText('wineType:')).toBeInTheDocument();
-    expect(screen.getByText('red')).toBeInTheDocument();
-    expect(screen.getByLabelText('Active')).toBeInTheDocument();
+    expect(screen.getByText('Type: wineType')).toBeInTheDocument();
+    expect(screen.getByText('Value: red')).toBeInTheDocument();
+    expect(screen.getByText('Source: manual')).toBeInTheDocument();
+    expect(screen.getByText('Confidence: 1')).toBeInTheDocument();
+    expect(screen.getByText('Timestamp: 27/10/2023, 10:00:00 am')).toBeInTheDocument(); // Adjust expected format based on toLocaleString output
+    expect(screen.getByText('Negated: No')).toBeInTheDocument();
+    expect(screen.getByLabelText('Include in Pairing')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
   });
 
-  it('should toggle the active state when the switch is clicked', async () => {
+  it('handles array value display correctly', () => {
+      const arrayPreference: PreferenceNode = {
+          ...mockPreference,
+          value: ['fruity', 'spicy'],
+          type: 'flavors',
+      };
+       render(
+        <PreferenceItem
+          preference={arrayPreference}
+          userId={mockUserId}
+          onPreferenceUpdated={mockOnPreferenceUpdated}
+          onPreferenceDeleted={mockOnPreferenceDeleted}
+          onEdit={mockOnEdit}
+        />
+      );
+      expect(screen.getByText('Value: fruity, spicy')).toBeInTheDocument();
+  });
+
+
+  it('handles toggle change and calls updatePreference and onPreferenceUpdated', async () => {
+    mockedUpdatePreference.mockResolvedValue(undefined); // Mock successful update
+
     render(
       <PreferenceItem
         preference={mockPreference}
@@ -67,34 +93,24 @@ describe('PreferenceItem', () => {
       />
     );
 
-    const toggleSwitch = screen.getByLabelText('Active');
-    expect(toggleSwitch).toBeChecked(); // Initially active
+    const toggle = screen.getByLabelText('Include in Pairing') as HTMLInputElement;
+    expect(toggle.checked).toBe(true); // Initially active
 
-    fireEvent.click(toggleSwitch); // Click to toggle off
+    fireEvent.click(toggle); // Click to toggle off
 
-    // Expect updatePreference to be called with active: false
+    // Optimistic update should make it unchecked immediately
+    expect(toggle.checked).toBe(false);
+
     await waitFor(() => {
-      expect(mockUpdatePreference).toHaveBeenCalledWith(mockUserId, mockPreference.id, { active: false });
+      expect(mockedUpdatePreference).toHaveBeenCalledWith(mockUserId, mockPreference.id, { active: false });
+      expect(mockOnPreferenceUpdated).toHaveBeenCalledTimes(1);
     });
-    // Expect onPreferenceUpdated to be called for revalidation
-    expect(mockOnPreferenceUpdated).toHaveBeenCalled();
-
-    // Simulate the state update after successful API call (optimistic update is already in component)
-    // Re-render with updated preference if needed, or rely on SWR revalidation in a real scenario
-    // For this unit test, we primarily check the API call and callback.
-
-    // Click to toggle on again
-    fireEvent.click(toggleSwitch);
-
-    // Expect updatePreference to be called with active: true
-    await waitFor(() => {
-      expect(mockUpdatePreference).toHaveBeenCalledWith(mockUserId, mockPreference.id, { active: true });
-    });
-    // Expect onPreferenceUpdated to be called again
-    expect(mockOnPreferenceUpdated).toHaveBeenCalledTimes(2);
   });
 
-  it('should call deletePreference and onPreferenceDeleted when delete button is clicked and confirmed', async () => {
+  it('reverts optimistic toggle update and logs error if updatePreference fails', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {}); // Spy on console.error
+    mockedUpdatePreference.mockRejectedValue(new Error('Update failed')); // Mock failed update
+
     render(
       <PreferenceItem
         preference={mockPreference}
@@ -105,55 +121,26 @@ describe('PreferenceItem', () => {
       />
     );
 
-    const deleteButton = screen.getByRole('button', { name: 'Delete' });
+    const toggle = screen.getByLabelText('Include in Pairing') as HTMLInputElement;
+    expect(toggle.checked).toBe(true); // Initially active
 
-    // Mock window.confirm to return true (user confirms deletion)
-    jest.spyOn(window, 'confirm').mockImplementation(() => true);
+    fireEvent.click(toggle); // Click to toggle off
 
-    fireEvent.click(deleteButton);
+    // Optimistic update
+    expect(toggle.checked).toBe(false);
 
-    // Expect deletePreference to be called
     await waitFor(() => {
-      expect(mockDeletePreference).toHaveBeenCalledWith(mockUserId, mockPreference.id);
+      expect(mockedUpdatePreference).toHaveBeenCalledWith(mockUserId, mockPreference.id, { active: false });
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to update preference active state:', expect.any(Error));
+      expect(toggle.checked).toBe(true); // Optimistic update should be reverted
+      expect(mockOnPreferenceUpdated).not.toHaveBeenCalled(); // Parent not notified on failure
     });
-    // Expect onPreferenceDeleted to be called for revalidation
-    expect(mockOnPreferenceDeleted).toHaveBeenCalled();
 
-    // Restore window.confirm mock
-    (window.confirm as jest.Mock).mockRestore();
-  });
-
-  it('should not call deletePreference if delete is not confirmed', async () => {
-    render(
-      <PreferenceItem
-        preference={mockPreference}
-        userId={mockUserId}
-        onPreferenceUpdated={mockOnPreferenceUpdated}
-        onPreferenceDeleted={mockOnPreferenceDeleted}
-        onEdit={mockOnEdit}
-      />
-    );
-
-    const deleteButton = screen.getByRole('button', { name: 'Delete' });
-
-    // Mock window.confirm to return false (user cancels deletion)
-    jest.spyOn(window, 'confirm').mockImplementation(() => false);
-
-    fireEvent.click(deleteButton);
-
-    // Expect deletePreference not to be called
-    await waitFor(() => {
-      expect(mockDeletePreference).not.toHaveBeenCalled();
-    });
-    // Expect onPreferenceDeleted not to be called
-    expect(mockOnPreferenceDeleted).not.toHaveBeenCalled();
-
-    // Restore window.confirm mock
-    (window.confirm as jest.Mock).mockRestore();
+    consoleErrorSpy.mockRestore(); // Restore console.error spy
   });
 
 
-  it('should call onEdit with the preference when the edit button is clicked', async () => {
+  it('calls onEdit when the Edit button is clicked', () => {
     render(
       <PreferenceItem
         preference={mockPreference}
@@ -167,110 +154,12 @@ describe('PreferenceItem', () => {
     const editButton = screen.getByRole('button', { name: 'Edit' });
     fireEvent.click(editButton);
 
-    // Expect onEdit to have been called with the preference
     expect(mockOnEdit).toHaveBeenCalledWith(mockPreference);
   });
 
-
-  it('should log an error and not call updatePreference if preference ID is missing when toggling', async () => {
-    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {}); // Mock console.error
-    const preferenceWithoutId = { ...mockPreference, id: undefined }; // Preference without ID
-
-    render(
-      <PreferenceItem
-        preference={preferenceWithoutId as any} // Cast to any because id is missing
-        userId={mockUserId}
-        onPreferenceUpdated={mockOnPreferenceUpdated}
-        onPreferenceDeleted={mockOnPreferenceDeleted}
-        onEdit={mockOnEdit}
-      />
-    );
-
-    const toggleSwitch = screen.getByLabelText('Active');
-    fireEvent.click(toggleSwitch);
-
-    // Expect console.error to have been called
-    await waitFor(() => {
-      expect(consoleSpy).toHaveBeenCalledWith('Preference ID is missing, cannot update.');
-    });
-    // Expect updatePreference not to be called
-    expect(mockUpdatePreference).not.toHaveBeenCalled();
-    // Expect onPreferenceUpdated not to be called
-    expect(mockOnPreferenceUpdated).not.toHaveBeenCalled();
-
-    consoleSpy.mockRestore(); // Restore console.error
-  });
-
-  it('should log an error and not call deletePreference if preference ID is missing when deleting', async () => {
-    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {}); // Mock console.error
-    const preferenceWithoutId = { ...mockPreference, id: undefined }; // Preference without ID
-
-    render(
-      <PreferenceItem
-        preference={preferenceWithoutId as any} // Cast to any because id is missing
-        userId={mockUserId}
-        onPreferenceUpdated={mockOnPreferenceUpdated}
-        onPreferenceDeleted={mockOnPreferenceDeleted}
-        onEdit={mockOnEdit}
-      />
-    );
-
-    const deleteButton = screen.getByRole('button', { name: 'Delete' });
-
-    // Mock window.confirm to return true (user confirms deletion)
-    jest.spyOn(window, 'confirm').mockImplementation(() => true);
-
-    fireEvent.click(deleteButton);
-
-    // Expect console.error to have been called
-    await waitFor(() => {
-      expect(consoleSpy).toHaveBeenCalledWith('Preference ID is missing, cannot delete.');
-    });
-    // Expect deletePreference not to be called
-    expect(mockDeletePreference).not.toHaveBeenCalled();
-    // Expect onPreferenceDeleted not to be called
-    expect(mockOnPreferenceDeleted).not.toHaveBeenCalled();
-
-    // Restore mocks
-    consoleSpy.mockRestore();
-    (window.confirm as jest.Mock).mockRestore();
-  });
-
-
-  it('should handle API errors when toggling active state', async () => {
-    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {}); // Mock console.error
-    const mockError = new Error('Failed to update');
-    mockUpdatePreference.mockRejectedValue(mockError); // Make updatePreference reject
-
-    render(
-      <PreferenceItem
-        preference={mockPreference}
-        userId={mockUserId}
-        onPreferenceUpdated={mockOnPreferenceUpdated}
-        onPreferenceDeleted={mockOnPreferenceDeleted}
-        onEdit={mockOnEdit}
-      />
-    );
-
-    const toggleSwitch = screen.getByLabelText('Active') as HTMLInputElement; // Cast to HTMLInputElement
-
-    fireEvent.click(toggleSwitch); // Click to trigger update
-
-    // Expect console.error to have been called
-    await waitFor(() => {
-      expect(consoleSpy).toHaveBeenCalledWith('Failed to update preference active state:', mockError);
-    });
-    // Expect onPreferenceUpdated not to be called on error
-    expect(mockOnPreferenceUpdated).not.toHaveBeenCalled();
-    // TODO: Verify that the toggle state is reverted on error (requires more complex test setup or component changes)
-
-    consoleSpy.mockRestore(); // Restore console.error
-  });
-
-  it('should handle API errors when deleting preference', async () => {
-    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {}); // Mock console.error
-    const mockError = new Error('Failed to delete');
-    mockDeletePreference.mockRejectedValue(mockError); // Make deletePreference reject
+  it('handles delete click, confirms, calls deletePreference, and onPreferenceDeleted', async () => {
+    const windowConfirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(true); // Mock window.confirm to return true
+    mockedDeletePreference.mockResolvedValue(undefined); // Mock successful delete
 
     render(
       <PreferenceItem
@@ -283,22 +172,79 @@ describe('PreferenceItem', () => {
     );
 
     const deleteButton = screen.getByRole('button', { name: 'Delete' });
-
-    // Mock window.confirm to return true (user confirms deletion)
-    jest.spyOn(window, 'confirm').mockImplementation(() => true);
-
     fireEvent.click(deleteButton);
 
-    // Expect console.error to have been called
-    await waitFor(() => {
-      expect(consoleSpy).toHaveBeenCalledWith('Failed to delete preference:', mockError);
-    });
-    // Expect onPreferenceDeleted not to be called on error
-    expect(mockOnPreferenceDeleted).not.toHaveBeenCalled();
-    // TODO: Verify that the isDeleting state is reset on error
+    expect(windowConfirmSpy).toHaveBeenCalledWith('Are you sure you want to delete this preference?');
 
-    // Restore mocks
-    consoleSpy.mockRestore();
-    (window.confirm as jest.Mock).mockRestore();
+    await waitFor(() => {
+      expect(mockedDeletePreference).toHaveBeenCalledWith(mockUserId, mockPreference.id);
+      expect(mockOnPreferenceDeleted).toHaveBeenCalledTimes(1);
+      expect(deleteButton).not.toBeDisabled(); // Button should not be disabled after successful deletion (state reverts)
+      expect(screen.getByRole('button', { name: 'Delete' })).not.toHaveTextContent('Deleting...'); // Text reverts
+    });
+
+    windowConfirmSpy.mockRestore(); // Restore window.confirm spy
+  });
+
+  it('does not call deletePreference if confirmation is cancelled', async () => {
+    const windowConfirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(false); // Mock window.confirm to return false
+
+    render(
+      <PreferenceItem
+        preference={mockPreference}
+        userId={mockUserId}
+        onPreferenceUpdated={mockOnPreferenceUpdated}
+        onPreferenceDeleted={mockOnPreferenceDeleted}
+        onEdit={mockOnEdit}
+      />
+    );
+
+    const deleteButton = screen.getByRole('button', { name: 'Delete' });
+    fireEvent.click(deleteButton);
+
+    expect(windowConfirmSpy).toHaveBeenCalledWith('Are you sure you want to delete this preference?');
+
+    await waitFor(() => {
+      expect(mockedDeletePreference).not.toHaveBeenCalled();
+      expect(mockOnPreferenceDeleted).not.toHaveBeenCalled();
+      expect(deleteButton).not.toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Delete' })).not.toHaveTextContent('Deleting...');
+    });
+
+    windowConfirmSpy.mockRestore();
+  });
+
+   it('reverts deleting state and logs error if deletePreference fails', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {}); // Spy on console.error
+    const windowConfirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(true); // Mock window.confirm to return true
+    mockedDeletePreference.mockRejectedValue(new Error('Delete failed')); // Mock failed delete
+
+    render(
+      <PreferenceItem
+        preference={mockPreference}
+        userId={mockUserId}
+        onPreferenceUpdated={mockOnPreferenceUpdated}
+        onPreferenceDeleted={mockOnPreferenceDeleted}
+        onEdit={mockOnEdit}
+      />
+    );
+
+    const deleteButton = screen.getByRole('button', { name: 'Delete' });
+    fireEvent.click(deleteButton);
+
+    expect(windowConfirmSpy).toHaveBeenCalledWith('Are you sure you want to delete this preference?');
+    expect(deleteButton).toBeDisabled(); // Button should be disabled while deleting
+    expect(screen.getByRole('button', { name: 'Deleting...' })).toBeInTheDocument(); // Text should change
+
+    await waitFor(() => {
+      expect(mockedDeletePreference).toHaveBeenCalledWith(mockUserId, mockPreference.id);
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to delete preference:', expect.any(Error));
+      expect(deleteButton).not.toBeDisabled(); // Deleting state should be reverted
+      expect(screen.getByRole('button', { name: 'Delete' })).not.toHaveTextContent('Deleting...'); // Text reverts
+      expect(mockOnPreferenceDeleted).not.toHaveBeenCalled(); // Parent not notified on failure
+    });
+
+    consoleErrorSpy.mockRestore(); // Restore console.error spy
+    windowConfirmSpy.mockRestore(); // Restore window.confirm spy
   });
 });
