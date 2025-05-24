@@ -52,6 +52,12 @@ export class SommelierCoordinator implements Agent {
 
   async handleMessage(message: RecommendationRequest): Promise<any> {
     this.logger.info('SommelierCoordinator received message:', message); // Use logger
+    // Publish message indicating start of orchestration
+    this.communicationBus.publish({
+      metadata: { traceId: `${message.userId}-${Date.now()}`, priority: 'NORMAL', timestamp: Date.now(), sender: this.getName() },
+      payload: { status: 'Orchestration started', input: message.input },
+      type: 'orchestration-status',
+    }, 'agent-orchestration');
 
     try {
       // Load user preferences at the start of the session
@@ -69,11 +75,23 @@ export class SommelierCoordinator implements Agent {
         this.logger.info('SommelierCoordinator: Processing message content for input validation.'); // Use logger
         // Use SharedContextMemory to pass input to InputValidationAgent
         this.communicationBus.setContext(this.getName(), 'inputMessage', message.input.message);
+        // Publish message before calling InputValidationAgent
+        this.communicationBus.publish({
+          metadata: { traceId: `${message.userId}-${Date.now()}`, priority: 'NORMAL', timestamp: Date.now(), sender: this.getName() },
+          payload: { status: 'Calling InputValidationAgent', input: message.input.message },
+          type: 'orchestration-status',
+        }, 'agent-orchestration');
         const validationResult = await this.inputValidationAgent.handleMessage({
           input: message.input.message,
           conversationHistory: conversationHistory,
         });
         this.logger.info('SommelierCoordinator: Input validation result:', validationResult); // Log validation result
+        // Publish message after receiving result from InputValidationAgent
+        this.communicationBus.publish({
+          metadata: { traceId: `${message.userId}-${Date.now()}`, priority: 'NORMAL', timestamp: Date.now(), sender: this.getName() },
+          payload: { status: 'Received result from InputValidationAgent', result: validationResult },
+          type: 'orchestration-status',
+        }, 'agent-orchestration');
 
         // Use SharedContextMemory to retrieve result from InputValidationAgent (assuming agent sets it)
         // const validationResult = this.communicationBus.getContext(this.inputValidationAgent.getName(), 'validationResult'); // This would be the pattern if agents set context
@@ -122,7 +140,19 @@ export class SommelierCoordinator implements Agent {
        try {
          // Use SharedContextMemory to pass input to ValueAnalysisAgent
          this.communicationBus.setContext(this.getName(), 'recommendationInput', recommendationInput);
+         // Publish message before calling ValueAnalysisAgent
+         this.communicationBus.publish({
+           metadata: { traceId: `${message.userId}-${Date.now()}`, priority: 'NORMAL', timestamp: Date.now(), sender: this.getName() },
+           payload: { status: 'Calling ValueAnalysisAgent', input: recommendationInput },
+           type: 'orchestration-status',
+         }, 'agent-orchestration');
          await this.valueAnalysisAgent.handleMessage({ input: recommendationInput, conversationHistory: conversationHistory }); // Basic call
+         // Publish message after receiving result from ValueAnalysisAgent
+         this.communicationBus.publish({
+           metadata: { traceId: `${message.userId}-${Date.now()}`, priority: 'NORMAL', timestamp: Date.now(), sender: this.getName() },
+           payload: { status: 'ValueAnalysisAgent call completed' },
+           type: 'orchestration-status',
+         }, 'agent-orchestration');
          // Use SharedContextMemory to retrieve result from ValueAnalysisAgent (assuming agent sets it)
          // const valueAnalysisResult = this.communicationBus.getContext(this.valueAnalysisAgent.getName(), 'analysisResult'); // This would be the pattern if agents set context
          this.logger.info('SommelierCoordinator: ValueAnalysisAgent call completed.'); // Log completion
@@ -138,7 +168,19 @@ export class SommelierCoordinator implements Agent {
          // Use SharedContextMemory to pass input to UserPreferenceAgent
          this.communicationBus.setContext(this.getName(), 'recommendationInput', recommendationInput);
          // Pass loaded preferences from UserProfileService to UserPreferenceAgent
+         // Publish message before calling UserPreferenceAgent
+         this.communicationBus.publish({
+           metadata: { traceId: `${message.userId}-${Date.now()}`, priority: 'NORMAL', timestamp: Date.now(), sender: this.getName() },
+           payload: { status: 'Calling UserPreferenceAgent', input: message.input.message || '', initialPreferences: userPreferences },
+           type: 'orchestration-status',
+         }, 'agent-orchestration');
          await this.userPreferenceAgent.handleMessage({ input: message.input.message || '', conversationHistory: conversationHistory, initialPreferences: userPreferences }); // Pass original message input, default to empty string if undefined
+         // Publish message after receiving result from UserPreferenceAgent
+         this.communicationBus.publish({
+           metadata: { traceId: `${message.userId}-${Date.now()}`, priority: 'NORMAL', timestamp: Date.now(), sender: this.getName() },
+           payload: { status: 'UserPreferenceAgent call completed' },
+           type: 'orchestration-status',
+         }, 'agent-orchestration');
          // Use SharedContextMemory to retrieve result from UserPreferenceAgent (assuming agent sets it)
          // const userPreferenceResult = this.communicationBus.getContext(this.userPreferenceAgent.getName(), 'preferencesResult'); // This would be the pattern if agents set context
          this.logger.info('SommelierCoordinator: UserPreferenceAgent call completed.'); // Log completion
@@ -153,7 +195,19 @@ export class SommelierCoordinator implements Agent {
        try {
          // Use SharedContextMemory to pass input to MCPAdapterAgent
          this.communicationBus.setContext(this.getName(), 'recommendationInput', recommendationInput);
+         // Publish message before calling MCPAdapterAgent
+         this.communicationBus.publish({
+           metadata: { traceId: `${message.userId}-${Date.now()}`, priority: 'NORMAL', timestamp: Date.now(), sender: this.getName() },
+           payload: { status: 'Calling MCPAdapterAgent', input: recommendationInput },
+           type: 'orchestration-status',
+         }, 'agent-orchestration');
          await this.mcpAdapterAgent.handleMessage({ input: recommendationInput, conversationHistory: conversationHistory }); // Basic call
+         // Publish message after receiving result from MCPAdapterAgent
+         this.communicationBus.publish({
+           metadata: { traceId: `${message.userId}-${Date.now()}`, priority: 'NORMAL', timestamp: Date.now(), sender: this.getName() },
+           payload: { status: 'MCPAdapterAgent call completed' },
+           type: 'orchestration-status',
+         }, 'agent-orchestration');
          // Use SharedContextMemory to retrieve result from MCPAdapterAgent (assuming agent sets it)
          // const mcpResult = this.communicationBus.getContext(this.mcpAdapterAgent.getName(), 'mcpResult'); // This would be the pattern if agents set context
          this.logger.info('SommelierCoordinator: MCPAdapterAgent call completed.'); // Log completion
@@ -172,6 +226,12 @@ export class SommelierCoordinator implements Agent {
        try {
            // Use SharedContextMemory to pass input to the selected Recommendation Agent
            this.communicationBus.setContext(this.getName(), 'recommendationInput', recommendationInput);
+           // Publish message before routing to specific Recommendation Agent
+           this.communicationBus.publish({
+             metadata: { traceId: `${message.userId}-${Date.now()}`, priority: 'NORMAL', timestamp: Date.now(), sender: this.getName() },
+             payload: { status: `Routing to ${recommendationSource === 'llm' ? 'LLMRecommendationAgent' : 'RecommendationAgent'}`, source: recommendationSource },
+             type: 'orchestration-status',
+           }, 'agent-orchestration');
 
            if (recommendationSource === 'llm') {
                this.logger.info('SommelierCoordinator: Routing to LLMRecommendationAgent');
@@ -182,6 +242,12 @@ export class SommelierCoordinator implements Agent {
            }
 
            this.logger.info('SommelierCoordinator: Received recommendation result:', recommendationResult);
+           // Publish message after receiving result from Recommendation Agent
+           this.communicationBus.publish({
+             metadata: { traceId: `${message.userId}-${Date.now()}`, priority: 'NORMAL', timestamp: Date.now(), sender: this.getName() },
+             payload: { status: `Received result from ${recommendationSource === 'llm' ? 'LLMRecommendationAgent' : 'RecommendationAgent'}`, result: recommendationResult },
+             type: 'orchestration-status',
+           }, 'agent-orchestration');
 
            // Check if the selected Recommendation Agent returned an error
            if (recommendationResult && recommendationResult.error) {
@@ -196,8 +262,20 @@ export class SommelierCoordinator implements Agent {
            try {
                // Use SharedContextMemory to pass input to ExplanationAgent
                this.communicationBus.setContext(this.getName(), 'recommendationResult', recommendationResult);
+               // Publish message before calling ExplanationAgent
+               this.communicationBus.publish({
+                 metadata: { traceId: `${message.userId}-${Date.now()}`, priority: 'NORMAL', timestamp: Date.now(), sender: this.getName() },
+                 payload: { status: 'Calling ExplanationAgent', input: recommendationResult },
+                 type: 'orchestration-status',
+               }, 'agent-orchestration');
                const explanationResult = await this.explanationAgent.handleMessage(recommendationResult); // Basic call
                this.logger.info('SommelierCoordinator: ExplanationAgent call completed. Result:', explanationResult);
+               // Publish message after receiving result from ExplanationAgent
+               this.communicationBus.publish({
+                 metadata: { traceId: `${message.userId}-${Date.now()}`, priority: 'NORMAL', timestamp: Date.now(), sender: this.getName() },
+                 payload: { status: 'ExplanationAgent call completed', result: explanationResult },
+                 type: 'orchestration-status',
+               }, 'agent-orchestration');
                // TODO: Integrate explanationResult into the final response if needed
            } catch (error) {
                this.logger.error('Error calling ExplanationAgent:', error);
@@ -208,6 +286,12 @@ export class SommelierCoordinator implements Agent {
 
            // Return the final result from the selected Recommendation Agent
            this.logger.info('SommelierCoordinator: Returning final recommendation result:', recommendationResult);
+           // Publish message indicating orchestration completed
+           this.communicationBus.publish({
+             metadata: { traceId: `${message.userId}-${Date.now()}`, priority: 'NORMAL', timestamp: Date.now(), sender: this.getName() },
+             payload: { status: 'Orchestration completed', finalResult: recommendationResult },
+             type: 'orchestration-status',
+           }, 'agent-orchestration');
 
            // Add user message and assistant response to history
            if (message.input.message) {

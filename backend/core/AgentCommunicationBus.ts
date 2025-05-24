@@ -50,6 +50,7 @@ console.log('AgentCommunicationBus constructor entered.');
 
   publish<T>(message: AgentMessage<T>, topic?: string): void {
     const eventName = topic ? `message:${topic}` : 'message';
+    console.log(`AgentCommunicationBus: Publishing message to event "${eventName}"`, message); // Add logging
     this.emitter.emit(eventName, message);
   }
 
