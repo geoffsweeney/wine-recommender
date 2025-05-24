@@ -19,6 +19,9 @@
     }
   },
   "devDependencies": {
+    "@babel/preset-env": "^7.24.8",
+    "@babel/preset-react": "^7.24.7",
+    "@babel/preset-typescript": "^7.24.7",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
@@ -28,6 +31,8 @@
     "@types/jest": "^29.5.14",
     "@types/node": "^22.15.3",
     "@types/supertest": "^6.0.3",
+    "@types/ws": "^8.18.1",
+    "babel-jest": "^29.7.0",
     "eslint": "^9.26.0",
     "husky": "^9.0.0",
     "identity-obj-proxy": "^3.0.0",
@@ -39,11 +44,7 @@
     "ts-jest": "^29.3.2",
     "ts-mockito": "^2.6.1",
     "ts-node": "^10.9.2",
-    "tsconfig-paths": "^4.2.0",
-    "babel-jest": "^29.7.0",
-    "@babel/preset-env": "^7.24.8",
-    "@babel/preset-typescript": "^7.24.7",
-    "@babel/preset-react": "^7.24.7"
+    "tsconfig-paths": "^4.2.0"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.0",

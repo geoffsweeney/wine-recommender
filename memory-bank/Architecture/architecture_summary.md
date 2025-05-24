@@ -44,7 +44,8 @@ graph TD
     AgentSys --> Memory[Context Memory System]
     Memory -->|Persistent| DB
     Memory -->|Ephemeral| Redis[(Redis Streams)]
-    API --> SSE[Server-Sent Events]
+    AgentBus --> WebSocketServer[WebSocket Server]
+    WebSocketServer -->|WebSocket| FE
 ```
 
 ## Key Components
@@ -114,6 +115,9 @@ graph TD
     payload: T;
   }
   ```
+- **WebSocket Streaming (Agent Conversations)**:
+  - A WebSocket server in the backend streams agent conversation messages from the Agent Communication Bus to the frontend in real-time.
+  - This allows users to observe the internal reasoning process of the agents.
 - **Message Queues**:
   - Redis Streams for high-throughput operations
   - RabbitMQ for complex routing needs
@@ -154,7 +158,7 @@ graph RL
     A6[Agent Hierarchy] --> B6[Escalation Policies]
     B6 --> C6[Graceful degradation]
     
-    A7[Streaming] --> B7[SSE+Redis Streams]
+    A7[Streaming] --> B7[WebSocket+Redis Streams]
     B7 --> C7[Real-time updates]
 ```
 

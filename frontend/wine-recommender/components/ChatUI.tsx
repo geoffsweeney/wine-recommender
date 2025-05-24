@@ -3,6 +3,12 @@
 import React, { useState, useEffect } from 'react'; // Import necessary hooks
 // Import API functions if they are needed directly in this component
 // import { getRecommendation } from '../lib/api'; // Assuming an API function for recommendations
+import Markdown from 'react-markdown'; // Import react-markdown
+
+interface AgentMessagePayload {
+  status?: string;
+  [key: string]: any; // Allow for other properties
+}
 
 const ChatUI: React.FC = () => {
   // TODO: Implement state for user input, conversation history, etc.
@@ -10,7 +16,8 @@ const ChatUI: React.FC = () => {
   const [conversationHistory, setConversationHistory] = useState<{ role: string; content: string }[]>([]);
   const [recommendationSource, setRecommendationSource] = useState('llm'); // Default source
   const [isLoading, setIsLoading] = useState(false); // State for loading indicator
-  const [agentConversation, setAgentConversation] = useState<{ agent: string; message: string }[]>([]); // State for agent conversation history
+  // Update type definition for agentConversation to reflect object payload
+  const [agentConversation, setAgentConversation] = useState<{ agent: string; message: AgentMessagePayload }[]>([]); // State for agent conversation history
   // TODO: Implement logic to load/save conversation history from sessionStorage
   useEffect(() => {
     // Load history from sessionStorage on component mount
@@ -34,9 +41,17 @@ const ChatUI: React.FC = () => {
       // Assuming the backend sends messages in a specific format, e.g., JSON { agent: 'AgentName', message: '...' }
       try {
         const agentMessage = JSON.parse(event.data);
-        setAgentConversation(prevHistory => [...prevHistory, agentMessage]);
+        // Parse the message payload from JSON string to object
+        const parsedPayload = JSON.parse(agentMessage.message);
+        // Explicitly construct the new agent message object for state
+        const newAgentMessage = {
+          agent: agentMessage.agent, // Assuming agent name is in agentMessage
+          message: parsedPayload, // Use the parsed object
+        };
+        // Update agentConversation state
+        setAgentConversation(prevHistory => [...prevHistory, newAgentMessage]);
       } catch (error) {
-        console.error('Failed to parse agent message:', error);
+        console.error('Failed to process agent message:', error);
       }
     };
 
@@ -118,15 +133,56 @@ const ChatUI: React.FC = () => {
     sessionStorage.removeItem('conversationHistory_test-user');
   };
 
-  // Helper function to render conversation turns (basic markdown support)
-  const renderConversation = () => {
+  // Helper function to render user/assistant conversation turns (markdown support)
+  const renderUserConversation = () => {
     return conversationHistory.map((turn, index) => (
       <div key={index} className={`mb-2 ${turn.role === 'user' ? 'text-right' : 'text-left'}`}>
         <strong>{turn.role}:</strong>
-        {/* TODO: Implement proper markdown rendering if needed */}
-        <div dangerouslySetInnerHTML={{ __html: turn.content.replace(/\\n/g, '<br>') }} /> {/* Basic line breaks */}
+        {/* Render markdown content */}
+        <Markdown>{turn.content}</Markdown>
       </div>
     ));
+  };
+
+  // Helper function to render agent conversation turns (formatted object display)
+  const renderAgentConversation = () => {
+    return agentConversation.map((turn, index) => {
+      // Logging for debugging
+      console.log('Rendering agent message:', turn);
+      console.log('Type of turn.message:', typeof turn.message);
+      console.log('Value of turn.message:', turn.message);
+
+      console.log('Turn object before rendering:', turn); // Add logging here
+      return (
+        <div key={index} className="mb-2 text-sm text-burgundy-700">
+          <strong>{turn.agent}:</strong>
+          {/* Format and display the agent message payload */}
+          {turn.message && typeof turn.message === 'object' && (
+            <div className="ml-4 p-2 bg-burgundy-100 rounded-md">
+              {/* Display status if available */}
+              {turn.message.status && <p><strong>Status:</strong> {turn.message.status}</p>}
+              {/* Display other payload properties */}
+              {Object.keys(turn.message).map(key => {
+                if (key !== 'status') {
+                  const value = turn.message[key];
+                  return (
+                    <div key={key}>
+                      <strong>{key}:</strong>
+                      {typeof value === 'object' ? (
+                        <pre className="whitespace-pre-wrap break-all text-xs">{JSON.stringify(value, null, 2)}</pre>
+                      ) : (
+                        <span>{String(value)}</span>
+                      )}
+                    </div>
+                  );
+                }
+                return null;
+              })}
+            </div>
+          )}
+        </div>
+      );
+    });
   };
 
 
@@ -180,17 +236,13 @@ const ChatUI: React.FC = () => {
       <div className="flex flex-col md:flex-row space-y-6 md:space-y-0 md:space-x-6 mt-6">
         {/* User Conversation */}
         <div id="recommendation-output" className="flex-1 border border-burgundy-300 p-8 rounded-md bg-burgundy-50 overflow-y-auto h-64">
-          {renderConversation()}
+          {renderUserConversation()} {/* Use renderUserConversation */}
         </div>
 
         {/* Agent Conversation */}
         <div className="flex-1 border border-burgundy-300 p-4 rounded-md bg-burgundy-50 overflow-y-auto h-64"> {/* Adjusted height */}
           <h3 className="text-lg font-semibold text-burgundy-800 mb-2">Agent Conversation:</h3>
-          {agentConversation.map((turn, index) => (
-            <div key={index} className="mb-2 text-sm text-burgundy-700">
-              <strong>{turn.agent}:</strong> {turn.message}
-            </div>
-          ))}
+          {renderAgentConversation()} {/* Use renderAgentConversation */}
         </div>
       </div>
     </div>

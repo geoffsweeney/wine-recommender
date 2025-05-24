@@ -15,6 +15,7 @@ An autonomous multi agentic AI agent wine recommendation system that:
 - Clear explanations of wine pairings
 - Value-focused purchasing advice
 - Ability to explore alternatives
+- Transparency into agent reasoning process
 
 ## Key Metrics
 - Recommendation accuracy
