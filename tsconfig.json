@@ -8,7 +8,7 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "moduleResolution": "node",
-    "rootDir": "src",
+    "rootDir": "backend",
     "outDir": "./dist",
     "sourceMap": true,
     "declaration": true,
@@ -16,17 +16,17 @@
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "paths": {
-      "@src/*": ["src/*"]
+      "@src/*": ["backend/*"]
     },
     "types": ["node", "jest"], // Updated to include jest
     "typeRoots": [
       "./node_modules/@types",
-      "./src/types"
+      "./backend/types"
     ]
   },
   "include": [
-    "src/**/*",
-    "src/types/**/*.d.ts"
+    "backend/**/*",
+    "backend/types/**/*.d.ts"
   ],
   "exclude": ["node_modules", "dist"]
 }
