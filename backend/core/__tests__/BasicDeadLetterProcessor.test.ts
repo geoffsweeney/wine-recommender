@@ -16,26 +16,31 @@ describe('BasicDeadLetterProcessor', () => {
   beforeEach(() => {
     dlq = new InMemoryDeadLetterQueue();
     loggingHandler = new LoggingDeadLetterHandler();
-    mockRetryManager = new BasicRetryManager() as jest.Mocked<BasicRetryManager>; // Instantiate mock
+    mockRetryManager = new BasicRetryManager() as jest.Mocked<BasicRetryManager>;
 
-    // Mock the executeWithRetry method to simulate failure after retries
     mockRetryManager.executeWithRetry.mockRejectedValue(new Error('Retry attempts exhausted'));
-
     processor = new BasicDeadLetterProcessor(dlq, loggingHandler, mockRetryManager);
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+    jest.restoreAllMocks();
   });
 
   it('should call handlePermanentFailure if retry attempts are exhausted', async () => {
     const handlePermanentFailureSpy = jest.spyOn(processor as any, 'handlePermanentFailure');
-    const testMessage = { data: 'failed message' };
-    const testError = new Error('Operation failed');
-    const testMetadata = { source: 'TestAgent' };
+    try {
+      const testMessage = { data: 'failed message' };
+      const testError = new Error('Operation failed');
+      const testMetadata = { source: 'TestAgent' };
 
-    await processor.process(testMessage, testError, testMetadata);
+      await processor.process(testMessage, testError, testMetadata);
 
-    expect(mockRetryManager.executeWithRetry).toHaveBeenCalled();
-    expect(handlePermanentFailureSpy).toHaveBeenCalledWith(testMessage, testError, testMetadata);
-
-    handlePermanentFailureSpy.mockRestore();
+      expect(mockRetryManager.executeWithRetry).toHaveBeenCalled();
+      expect(handlePermanentFailureSpy).toHaveBeenCalledWith(testMessage, testError, testMetadata);
+    } finally {
+      handlePermanentFailureSpy.mockRestore();
+    }
   });
 
   it('should add the failed message to the in-memory DLQ on permanent failure', async () => {
