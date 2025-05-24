@@ -10,7 +10,7 @@ const ChatUI: React.FC = () => {
   const [conversationHistory, setConversationHistory] = useState<{ role: string; content: string }[]>([]);
   const [recommendationSource, setRecommendationSource] = useState('llm'); // Default source
   const [isLoading, setIsLoading] = useState(false); // State for loading indicator
-
+  const [agentConversation, setAgentConversation] = useState<{ agent: string; message: string }[]>([]); // State for agent conversation history
   // TODO: Implement logic to load/save conversation history from sessionStorage
   useEffect(() => {
     // Load history from sessionStorage on component mount
@@ -25,6 +25,36 @@ const ChatUI: React.FC = () => {
     sessionStorage.setItem('conversationHistory_test-user', JSON.stringify(conversationHistory));
   }, [conversationHistory]); // Run whenever conversationHistory changes
 
+  // TODO: Implement WebSocket connection for agent conversation updates
+  useEffect(() => {
+    const wsUrl = 'ws://localhost:3001/ws/agent-conversation'; // Placeholder URL
+    const websocket = new WebSocket(wsUrl);
+
+    websocket.onmessage = (event) => {
+      // Assuming the backend sends messages in a specific format, e.g., JSON { agent: 'AgentName', message: '...' }
+      try {
+        const agentMessage = JSON.parse(event.data);
+        setAgentConversation(prevHistory => [...prevHistory, agentMessage]);
+      } catch (error) {
+        console.error('Failed to parse agent message:', error);
+      }
+    };
+
+    websocket.onerror = (error) => {
+      console.error('WebSocket error:', error);
+      // TODO: Handle WebSocket errors in the UI
+    };
+
+    websocket.onclose = (event) => {
+      console.log('WebSocket closed:', event);
+      // TODO: Handle WebSocket closure in the UI, maybe attempt to reconnect
+    };
+
+    // Clean up the WebSocket connection when the component unmounts
+    return () => {
+      websocket.close();
+    };
+  }, []); // Empty dependency array means this runs once on mount
 
   // TODO: Implement handleGetRecommendation function
   const handleGetRecommendation = async () => {
@@ -147,8 +177,21 @@ const ChatUI: React.FC = () => {
         </select>
       </div>
 
-      <div id="recommendation-output" className="mt-6 border border-burgundy-300 p-8 rounded-md bg-burgundy-50 overflow-y-auto h-64">
-        {renderConversation()}
+      <div className="flex flex-col md:flex-row space-y-6 md:space-y-0 md:space-x-6 mt-6">
+        {/* User Conversation */}
+        <div id="recommendation-output" className="flex-1 border border-burgundy-300 p-8 rounded-md bg-burgundy-50 overflow-y-auto h-64">
+          {renderConversation()}
+        </div>
+
+        {/* Agent Conversation */}
+        <div className="flex-1 border border-burgundy-300 p-4 rounded-md bg-burgundy-50 overflow-y-auto h-64"> {/* Adjusted height */}
+          <h3 className="text-lg font-semibold text-burgundy-800 mb-2">Agent Conversation:</h3>
+          {agentConversation.map((turn, index) => (
+            <div key={index} className="mb-2 text-sm text-burgundy-700">
+              <strong>{turn.agent}:</strong> {turn.message}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
