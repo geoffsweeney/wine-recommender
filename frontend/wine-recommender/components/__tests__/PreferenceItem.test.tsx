@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import PreferenceItem from '../PreferenceItem';
-import { PreferenceNode } from '../../../../src/types'; // Adjust import path as needed
+import { PreferenceNode } from '../../../../backend/types'; // Adjust import path as needed
 import { updatePreference, deletePreference } from '../../lib/api'; // Import API functions to mock
 
 // Mock the API functions
@@ -15,6 +15,18 @@ const mockedUpdatePreference = updatePreference as jest.Mock;
 const mockedDeletePreference = deletePreference as jest.Mock;
 
 describe('PreferenceItem', () => {
+  // Mock toLocaleString for consistent timestamp rendering
+  const mockLocaleString = jest.fn().mockReturnValue('10/27/2023, 10:00:00 AM');
+  const originalToLocaleString = Date.prototype.toLocaleString;
+
+  beforeAll(() => {
+    Date.prototype.toLocaleString = mockLocaleString;
+  });
+
+  afterAll(() => {
+    Date.prototype.toLocaleString = originalToLocaleString;
+  });
+
   const mockPreference: PreferenceNode = {
     id: '1',
     type: 'wineType',
@@ -54,7 +66,7 @@ describe('PreferenceItem', () => {
     expect(screen.getByText('Value: red')).toBeInTheDocument();
     expect(screen.getByText('Source: manual')).toBeInTheDocument();
     expect(screen.getByText('Confidence: 1')).toBeInTheDocument();
-    expect(screen.getByText('Timestamp: 27/10/2023, 10:00:00 am')).toBeInTheDocument(); // Adjust expected format based on toLocaleString output
+    expect(screen.getByText(/Timestamp:\s*10\/27\/2023,\s*10:00:00\s*AM/)).toBeInTheDocument(); // Adjust expected format based on toLocaleString output
     expect(screen.getByText('Negated: No')).toBeInTheDocument();
     expect(screen.getByLabelText('Include in Pairing')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument();
@@ -179,7 +191,7 @@ describe('PreferenceItem', () => {
     await waitFor(() => {
       expect(mockedDeletePreference).toHaveBeenCalledWith(mockUserId, mockPreference.id);
       expect(mockOnPreferenceDeleted).toHaveBeenCalledTimes(1);
-      expect(deleteButton).not.toBeDisabled(); // Button should not be disabled after successful deletion (state reverts)
+      expect(screen.getByRole('button', { name: 'Delete' })).not.toBeDisabled(); // Button should not be disabled after successful deletion (state reverts)
       expect(screen.getByRole('button', { name: 'Delete' })).not.toHaveTextContent('Deleting...'); // Text reverts
     });
 

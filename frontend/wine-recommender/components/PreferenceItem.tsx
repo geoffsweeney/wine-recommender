@@ -1,7 +1,7 @@
 "use client"; // Mark as a Client Component
 
 import React, { useState } from 'react'; // Import useState
-import { PreferenceNode } from '../../../src/types'; // Import PreferenceNode type
+import { PreferenceNode } from '../../../backend/types'; // Import PreferenceNode type
 import { updatePreference, deletePreference } from '../lib/api'; // Import API functions
 
 interface PreferenceItemProps {
@@ -44,6 +44,7 @@ const PreferenceItem: React.FC<PreferenceItemProps> = ({ preference, userId, onP
       try {
         await deletePreference(userId, preference.id);
         onPreferenceDeleted(); // Notify parent to revalidate
+        setIsDeleting(false); // Re-enable button after successful deletion
       } catch (error) {
         console.error('Failed to delete preference:', error);
         setIsDeleting(false); // Revert deleting state on error

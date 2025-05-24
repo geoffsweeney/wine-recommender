@@ -1,23 +1,16 @@
 import 'reflect-metadata';
 import express from 'express';
 import { container } from 'tsyringe';
-import { SommelierCoordinator } from '@src/core/agents/SommelierCoordinator'; // Use @src alias
-import { UserPreferenceController } from '@src/api/controllers/UserPreferenceController'; // Import UserPreferenceController
-import { AgentCommunicationBus } from '@src/core/AgentCommunicationBus'; // Import AgentCommunicationBus
-import { LLMService } from '@src/services/LLMService'; // Import LLMService
-
-
-// Import agents (InputValidationAgent and RecommendationAgent are dependencies of SommelierCoordinator)
-// import { InputValidationAgent } from '@src/core/agents/InputValidationAgent';
-// import { RecommendationAgent } from '@src/core/agents/RecommendationAgent';
-// Import services (Neo4jService is a dependency of KnowledgeGraphService)
-// import { Neo4jService } from '@src/services/Neo4jService';
+import { SommelierCoordinator } from '../core/agents/SommelierCoordinator'; // Use @src alias
+import { UserPreferenceController } from '..//api/controllers/UserPreferenceController'; // Import UserPreferenceController
+import { AgentCommunicationBus } from '..//core/AgentCommunicationBus'; // Import AgentCommunicationBus
+import { LLMService } from '..//services/LLMService'; // Import LLMService
 
 // Import validation middleware and schemas using @src alias
-import { validateRequest } from '@src/api/middleware/validation';
-import { RecommendationRequest } from '@src/api/dtos/RecommendationRequest.dto';
-import { SearchRequest } from '@src/api/dtos/SearchRequest.dto';
-import { BasicDeadLetterProcessor } from '../core/BasicDeadLetterProcessor'; // Import BasicDeadLetterProcessor
+import { validateRequest } from '..//api/middleware/validation';
+import { RecommendationRequest } from '..//api/dtos/RecommendationRequest.dto';
+import { SearchRequest } from '..//api/dtos/SearchRequest.dto';
+//import { BasicDeadLetterProcessor } from '../core/BasicDeadLetterProcessor'; // Import BasicDeadLetterProcessor
 
 const router = express.Router();
 

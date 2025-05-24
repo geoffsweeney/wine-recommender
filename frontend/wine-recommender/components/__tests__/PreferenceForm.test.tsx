@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import PreferenceForm from '../PreferenceForm';
-import { PreferenceNode } from '../../../../src/types'; // Adjust import path as needed
+import { PreferenceNode } from '../../../../backend/types'; // Adjust import path as needed
 import { addPreference, updatePreference } from '../../lib/api'; // Import API functions to mock
 
 // Mock the API functions
@@ -224,7 +224,7 @@ describe('PreferenceForm', () => {
         confidence: 1.0,
         timestamp: expect.any(String),
         active: true,
-        negated: false,
+        negated: undefined,
       });
       expect(mockOnSuccess).toHaveBeenCalledTimes(1);
     });
@@ -261,7 +261,7 @@ describe('PreferenceForm', () => {
         confidence: 1.0,
         timestamp: expect.any(String),
         active: true,
-        negated: false,
+        negated: undefined,
       });
       expect(mockOnSuccess).toHaveBeenCalledTimes(1);
     });

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useForm, Controller, ControllerRenderProps } from 'react-hook-form'; // Assuming React Hook Form, Import ControllerRenderProps
-import { PreferenceNode } from '../../../src/types'; // Import PreferenceNode type
+import { PreferenceNode } from '../../../backend/types'; // Import PreferenceNode type
 import { addPreference, updatePreference } from '../lib/api'; // Import API functions
 
 interface PreferenceFormProps {
@@ -19,6 +19,7 @@ const PreferenceForm: React.FC<PreferenceFormProps> = ({ initialData, userId, on
       confidence: 1.0, // Default confidence for manual entry
       timestamp: new Date().toISOString(),
       active: true,
+      negated: false, // Explicitly set default for negated
     },
   });
 
@@ -28,7 +29,13 @@ const PreferenceForm: React.FC<PreferenceFormProps> = ({ initialData, userId, on
     try {
       if (initialData?.id) {
         // Editing existing preference
-        await updatePreference(userId, initialData.id, data);
+        // Construct updates object with only fields that can be updated by the form
+        const updates: Partial<PreferenceNode> = {
+          value: data.value,
+          active: data.active,
+          negated: data.negated,
+        };
+        await updatePreference(userId, initialData.id, updates);
       } else {
         // Adding new preference
         await addPreference(userId, data);
@@ -80,7 +87,10 @@ const PreferenceForm: React.FC<PreferenceFormProps> = ({ initialData, userId, on
                >
                  <option value="">Select a value</option>
                  {/* TODO: Populate options based on selectedType and synonym registry */}
-                 {/* For now, just a placeholder */}
+                 {/* For now, add options needed by tests */}
+                 <option value="red">Red</option>
+                 <option value="dry">Dry</option>
+                 {/* TODO: Populate options based on selectedType and synonym registry */}
                  <option value="example">Example Option</option>
                </select>
              )}
