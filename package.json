@@ -51,7 +51,7 @@
     "cors": "^2.8.5",
     "express-rate-limit": "^7.5.0",
     "neo4j-driver": "^5.28.1",
-    "rate-limiter-flexible": "^7.1.0",
+    "rate-limiter-flexible": "^7.1.1",
     "spacy": "^0.0.4",
     "tsyringe": "^4.10.0",
     "winston": "^3.17.0"
