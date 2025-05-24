@@ -8,7 +8,7 @@ const ChatUI: React.FC = () => {
   // TODO: Implement state for user input, conversation history, etc.
   const [userInput, setUserInput] = useState('');
   const [conversationHistory, setConversationHistory] = useState<{ role: string; content: string }[]>([]);
-  const [recommendationSource, setRecommendationSource] = useState('knowledgeGraph'); // Default source
+  const [recommendationSource, setRecommendationSource] = useState('llm'); // Default source
   const [isLoading, setIsLoading] = useState(false); // State for loading indicator
 
   // TODO: Implement logic to load/save conversation history from sessionStorage
@@ -101,56 +101,53 @@ const ChatUI: React.FC = () => {
 
 
   return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Get a Wine Recommendation</h1>
+    <div className="container mx-auto p-6 bg-white rounded-lg shadow-md border border-burgundy-200">
+      <h2 className="text-2xl font-bold text-burgundy-800 mb-6">Get a Wine Recommendation</h2>
 
-      <div className="mb-4">
+      <div className="mb-6 flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4">
         <input
           type="text"
-          id="user-input" // Consider removing ID if not needed for direct DOM manipulation
-          placeholder="Enter your preferences or ingredients"
-          className="border p-2 mr-2"
+          placeholder="Enter your preferences or ingredients..."
+          className="flex-grow border border-burgundy-300 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-burgundy-600 focus:border-transparent text-burgundy-800 placeholder-burgundy-400"
           value={userInput}
           onChange={(e) => setUserInput(e.target.value)}
-          onKeyPress={(e) => { // Allow sending on Enter key press
+          onKeyPress={(e) => {
             if (e.key === 'Enter') {
               handleGetRecommendation();
             }
           }}
         />
         <button
-          id="get-recommendation" // Consider removing ID
           onClick={handleGetRecommendation}
-          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-          disabled={isLoading} // Disable button while loading
+          className="px-6 py-3 text-base font-medium text-white bg-burgundy-600 border border-transparent rounded-md shadow-sm hover:bg-burgundy-700 focus:outline-none focus:ring-2 focus:ring-burgundy-600 focus:ring-offset-2 transition duration-150 ease-in-out"
+          disabled={isLoading}
         >
           {isLoading ? 'Getting Recommendation...' : 'Get Recommendation'}
         </button>
         <button
-          id="clear-history" // Consider removing ID
           onClick={handleClearHistory}
-          className="ml-2 px-4 py-2 text-sm font-medium text-white bg-gray-600 border border-transparent rounded-md shadow-sm hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
-          disabled={isLoading} // Disable while loading
+          className="px-6 py-3 text-base font-medium text-burgundy-700 bg-white border border-burgundy-300 rounded-md shadow-sm hover:bg-burgundy-50 focus:outline-none focus:ring-2 focus:ring-burgundy-600 focus:ring-offset-2 transition duration-150 ease-in-out"
+          disabled={isLoading}
         >
           Clear History
         </button>
       </div>
 
-      <div className="mb-4">
-        <label htmlFor="recommendation-source" className="mr-2">Recommendation Source:</label>
+      <div className="mb-6 flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-2">
+        <label htmlFor="recommendation-source" className="text-burgundy-800 font-medium">Recommendation Source:</label>
         <select
-          id="recommendation-source" // Consider removing ID
-          className="border p-2"
+          id="recommendation-source"
+          className="border border-burgundy-300 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-burgundy-600 focus:border-transparent text-burgundy-800"
           value={recommendationSource}
           onChange={(e) => setRecommendationSource(e.target.value)}
-          disabled={isLoading} // Disable while loading
+          disabled={isLoading}
         >
           <option value="knowledgeGraph">Knowledge Graph</option>
           <option value="llm">LLM</option>
         </select>
       </div>
 
-      <div id="recommendation-output" className="mt-4 border p-4 rounded"> {/* Consider removing ID */}
+      <div id="recommendation-output" className="mt-6 border border-burgundy-300 p-8 rounded-md bg-burgundy-50 overflow-y-auto h-64">
         {renderConversation()}
       </div>
     </div>

@@ -1,35 +1,33 @@
 import React from 'react';
-import { useForm, Controller, ControllerRenderProps } from 'react-hook-form'; // Assuming React Hook Form, Import ControllerRenderProps
-import { PreferenceNode } from '../../../backend/types'; // Import PreferenceNode type
-import { addPreference, updatePreference } from '../lib/api'; // Import API functions
+import { useForm, Controller, ControllerRenderProps } from 'react-hook-form';
+import { PreferenceNode } from '../../../backend/types';
+import { addPreference, updatePreference } from '../lib/api';
 
 interface PreferenceFormProps {
-  initialData?: PreferenceNode; // Optional initial data for editing
-  userId: string; // User ID is required for API calls
-  onSuccess: () => void; // Handler for successful submission
-  onCancel: () => void; // Handler for canceling the form
+  initialData?: PreferenceNode;
+  userId: string;
+  onSuccess: () => void;
+  onCancel: () => void;
 }
 
 const PreferenceForm: React.FC<PreferenceFormProps> = ({ initialData, userId, onSuccess, onCancel }) => {
-  const { handleSubmit, control, reset, watch, formState: { isSubmitting, errors } } = useForm<PreferenceNode>({ // Include errors and watch
+  const { handleSubmit, control, reset, watch, formState: { isSubmitting, errors } } = useForm<PreferenceNode>({
     defaultValues: initialData || {
       type: '',
-      value: '', // TODO: Handle different value types
-      source: 'manual', // Default source for manual entry
-      confidence: 1.0, // Default confidence for manual entry
+      value: '',
+      source: 'manual',
+      confidence: 1.0,
       timestamp: new Date().toISOString(),
       active: true,
-      negated: false, // Explicitly set default for negated
+      negated: false,
     },
   });
 
-  const selectedType = watch('type'); // Watch the 'type' field to dynamically render value input
+  const selectedType = watch('type');
 
   const handleFormSubmit = async (data: PreferenceNode) => {
     try {
       if (initialData?.id) {
-        // Editing existing preference
-        // Construct updates object with only fields that can be updated by the form
         const updates: Partial<PreferenceNode> = {
           value: data.value,
           active: data.active,
@@ -37,194 +35,160 @@ const PreferenceForm: React.FC<PreferenceFormProps> = ({ initialData, userId, on
         };
         await updatePreference(userId, initialData.id, updates);
       } else {
-        // Adding new preference
         await addPreference(userId, data);
       }
-      onSuccess(); // Call success handler
-      reset(); // Reset form after submission
+      onSuccess();
+      reset();
     } catch (error) {
       console.error('Failed to save preference:', error);
-      // TODO: Show a user-friendly error message (e.g., toast)
     }
   };
 
-  // TODO: Implement form fields for type, value, active state, etc.
-  // TODO: Implement submit and cancel buttons
-
   return (
-    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
+    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6 p-6 bg-white rounded-lg shadow-md border border-burgundy-200">
+      {/* Type Field */}
       <div>
-        <label htmlFor="type" className="block text-sm font-medium text-gray-700">Preference Type</label>
+        <label htmlFor="type" className="block text-sm font-medium text-burgundy-800">Preference Type</label>
         <Controller
           name="type"
           control={control}
           rules={{ required: 'Preference type is required' }}
-          render={({ field }: { field: ControllerRenderProps<PreferenceNode, "type"> }) => ( // Explicitly type field
+          render={({ field }) => (
             <input
               id="type"
               {...field}
-              className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm ${errors.type ? 'border-red-500' : ''}`} // Add error styling
+              className={`mt-1 block w-full rounded-md border-burgundy-200 shadow-sm focus:border-burgundy-600 focus:ring-burgundy-600 sm:text-sm ${
+                errors.type ? 'border-red-500' : ''
+              }`}
             />
           )}
         />
-        {errors.type && <p className="mt-1 text-sm text-red-600">{errors.type.message}</p>} {/* Display validation errors */}
+        {errors.type && <p className="mt-1 text-sm text-red-600">{errors.type.message}</p>}
       </div>
 
+      {/* Value Field */}
       <div>
-        <label htmlFor="value" className="block text-sm font-medium text-gray-700">Preference Value</label>
-        {/* Dynamically render input based on selectedType */}
+        <label htmlFor="value" className="block text-sm font-medium text-burgundy-800">Preference Value</label>
         {selectedType === 'wineType' || selectedType === 'sweetness' || selectedType === 'body' || selectedType === 'region' ? (
-           <Controller
-             name="value"
-             control={control}
-             rules={{ required: 'Preference value is required' }}
-             render={({ field }: { field: ControllerRenderProps<PreferenceNode, "value"> }) => (
-               <select
-                 id="value"
-                 {...field}
-                 value={String(field.value)} // Ensure value is a string for the select input
-                 className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm ${errors.value ? 'border-red-500' : ''}`}
-               >
-                 <option value="">Select a value</option>
-                 {/* TODO: Populate options based on selectedType and synonym registry */}
-                 {/* For now, add options needed by tests */}
-                 <option value="red">Red</option>
-                 <option value="dry">Dry</option>
-                 {/* TODO: Populate options based on selectedType and synonym registry */}
-                 <option value="example">Example Option</option>
-               </select>
-             )}
-           />
+          <Controller
+            name="value"
+            control={control}
+            rules={{ required: 'Preference value is required' }}
+            render={({ field }: { field: ControllerRenderProps<PreferenceNode, "value"> }) => (
+              <select
+                id="value"
+                {...field}
+                className={`mt-1 block w-full rounded-md border-burgundy-200 shadow-sm focus:border-burgundy-600 focus:ring-burgundy-600 sm:text-sm ${
+                  errors.value ? 'border-red-500' : ''
+                }`}
+                value={String(field.value)}
+              >
+                <option value="">Select a value</option>
+                <option value="red">Red</option>
+                <option value="dry">Dry</option>
+                <option value="example">Example Option</option>
+              </select>
+            )}
+          />
         ) : selectedType === 'priceRange' ? (
-           // TODO: Implement range input or two number inputs
-           <Controller
-             name="value"
-             control={control}
-             rules={{ required: 'Preference value is required', validate: value => Array.isArray(value) && value.length === 2 && value.every(v => typeof v === 'number') || 'Invalid price range format' }} // Basic array validation
-             render={({ field }: { field: ControllerRenderProps<PreferenceNode, "value"> }) => (
-               <> {/* Use fragment for multiple inputs */}
-                 <input
-                   type="number"
-                   placeholder="Min Price"
-                   {...field}
-                   value={Array.isArray(field.value) ? field.value[0] : ''} // Bind min value
-                   onChange={e => {
-                     const newValue = [...(Array.isArray(field.value) ? field.value : [0, 0])];
-                     newValue[0] = Number(e.target.value);
-                     field.onChange(newValue);
-                   }}
-                   className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm ${errors.value ? 'border-red-500' : ''}`}
-                 />
-                 <input
-                   type="number"
-                   placeholder="Max Price"
-                   {...field}
-                   value={Array.isArray(field.value) ? field.value[1] : ''} // Bind max value
-                   onChange={e => {
-                     const newValue = [...(Array.isArray(field.value) ? field.value : [0, 0])];
-                     newValue[1] = Number(e.target.value);
-                     field.onChange(newValue);
-                   }}
-                   className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm ${errors.value ? 'border-red-500' : ''}`}
-                 />
-               </>
-             )}
-           />
-        ) : selectedType === 'alcoholContent' || selectedType === 'servingTemperature' || selectedType === 'volume' || selectedType === 'distance' ? (
-           <Controller
-             name="value"
-             control={control}
-             rules={{ required: 'Preference value is required', validate: value => typeof value === 'number' || 'Value must be a number' }} // Basic number validation
-             render={({ field }: { field: ControllerRenderProps<PreferenceNode, "value"> }) => (
-               <input
-                 type="number" // Use number input for numeric types
-                 id="value"
-                 {...field}
-                 value={typeof field.value === 'number' ? field.value : ''} // Bind number value
-                 onChange={e => field.onChange(Number(e.target.value))} // Convert to number on change
-                 className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm ${errors.value ? 'border-red-500' : ''}`}
-               />
-             )}
-           />
+          <Controller
+            name="value"
+            control={control}
+            rules={{ required: 'Preference value is required' }}
+            render={({ field }) => (
+              <div className="space-y-2">
+                <input
+                  type="number"
+                  placeholder="Min Price"
+                  {...field}
+                  className={`w-full rounded-md border-burgundy-200 shadow-sm focus:border-burgundy-600 focus:ring-burgundy-600 sm:text-sm ${
+                    errors.value ? 'border-red-500' : ''
+                  }`}
+                  value={Array.isArray(field.value) ? (field.value as number[])[0] || '' : Number(field.value) || ''}
+                />
+                <input
+                  type="number"
+                  placeholder="Max Price"
+                  {...field}
+                  className={`w-full rounded-md border-burgundy-200 shadow-sm focus:border-burgundy-600 focus:ring-burgundy-600 sm:text-sm ${
+                    errors.value ? 'border-red-500' : ''
+                  }`}
+                  value={Array.isArray(field.value) ? (field.value as number[])[1] || '' : ''} // Assuming the second element is max price
+                />
+              </div>
+            )}
+          />
         ) : (
-           // Default text input for other types
-           <Controller
-             name="value"
-             control={control}
-             rules={{ required: 'Preference value is required' }}
-             render={({ field }: { field: ControllerRenderProps<PreferenceNode, "value"> }) => (
-               <input
-                 id="value"
-                 {...field}
-                 value={String(field.value)} // Ensure value is a string for the input
-                 className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm ${errors.value ? 'border-red-500' : ''}`}
-               />
-             )}
-           />
+          <Controller
+            name="value"
+            control={control}
+            rules={{ required: 'Preference value is required' }}
+            render={({ field }) => (
+              <input
+                id="value"
+                {...field}
+                className={`mt-1 block w-full rounded-md border-burgundy-200 shadow-sm focus:border-burgundy-600 focus:ring-burgundy-600 sm:text-sm ${
+                  errors.value ? 'border-red-500' : ''
+                }`}
+                value={String(field.value)} // Explicitly convert to string
+              />
+            )}
+          />
         )}
-        {errors.value && <p className="mt-1 text-sm text-red-600">{errors.value.message}</p>} {/* Display validation errors */}
+        {errors.value && <p className="mt-1 text-sm text-red-600">{errors.value.message}</p>}
       </div>
 
-       {/* Implement active toggle */}
-       <div>
-         <label htmlFor="active" className="flex items-center text-sm font-medium text-gray-700">
-           <Controller
-             name="active"
-             control={control}
-             render={({ field }: { field: ControllerRenderProps<PreferenceNode, "active"> }) => ( // Explicitly type field
-               <input
-                 id="active"
-                 type="checkbox" // Use checkbox for boolean active state
-                 onChange={field.onChange} // Explicitly bind onChange
-                 onBlur={field.onBlur} // Explicitly bind onBlur
-                 name={field.name} // Explicitly bind name
-                 checked={field.value as boolean} // Bind checked state, explicitly cast
-                 className="mr-2 rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-               />
-             )}
-           />
-           Include in Pairing
-         </label>
-       </div>
+      {/* Toggles */}
+      <div className="space-y-4">
+        <div className="flex items-center">
+          <Controller
+            name="active"
+            control={control}
+            render={({ field }: { field: ControllerRenderProps<PreferenceNode, "active"> }) => (
+              <input
+                type="checkbox"
+                className="h-4 w-4 text-burgundy-600 border-burgundy-300 rounded focus:ring-burgundy-600"
+                checked={field.value as boolean}
+                onChange={field.onChange}
+              />
+            )}
+          />
+          <label htmlFor="active" className="ml-2 text-sm text-burgundy-700">Include in Pairing</label>
+        </div>
 
-       {/* Implement negated toggle */}
-       <div>
-         <label htmlFor="negated" className="flex items-center text-sm font-medium text-gray-700">
-           <Controller
-             name="negated"
-             control={control}
-             render={({ field }: { field: ControllerRenderProps<PreferenceNode, "negated"> }) => ( // Explicitly type field
-               <input
-                 id="negated"
-                 type="checkbox" // Use checkbox for boolean negated state
-                 onChange={field.onChange} // Explicitly bind onChange
-                 onBlur={field.onBlur} // Explicitly bind onBlur
-                 name={field.name} // Explicitly bind name
-                 checked={field.value as boolean} // Bind checked state, explicitly cast
-                 className="mr-2 rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-               />
-             )}
-           />
-           Negated
-         </label>
-       </div>
+        <div className="flex items-center">
+          <Controller
+            name="negated"
+            control={control}
+            render={({ field }: { field: ControllerRenderProps<PreferenceNode, "negated"> }) => (
+              <input
+                type="checkbox"
+                className="h-4 w-4 text-burgundy-600 border-burgundy-300 rounded focus:ring-burgundy-600"
+                checked={field.value as boolean}
+                onChange={field.onChange}
+              />
+            )}
+          />
+          <label htmlFor="negated" className="ml-2 text-sm text-burgundy-700">Negated</label>
+        </div>
+      </div>
 
-
-      <div className="flex justify-end space-x-2">
+      {/* Buttons */}
+      <div className="flex justify-end space-x-3 pt-6 border-t border-burgundy-100">
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-          disabled={isSubmitting} // Disable while submitting
+          className="px-4 py-2 text-sm font-medium text-burgundy-700 bg-white border border-burgundy-200 rounded-md shadow-sm hover:bg-burgundy-50 focus:ring-2 focus:ring-burgundy-600"
+          disabled={isSubmitting}
         >
           Cancel
         </button>
         <button
           type="submit"
-          className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-          disabled={isSubmitting} // Disable while submitting
+          className="px-4 py-2 text-sm font-medium text-white bg-burgundy-600 rounded-md shadow-sm hover:bg-burgundy-700 focus:ring-2 focus:ring-burgundy-600"
+          disabled={isSubmitting}
         >
-          {isSubmitting ? 'Saving...' : 'Save Preference'} {/* Show saving state */}
+          {isSubmitting ? 'Saving...' : 'Save Preference'}
         </button>
       </div>
     </form>

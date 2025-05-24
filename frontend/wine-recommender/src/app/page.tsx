@@ -3,12 +3,12 @@ import ChatUI from '../../components/ChatUI'; // Import ChatUI component
 
 export default function Home() {
   return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Wine Recommender Application</h1>
+    <div className="container mx-auto p-6">
+      <h1 className="text-3xl font-bold text-center text-burgundy-800 mb-8">Wine Recommender Application</h1>
 
       {/* Navigation link to the preferences page */}
-      <div className="mb-4">
-        <Link href="/preferences" className="text-blue-600 hover:underline">
+      <div className="text-center mb-8">
+        <Link href="/preferences" className="text-burgundy-600 hover:underline text-lg">
           Manage Preferences
         </Link>
       </div>
