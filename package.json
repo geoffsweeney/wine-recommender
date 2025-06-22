@@ -8,9 +8,9 @@
     "test:all": "jest --coverage",
     "test:changed": "jest --onlyChanged --coverage",
     "lint": "eslint . --ext .ts",
-    "dev": "node -r tsconfig-paths/register -r ts-node/register src/server.ts",
+    "dev": "node -r tsconfig-paths/register -r ts-node/register backend/server.ts",
     "build": "tsc",
-    "start": "npm run build && node dist/server.js"
+    "start": "npm run build && node dist/backend/server.js"
   },
   "husky": {
     "hooks": {
@@ -31,6 +31,7 @@
     "@types/jest": "^29.5.14",
     "@types/node": "^22.15.21",
     "@types/supertest": "^6.0.3",
+    "@types/uuid": "^10.0.0",
     "@types/ws": "^8.18.1",
     "babel-jest": "^29.7.0",
     "eslint": "^9.26.0",
@@ -44,7 +45,8 @@
     "ts-jest": "^29.3.4",
     "ts-mockito": "^2.6.1",
     "ts-node": "^10.9.2",
-    "tsconfig-paths": "^4.2.0"
+    "tsconfig-paths": "^4.2.0",
+    "zod": "^3.25.56"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.0",
@@ -55,10 +57,12 @@
     "class-validator": "^0.14.2",
     "cors": "^2.8.5",
     "express-rate-limit": "^7.5.0",
+    "jest-junit": "^16.0.0",
     "neo4j-driver": "^5.28.1",
     "rate-limiter-flexible": "^7.1.1",
     "spacy": "^0.0.4",
     "tsyringe": "^4.10.0",
+    "uuid": "^11.1.0",
     "winston": "^3.17.0"
   },
   "ts-node": {

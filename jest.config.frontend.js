@@ -25,6 +25,5 @@ module.exports = {
   transformIgnorePatterns: [
     '/node_modules/(?!@swc/helpers|@babel/runtime)/'
   ],
-  collectCoverage: true,
   coverageDirectory: '<rootDir>/coverage',
 };

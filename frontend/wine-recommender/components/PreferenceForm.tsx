@@ -95,28 +95,31 @@ const PreferenceForm: React.FC<PreferenceFormProps> = ({ initialData, userId, on
             name="value"
             control={control}
             rules={{ required: 'Preference value is required' }}
-            render={({ field }) => (
-              <div className="space-y-2">
-                <input
-                  type="number"
-                  placeholder="Min Price"
-                  {...field}
-                  className={`w-full rounded-md border-burgundy-200 shadow-sm focus:border-burgundy-600 focus:ring-burgundy-600 sm:text-sm ${
-                    errors.value ? 'border-red-500' : ''
-                  }`}
-                  value={Array.isArray(field.value) ? (field.value as number[])[0] || '' : Number(field.value) || ''}
-                />
-                <input
-                  type="number"
-                  placeholder="Max Price"
-                  {...field}
-                  className={`w-full rounded-md border-burgundy-200 shadow-sm focus:border-burgundy-600 focus:ring-burgundy-600 sm:text-sm ${
-                    errors.value ? 'border-red-500' : ''
-                  }`}
-                  value={Array.isArray(field.value) ? (field.value as number[])[1] || '' : ''} // Assuming the second element is max price
-                />
-              </div>
-            )}
+            render={({ field }) => {
+              const value = Array.isArray(field.value) ? field.value : [Number(field.value) || 0, 0];
+              return (
+                <div className="space-y-2">
+                  <input
+                    type="number"
+                    placeholder="Min Price"
+                    className={`w-full rounded-md border-burgundy-200 shadow-sm focus:border-burgundy-600 focus:ring-burgundy-600 sm:text-sm ${
+                      errors.value ? 'border-red-500' : ''
+                    }`}
+                    value={value[0] || ''}
+                    onChange={(e) => field.onChange([Number(e.target.value), value[1]])}
+                  />
+                  <input
+                    type="number"
+                    placeholder="Max Price"
+                    className={`w-full rounded-md border-burgundy-200 shadow-sm focus:border-burgundy-600 focus:ring-burgundy-600 sm:text-sm ${
+                      errors.value ? 'border-red-500' : ''
+                    }`}
+                    value={value[1] || ''}
+                    onChange={(e) => field.onChange([value[0], Number(e.target.value)])}
+                  />
+                </div>
+              );
+            }}
           />
         ) : (
           <Controller
@@ -127,6 +130,7 @@ const PreferenceForm: React.FC<PreferenceFormProps> = ({ initialData, userId, on
               <input
                 id="value"
                 {...field}
+                type={selectedType === 'alcoholContent' ? 'number' : 'text'}
                 className={`mt-1 block w-full rounded-md border-burgundy-200 shadow-sm focus:border-burgundy-600 focus:ring-burgundy-600 sm:text-sm ${
                   errors.value ? 'border-red-500' : ''
                 }`}
@@ -146,6 +150,7 @@ const PreferenceForm: React.FC<PreferenceFormProps> = ({ initialData, userId, on
             control={control}
             render={({ field }: { field: ControllerRenderProps<PreferenceNode, "active"> }) => (
               <input
+                id="active"
                 type="checkbox"
                 className="h-4 w-4 text-burgundy-600 border-burgundy-300 rounded focus:ring-burgundy-600"
                 checked={field.value as boolean}
@@ -162,6 +167,7 @@ const PreferenceForm: React.FC<PreferenceFormProps> = ({ initialData, userId, on
             control={control}
             render={({ field }: { field: ControllerRenderProps<PreferenceNode, "negated"> }) => (
               <input
+                id="negated"
                 type="checkbox"
                 className="h-4 w-4 text-burgundy-600 border-burgundy-300 rounded focus:ring-burgundy-600"
                 checked={field.value as boolean}

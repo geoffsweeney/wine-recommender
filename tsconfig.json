@@ -24,9 +24,9 @@
       "./backend/types"
     ]
   },
-  "include": [
-    "backend/**/*",
-    "backend/types/**/*.d.ts"
-  ],
+"include": [
+  "backend/**/*",
+  "backend/types/**/*.d.ts"
+],
   "exclude": ["node_modules", "dist"]
 }

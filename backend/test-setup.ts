@@ -1,1 +1,351 @@
 import "reflect-metadata";
+import { container, DependencyContainer } from 'tsyringe';
+import winston from 'winston';
+import { TYPES } from './di/Types';
+import { KnowledgeGraphService } from './services/KnowledgeGraphService';
+import { Neo4jCircuitWrapper } from './services/Neo4jCircuitWrapper';
+import { LLMService } from './services/LLMService';
+import { Neo4jService } from './services/Neo4jService';
+import { logger as appLogger } from './utils/logger';
+import { PreferenceExtractionService } from './services/PreferenceExtractionService';
+import { PreferenceNormalizationService } from './services/PreferenceNormalizationService';
+import { UserProfileService } from './services/UserProfileService';
+import { ConversationHistoryService } from './core/ConversationHistoryService';
+import { BasicDeadLetterProcessor } from './core/BasicDeadLetterProcessor';
+import { EnhancedAgentCommunicationBus } from './core/agents/communication/EnhancedAgentCommunicationBus';
+import { AgentMessage, createAgentMessage, MessageTypes } from './core/agents/communication/AgentMessage'; // Added AgentMessage import
+import { MCPClient } from './mcp/mcpClient';
+import { Result } from './core/types/Result';
+import { AgentError } from './core/agents/AgentError';
+import { mock } from 'jest-mock-extended';
+import { v4 as uuidv4 } from 'uuid'; // Added
+import { RecommendationRequest } from './api/dtos/RecommendationRequest.dto'; // Added
+import { SommelierCoordinator } from './core/agents/SommelierCoordinator'; // Added
+
+// Define a test container factory function for proper test isolation
+export const createTestContainer = (): { container: DependencyContainer; resetMocks: () => void } => {
+  container.clearInstances();
+  container.reset();
+
+  // Configuration registry with DI pattern
+  // Configuration values for LLMService
+  container.registerInstance(TYPES.LlmApiUrl, 'http://mock-llm-api.com');
+  container.registerInstance(TYPES.LlmModel, 'mock-model');
+  container.registerInstance(TYPES.LlmApiKey, 'mock-api-key');
+  container.registerInstance(TYPES.LlmMaxRetries, 3);
+  container.registerInstance(TYPES.LlmRetryDelayMs, 1000);
+  container.registerInstance(TYPES.DucklingUrl, 'http://mock-duckling-url.com');
+
+  // General Config (if still needed for other parts)
+  const config = {
+    llmApiUrl: 'http://mock-llm-api.com', // Keep for consistency if other parts use TYPES.Config
+    llmModel: 'mock-model',
+    llmApiKey: 'mock-api-key',
+    ducklingUrl: 'http://mock-duckling-url.com'
+  };
+  container.registerInstance(TYPES.Config, config);
+
+  // Enhanced structured logger mock with context support
+  const mockLogger = {
+    debug: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    child: jest.fn().mockImplementation(() => mockLogger)
+  };
+  container.registerInstance(TYPES.Logger, mockLogger);
+
+  // Performance tracking hooks
+  const performanceHooks = {
+    start: jest.fn(),
+    end: jest.fn(),
+    metrics: {}
+  };
+  container.registerInstance(TYPES.PerformanceTracker, performanceHooks);
+
+  // Mock RecommendationAgentConfig
+  const recommendationAgentConfig = {
+    defaultRecommendationCount: 5
+  };
+  container.registerInstance(TYPES.RecommendationAgentConfig, recommendationAgentConfig);
+
+  // Mock LLM service
+  const mockLlmService = mock<LLMService>();
+  mockLlmService.sendPrompt.mockResolvedValue({ success: true, data: 'mock-llm-response' });
+  container.registerInstance(TYPES.LLMService, mockLlmService);
+
+  // Mock LLMRecommendationAgentConfig
+  const llmRecommendationAgentConfig = {
+    defaultConfidenceScore: 0.8
+  };
+  container.registerInstance(TYPES.LLMRecommendationAgentConfig, llmRecommendationAgentConfig);
+
+  // Mock InputValidationAgentConfig
+  const inputValidationAgentConfig = {
+    ingredientDatabasePath: 'mock/path/to/ingredients.json',
+    dietaryRestrictions: ['vegan', 'gluten-free'],
+    standardIngredients: { 'tomato': 'fruit' },
+    maxIngredients: 10
+  };
+  container.registerInstance(TYPES.InputValidationAgentConfig, inputValidationAgentConfig);
+
+  // Mock Agent Communication Bus
+  const mockAgentCommunicationBus = mock<EnhancedAgentCommunicationBus>();
+
+  // Use Object.defineProperty to mock the private messageHandlers property
+  Object.defineProperty(mockAgentCommunicationBus, 'messageHandlers', {
+    value: new Map<string, Map<string, (message: AgentMessage) => Promise<Result<AgentMessage | null, AgentError>>>>(),
+    writable: true,
+    configurable: true,
+  });
+
+  // Mock the registerMessageHandler to actually store handlers in our mock map
+  mockAgentCommunicationBus.registerMessageHandler.mockImplementation(
+    (agentId: string, messageType: string, handler: (message: AgentMessage) => Promise<Result<AgentMessage | null, AgentError>>) => {
+      // Access the mocked private property via the mock object
+      const messageHandlers = (mockAgentCommunicationBus as any).messageHandlers;
+      if (!messageHandlers.has(agentId)) {
+        messageHandlers.set(agentId, new Map());
+      }
+      messageHandlers.get(agentId)!.set(messageType, handler);
+    }
+  );
+
+  // Mock sendMessageAndWaitForResponse to simulate message routing
+  // Mock sendMessageAndWaitForResponse to simulate message routing to SommelierCoordinator
+  // Mock sendMessageAndWaitForResponse to simulate the direct return of a FinalRecommendation AgentMessage
+  mockAgentCommunicationBus.sendMessageAndWaitForResponse.mockImplementation(
+    async <T>(targetAgentId: string, message: AgentMessage, timeoutMs: number = 10000): Promise<Result<AgentMessage<T> | null, AgentError>> => {
+      if (targetAgentId === 'sommelier' && message.type === MessageTypes.ORCHESTRATE_RECOMMENDATION_REQUEST) {
+        const sommelierCoordinator = container.resolve(TYPES.SommelierCoordinator) as SommelierCoordinator;
+        
+        // Directly call orchestrateRecommendation and wrap its result in a FINAL_RECOMMENDATION AgentMessage
+        try {
+          const finalRecommendationPayload = await sommelierCoordinator.orchestrateRecommendation(
+            (message.payload as RecommendationRequest).input, // Cast payload to RecommendationRequest
+            message.conversationId,
+            message.correlationId
+          );
+
+          const finalAgentMessage = createAgentMessage(
+            MessageTypes.FINAL_RECOMMENDATION,
+            finalRecommendationPayload,
+            container.resolve(TYPES.SommelierCoordinatorId), // Source agent is the SommelierCoordinator
+            message.conversationId,
+            message.correlationId,
+            message.sourceAgent // Target agent is the original source of the request
+          );
+          return { success: true, data: finalAgentMessage as AgentMessage<T> };
+        } catch (error: any) {
+          return { success: false, error: new AgentError(error.message, 'ORCHESTRATION_ERROR', container.resolve(TYPES.SommelierCoordinatorId), message.correlationId) };
+        }
+      }
+      return { success: false, error: new AgentError('No handler found for message', 'NO_HANDLER', 'test-setup', message.correlationId) };
+    }
+  );
+
+  // Mock publishToAgent to simulate message routing
+  mockAgentCommunicationBus.publishToAgent.mockImplementation(
+    async (targetAgentId: string, message: AgentMessage) => {
+      const messageHandlers = (mockAgentCommunicationBus as any).messageHandlers;
+      const agentHandlers = messageHandlers.get(targetAgentId);
+      if (agentHandlers) {
+        const handler = agentHandlers.get(message.type);
+        if (handler) {
+          await handler(message);
+        }
+      }
+    }
+  );
+
+  // LLMService is injected into EnhancedAgentCommunicationBus, so no need to manually assign
+  container.registerInstance(TYPES.AgentCommunicationBus, mockAgentCommunicationBus);
+
+  // Mock ValueAnalysisAgentConfig
+  const valueAnalysisAgentConfig = {
+    defaultTimeoutMs: 5000
+  };
+  container.registerInstance(TYPES.ValueAnalysisAgentConfig, valueAnalysisAgentConfig);
+
+  // Mock Neo4j Circuit Wrapper
+  const mockNeo4jCircuitWrapper = {
+    executeQuery: jest.fn().mockImplementation(async (fn) => {
+      const mockSession = {
+        run: jest.fn(),
+        close: jest.fn().mockResolvedValue(undefined)
+      };
+      const mockDriver = {
+        session: jest.fn().mockReturnValue(mockSession)
+      };
+      return fn(mockDriver);
+    }),
+    close: jest.fn().mockResolvedValue(undefined),
+    beginTransaction: jest.fn().mockResolvedValue({
+      run: jest.fn(),
+      commit: jest.fn(),
+      rollback: jest.fn()
+    }),
+    readTransaction: jest.fn().mockResolvedValue({ records: [] }),
+    writeTransaction: jest.fn().mockResolvedValue({ records: [] })
+  };
+  container.registerInstance(TYPES.Neo4jCircuitWrapper, mockNeo4jCircuitWrapper);
+
+  // Mock Neo4jService
+  const mockNeo4jService = mock<Neo4jService>();
+  container.registerInstance(TYPES.Neo4jService, mockNeo4jService);
+
+  // Mock Neo4j connection details
+  container.registerInstance(TYPES.Neo4jUri, 'bolt://localhost:7687');
+  container.registerInstance(TYPES.Neo4jUser, 'neo4j');
+  container.registerInstance(TYPES.Neo4jPassword, 'password');
+
+  // Mock Search Strategy
+  // Mock Search Strategy
+  const mockSearchStrategy = {
+    execute: jest.fn().mockResolvedValue([]) // Changed 'search' to 'execute'
+  };
+  container.registerInstance(TYPES.ISearchStrategy, mockSearchStrategy);
+
+  // Recommendation Strategies
+  const mockUserPreferencesStrategy = {
+    getRecommendations: jest.fn().mockResolvedValue([])
+  };
+  const mockCollaborativeFilteringStrategy = {
+    getRecommendations: jest.fn().mockResolvedValue([])
+  };
+  const mockPopularWinesStrategy = {
+    getRecommendations: jest.fn().mockResolvedValue([])
+  };
+  
+  container.registerInstance(TYPES.UserPreferencesStrategy, mockUserPreferencesStrategy);
+  container.registerInstance(TYPES.CollaborativeFilteringStrategy, mockCollaborativeFilteringStrategy);
+  container.registerInstance(TYPES.PopularWinesStrategy, mockPopularWinesStrategy);
+  
+  container.registerInstance(TYPES.IRecommendationStrategy, {
+    execute: jest.fn().mockResolvedValue([
+      {
+        id: 'w1',
+        name: 'Wine 1',
+        type: 'Red',
+        region: 'Bordeaux',
+        year: 2018,
+        price: 45.99,
+        rating: 4.5,
+        description: 'Full-bodied with notes of black cherry'
+      }
+    ])
+  });
+
+  // Register Sommelier Coordinator class
+  container.register(TYPES.SommelierCoordinator, { useClass: SommelierCoordinator });
+
+  // Mock Knowledge Graph Service
+  const mockKnowledgeGraphService = mock<KnowledgeGraphService>();
+  container.registerInstance(TYPES.KnowledgeGraphService, mockKnowledgeGraphService);
+
+  // Mock User Profile Service
+  const mockUserProfileService = mock<UserProfileService>();
+  container.registerInstance(UserProfileService, mockUserProfileService);
+
+  // Mock Conversation History Service
+  const mockConversationHistoryService = mock<ConversationHistoryService>();
+  container.registerInstance(ConversationHistoryService, mockConversationHistoryService);
+
+  // Mock PreferenceExtractionService
+  const mockPreferenceExtractionService = mock<PreferenceExtractionService>();
+  container.registerInstance(TYPES.PreferenceExtractionService, mockPreferenceExtractionService);
+
+  // Mock PreferenceNormalizationService
+  const mockPreferenceNormalizationService = mock<PreferenceNormalizationService>();
+  container.registerInstance(TYPES.PreferenceNormalizationService, mockPreferenceNormalizationService);
+
+  // Mock UserPreferenceAgentConfig
+  const userPreferenceAgentConfig = {
+    defaultConfidenceThreshold: 0.7
+  };
+  container.registerInstance(TYPES.UserPreferenceAgentConfig, userPreferenceAgentConfig);
+
+  // Mock Dead Letter Processor
+  const mockDeadLetterProcessor = {
+    process: jest.fn().mockResolvedValue(undefined)
+  };
+  container.registerInstance(TYPES.DeadLetterProcessor, mockDeadLetterProcessor);
+
+  // Mock MCPClient
+  const mockMcpClient = mock<MCPClient>();
+  container.registerInstance(MCPClient, mockMcpClient);
+
+  // Mock MCPAdapterAgentConfig
+  const mcpAdapterAgentConfig = {
+    defaultToolTimeoutMs: 30000
+  };
+  container.registerInstance(TYPES.MCPAdapterAgentConfig, mcpAdapterAgentConfig);
+
+  // Mock ExplanationAgentConfig
+  const explanationAgentConfig = {
+    defaultExplanation: 'This is a default explanation.'
+  };
+  container.registerInstance(TYPES.ExplanationAgentConfig, explanationAgentConfig);
+
+  // Mock FallbackAgentConfig
+  const fallbackAgentConfig = {
+    defaultFallbackResponse: 'I apologize, but I am unable to assist with that request at the moment. Please try again later.'
+  };
+  container.registerInstance(TYPES.FallbackAgentConfig, fallbackAgentConfig);
+
+  // Agent Dependencies
+  const mockAgentDependencies = {
+    logger: mockLogger,
+    messageQueue: {},
+    stateManager: {},
+    config
+  };
+  container.registerInstance(TYPES.AgentDependencies, mockAgentDependencies);
+
+  const mockCommunicatingAgentDependencies = {
+    communicationBus: mockAgentCommunicationBus,
+    logger: mockLogger,
+    messageQueue: {},
+    stateManager: {},
+    config
+  };
+  container.registerInstance(TYPES.CommunicatingAgentDependencies, mockCommunicatingAgentDependencies);
+
+  // Mock SommelierCoordinatorId
+  container.registerInstance(TYPES.SommelierCoordinatorId, 'sommelier-coordinator-test-id');
+
+  // Mock SommelierCoordinatorConfig
+  const sommelierCoordinatorConfig = {
+    maxRecommendationAttempts: 3,
+    agentTimeoutMs: 5000,
+    circuitBreakerFailureThreshold: 5,
+    circuitBreakerSuccessThreshold: 3
+  };
+  container.registerInstance(TYPES.SommelierCoordinatorConfig, sommelierCoordinatorConfig);
+
+  // Mock SommelierCoordinatorDependencies
+  const mockSommelierCoordinatorDependencies = {
+    communicationBus: mockAgentCommunicationBus,
+    deadLetterProcessor: mockDeadLetterProcessor,
+    userProfileService: mockUserProfileService,
+    conversationHistoryService: mockConversationHistoryService,
+    logger: mockLogger,
+    messageQueue: {},
+    stateManager: {},
+    config: sommelierCoordinatorConfig
+  };
+  container.registerInstance(TYPES.SommelierCoordinatorDependencies, mockSommelierCoordinatorDependencies);
+
+  // Reset function for all mocks
+  const resetMocks = () => {
+    Object.values(mockLogger).forEach(fn => fn.mockReset());
+    mockLlmService.sendPrompt.mockReset();
+    performanceHooks.start.mockReset();
+    performanceHooks.end.mockReset();
+  };
+
+  return { container, resetMocks };
+};
+
+// Export factory function for test usage
+export const { container: testContainer, resetMocks } = createTestContainer();

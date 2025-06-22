@@ -33,7 +33,7 @@ export class CircuitBreaker {
       return result;
     } catch (error) {
       this.recordFailure();
-      throw error;
+      throw error; // Always re-throw the error if the operation fails while circuit is CLOSED or HALF_OPEN
     }
   }
 

@@ -1,162 +1,270 @@
 import { inject, injectable } from 'tsyringe';
-import { Agent } from './Agent';
-import { AgentCommunicationBus } from '../AgentCommunicationBus'; // Import AgentCommunicationBus
-import { DeadLetterProcessor } from '../DeadLetterProcessor'; // Import DeadLetterProcessor
-import { ConversationTurn } from '../ConversationHistoryService'; // Import ConversationTurn interface
+import { TYPES } from '../../di/Types';
+import { CommunicatingAgent, CommunicatingAgentDependencies } from './CommunicatingAgent';
+import { EnhancedAgentCommunicationBus } from './communication/EnhancedAgentCommunicationBus';
+import { AgentMessage, createAgentMessage } from './communication/AgentMessage'; // Added
+import { BasicDeadLetterProcessor } from '../BasicDeadLetterProcessor';
+import { Result } from '../types/Result';
+import { AgentError } from './AgentError';
+import winston from 'winston';
+import { UserPreferences } from '../../types'; // Import UserPreferences
 
-// Define a type for the expected structured output from the LLM
-interface LLMValidationOutput {
+
+export interface ValidationResult {
   isValid: boolean;
-  ingredients?: string[];
-  preferences?: { [key: string]: any }; // Flexible for various preferences
-  error?: string;
+  errors?: string[];
+  cleanedInput?: { // Renamed from sanitizedInput
+    ingredients: string[];
+    budget: number;
+    occasion?: string;
+  };
+  extractedData?: { // Renamed from processedInput
+    preferences?: UserPreferences;
+    dietaryRestrictions?: string[];
+    standardizedIngredients?: Record<string, string>;
+  };
+}
+
+// Define the configuration interface for InputValidationAgent
+export interface InputValidationAgentConfig {
+  ingredientDatabasePath: string;
+  dietaryRestrictions: string[];
+  standardIngredients: Record<string, string>;
+  maxIngredients: number;
 }
 
 @injectable()
-export class InputValidationAgent implements Agent {
+export class InputValidationAgent extends CommunicatingAgent {
   constructor(
-    @inject(AgentCommunicationBus) private readonly communicationBus: AgentCommunicationBus, // Inject AgentCommunicationBus
-    @inject('DeadLetterProcessor') private readonly deadLetterProcessor: DeadLetterProcessor // Inject DeadLetterProcessor
+    @inject(EnhancedAgentCommunicationBus) private readonly injectedCommunicationBus: EnhancedAgentCommunicationBus,
+    @inject(TYPES.DeadLetterProcessor) private readonly deadLetterProcessor: BasicDeadLetterProcessor,
+    @inject(TYPES.Logger) protected readonly logger: winston.Logger,
+    @inject(TYPES.InputValidationAgentConfig) private readonly agentConfig: InputValidationAgentConfig // Inject the specific agent config
   ) {
-    console.log('InputValidationAgent constructor entered.');
+    const id = 'input-validation-agent';
+    // Pass the injected agentConfig to the super constructor as the agent's config
+    const dependencies: CommunicatingAgentDependencies = {
+      communicationBus: injectedCommunicationBus,
+      logger: logger,
+      messageQueue: {} as any, // Placeholder for IMessageQueue
+      stateManager: {} as any, // Placeholder for IStateManager
+      config: agentConfig as any // Use the injected config
+    };
+    super(id, agentConfig, dependencies); // Pass agentConfig as the config for BaseAgent
+    this.registerHandlers();
+    this.logger.info(`[${this.id}] InputValidationAgent initialized`, { agentId: this.id, operation: 'initialization' });
   }
 
   getName(): string {
     return 'InputValidationAgent';
   }
 
-  async handleMessage(message: { input: string; conversationHistory?: ConversationTurn[] }): Promise<{ isValid: boolean; processedInput?: { ingredients?: string[], preferences?: { [key: string]: any } }; error?: string }> {
-    console.log('InputValidationAgent received message:', message);
+  getCapabilities(): string[] {
+    return ['input-validation', 'llm-integration', 'dead-letter-processing'];
+  }
 
-    if (!this.communicationBus) {
-      console.error('InputValidationAgent: AgentCommunicationBus not available.');
-      return { isValid: false, error: 'Communication bus not available' };
-    }
+  protected registerHandlers(): void {
+    super.registerHandlers();
+    
+    // Register for validation requests
+    this.communicationBus.registerMessageHandler(
+      this.id, // Corrected to this.id
+      'validate-input',
+      this.handleValidationRequest.bind(this)
+    );
+  }
 
-    // Validate that the input property is a non-empty string
-    if (typeof message.input !== 'string' || message.input.trim() === '') {
-      return { isValid: false, error: 'Invalid input: message input must be a non-empty string.' };
-    }
-
-    // --- LLM Integration for Input Validation and Extraction ---
+  async handleValidationRequest(message: AgentMessage<unknown>): Promise<Result<AgentMessage | null, AgentError>> {
+    const correlationId = message.correlationId;
     try {
-      console.log('InputValidationAgent: Sending input to LLM for validation and extraction.');
-      // Formulate a prompt for the LLM to validate and extract structured data
-      let llmPrompt = `Analyze the following user input for a wine recommendation request. Determine if it's a valid request and extract all mentioned ingredients and wine preferences. Focus on identifying specific ingredients and any details about them (e.g., how they are prepared). Provide the output strictly in JSON format with the following structure:
-{
-"isValid": boolean, // true if the input is valid and contains recognizable ingredients or preferences, false otherwise.
-"ingredients"?: string[], // An array of extracted ingredients (e.g., ["beef", "roasted potatoes", "asparagus"]). Be as specific as possible.
-"preferences"?: { [key: string]: any }, // An object containing extracted wine preferences (e.g., { "wineType": "red", "sweetness": "dry" }).
-"error"?: string // A descriptive error message if isValid is false.
-}
-
-If the input is invalid (not related to wine or food pairing for wine), set "isValid" to false and provide a clear "error" message.
-
-Process the LAST "User Input" provided below and return ONLY the JSON output for that input. Do NOT include any examples, extra text, or comments in the response.
-
-Examples:
-User Input: "I need a red wine for pasta with tomato sauce"
-Output: {"isValid": true, "preferences": {"foodPairing": "pasta with tomato sauce", "wineType": "red"}}
-
-User Input: "What's a good sweet white wine under $20?"
-Output: {"isValid": true, "preferences": {"sweetness": "sweet", "wineType": "white", "priceRange": [null, 20]}}
-
-User Input: "I'm making roasted chicken with herbs and root vegetables."
-Output: {"isValid": true, "ingredients": ["roasted chicken", "herbs", "root vegetables"]}
-
-User Input: "Tell me about cars"
-Output: {"isValid": false, "error": "Input is not related to wine or food pairing for wine."}
-
-`;
-
-      // Include conversation history if available
-      if (message.conversationHistory && message.conversationHistory.length > 0) {
-        llmPrompt += "Conversation History:\n";
-        message.conversationHistory.forEach(turn => {
-          llmPrompt += `${turn.role}: ${turn.content}\n`;
-        });
-        llmPrompt += "\n"; // Add a newline for separation
+      const validationResult = await this.validateInput(message.payload, message.correlationId);
+      
+      if (!validationResult.success) {
+        await this.deadLetterProcessor.process(message.payload,
+          validationResult.error, {
+            source: this.id, // Corrected to this.id
+            stage: 'validation',
+            correlationId: correlationId
+          });
+        return { success: false, error: validationResult.error };
       }
 
-      llmPrompt += `User Input: "${message.input}"`; // Use message.input
+      const resultPayload = validationResult.data;
 
-      console.log('InputValidationAgent: Calling communicationBus.sendLLMPrompt');
-      const llmResponse = await this.communicationBus.sendLLMPrompt(llmPrompt);
-      console.log('InputValidationAgent: Returned from communicationBus.sendLLMPrompt');
+      // Send validation result back
+      const responseMessage = createAgentMessage(
+        'validation-result',
+        resultPayload,
+        this.id,
+        correlationId,
+        message.sourceAgent
+      );
+      this.communicationBus.sendResponse(message.sourceAgent, responseMessage);
 
-      if (llmResponse) {
-        console.log('InputValidationAgent: Received LLM response for validation.');
-        console.log('InputValidationAgent: Raw LLM response:', llmResponse); // Added logging
-        try {
-          // Extract JSON string from the LLM response
-          const jsonMatch = llmResponse.match(/```json\n([\s\S]*?)\n```/);
-          let jsonString = llmResponse; // Default to full response if markers not found
-
-          if (jsonMatch && jsonMatch[1]) {
-            jsonString = jsonMatch[1];
-            console.log('InputValidationAgent: Extracted JSON string:', jsonString); // Added logging
-          } else {
-             console.warn('InputValidationAgent: Could not find ```json\\n``` markers in LLM response. Attempting to parse full response.'); // Corrected logging
-           }
- 
-           const validationOutput: LLMValidationOutput = JSON.parse(jsonString);
-          console.log('InputValidationAgent: Parsed validation output:', validationOutput); // Added logging
-
-
-
-          // Robust validation of the parsed structure
-          if (typeof validationOutput.isValid !== 'boolean') {
-            console.error('InputValidationAgent: LLM response missing or invalid "isValid" field.');
-            return { isValid: false, error: 'Invalid structure in LLM validation response: missing or invalid "isValid".' };
-          }
-
-          if (validationOutput.ingredients !== undefined && (validationOutput.ingredients === null || !Array.isArray(validationOutput.ingredients))) {
-            console.error('InputValidationAgent: LLM response "ingredients" field is not an array.');
-            return { isValid: false, error: 'Invalid structure in LLM validation response: "ingredients" is not an array.' };
-          }
-
-          if (validationOutput.preferences !== undefined && (validationOutput.preferences === null || typeof validationOutput.preferences !== 'object' || Array.isArray(validationOutput.preferences))) {
-            console.error('InputValidationAgent: LLM response "preferences" field is not an object.');
-            return { isValid: false, error: 'Invalid structure in LLM validation response: "preferences" is not an object.' };
-          }
-
-          if (validationOutput.isValid === false && validationOutput.error !== undefined && typeof validationOutput.error !== 'string') {
-            console.error('InputValidationAgent: LLM response "error" field is not a string.');
-            return { isValid: false, error: 'Invalid structure in LLM validation response: "error" is not a string.' };
-          }
-
-          if (validationOutput.isValid) {
-            console.log('InputValidationAgent: LLM validated input as valid.');
-            return {
-              isValid: true,
-              processedInput: {
-                ingredients: validationOutput.ingredients,
-                preferences: validationOutput.preferences
-              }
-            };
-          } else {
-            console.log('InputValidationAgent: LLM validated input as invalid.');
-            return { isValid: false, error: validationOutput.error || 'Invalid input according to LLM.' };
-          }
-
-        } catch (parseError: any) {
-          console.error('InputValidationAgent: Error parsing or validating LLM response:', parseError);
-          return { isValid: false, error: `Error processing LLM validation response: ${parseError.message || String(parseError)}` };
+      // If validation successful and contains preferences, notify UserPreferenceAgent
+      if (resultPayload.isValid && resultPayload.extractedData?.preferences) {
+        const preferenceUpdateMessage = createAgentMessage(
+          'preference-update',
+          {
+            preferences: resultPayload.extractedData.preferences,
+            context: 'from-validation'
+          },
+          this.id,
+          correlationId,
+          'UserPreferenceAgent' // Target agent
+        );
+        const sendResult = await this.communicationBus.sendMessageAndWaitForResponse('UserPreferenceAgent', preferenceUpdateMessage);
+        if (!sendResult.success) {
+          this.logger.error(`[${correlationId}] Failed to send preference update to UserPreferenceAgent: ${sendResult.error.message}`, {
+            agentId: this.id,
+            operation: 'handleValidationRequest',
+            correlationId: correlationId,
+            targetAgent: 'UserPreferenceAgent',
+            originalError: sendResult.error.message
+          });
+          // Optionally, send to dead letter queue or return error
+          // For now, we'll just log and continue, as preference update might not be critical for the main flow
         }
-
-      } else {
-        console.warn('InputValidationAgent: LLM did not return a validation response.');
-        return { isValid: false, error: 'LLM failed to provide validation response.' };
       }
+      return { success: true, data: responseMessage };
 
-    } catch (llmError: any) { // Explicitly type error as any
-      console.error('InputValidationAgent: Error during LLM validation:', llmError);
-      // Log LLM error and return invalid
-      // Add to Dead Letter Queue
-      await this.deadLetterProcessor.process(message, llmError instanceof Error ? llmError : new Error(llmError), { source: this.getName(), stage: 'LLMValidation' });
-      return { isValid: false, error: 'Error communicating with LLM for validation.' };
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const agentError = new AgentError(
+        `Error handling validation request: ${errorMessage}`,
+        'VALIDATION_REQUEST_ERROR',
+        this.id,
+        correlationId,
+        true,
+        { originalError: errorMessage }
+      );
+      await this.deadLetterProcessor.process(message.payload,
+        agentError, {
+          source: this.id,
+          stage: 'validation',
+          correlationId: correlationId,
+          agentId: this.id,
+          operation: 'handleValidationRequest'
+        });
+      return { success: false, error: agentError };
     }
- }
-}
+  }
 
-// TODO: Implement more sophisticated input validation logic (now using LLM)
+  async handleMessage(message: AgentMessage<unknown>): Promise<Result<AgentMessage | null, AgentError>> {
+    const correlationId = message.correlationId;
+    this.logger.warn(`[${correlationId}] InputValidationAgent received unhandled message type: ${message.type}`, {
+      agentId: this.id,
+      operation: 'handleMessage',
+      correlationId: correlationId,
+      messageType: message.type
+    });
+    return {
+      success: false,
+      error: new AgentError(
+        `Unhandled message type: ${message.type}`,
+        'UNHANDLED_MESSAGE_TYPE',
+        this.id,
+        correlationId,
+        false, // Not recoverable, as it's an unhandled type
+        { messageType: message.type }
+      )
+    };
+  }
+
+  protected async validateInput(input: any, correlationId: string = ''): Promise<Result<ValidationResult, AgentError>> {
+    // Basic validation
+    if (!input || typeof input !== 'object') {
+      return { success: false, error: new AgentError('Input must be an object', 'INVALID_INPUT_TYPE', this.id, correlationId) };
+    }
+
+    if (!input.ingredients || !Array.isArray(input.ingredients) || input.ingredients.length === 0) {
+      return {
+        success: false,
+        error: new AgentError('At least one ingredient must be provided', 'MISSING_INGREDIENTS', this.id, correlationId)
+      };
+    }
+
+    if (input.ingredients.length > this.config.maxIngredients) {
+      return {
+        success: false,
+        error: new AgentError(
+          `Maximum ${this.config.maxIngredients} ingredients allowed`,
+          'TOO_MANY_INGREDIENTS',
+          this.id,
+          correlationId
+        )
+      };
+    }
+
+    if (typeof input.budget !== 'number' || input.budget <= 0) {
+      return {
+        success: false,
+        error: new AgentError('Budget must be a positive number', 'INVALID_BUDGET', this.id, correlationId)
+      };
+    }
+
+    try {
+      const llmResponseResult = await this.communicationBus.sendLLMPrompt(this.buildValidationPrompt(input), correlationId);
+      if (!llmResponseResult.success) {
+        return { success: false, error: llmResponseResult.error };
+      }
+      const llmResponse = llmResponseResult.data;
+
+      if (llmResponse === undefined || llmResponse === null) {
+        return { success: false, error: new AgentError('LLM service not configured or returned no response', 'LLM_NO_RESPONSE', this.id, correlationId) };
+      }
+      return this.parseValidationResponse(llmResponse, correlationId);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.error(`[${correlationId}] Error during LLM validation: ${errorMessage}`, {
+        agentId: this.id,
+        operation: 'validateInput',
+        correlationId: correlationId,
+        originalError: errorMessage
+      });
+      return { success: false, error: new AgentError(`Error during LLM validation: ${errorMessage}`, 'LLM_VALIDATION_ERROR', this.id, correlationId, true, { originalError: errorMessage }) };
+    }
+  }
+
+  private buildValidationPrompt(input: any): string {
+    return `Analyze these ingredients for wine pairing:
+Ingredients: ${input.ingredients.join(', ')}
+Budget: $${input.budget}
+${input.occasion ? `Occasion: ${input.occasion}` : ''}
+
+Tasks:
+1. Validate ingredients exist and are food items
+2. Standardize ingredient names (e.g. "salmon" → "fish")
+3. Check for dietary restrictions
+4. Return JSON with:
+{
+  "isValid": boolean,
+  "errors": string[],
+  "cleanedInput": { // Renamed from sanitizedInput
+    "ingredients": string[],
+    "budget": number,
+    "occasion": string
+  },
+  "extractedData": { // Renamed from processedInput
+    "standardizedIngredients": Record<string, string>,
+    "dietaryRestrictions": string[]
+  }
+}`;
+  }
+
+  private parseValidationResponse(response: string, correlationId: string): Result<ValidationResult, AgentError> {
+    try {
+      const parsedResponse = JSON.parse(response);
+      // Basic structural validation of the parsed response
+      if (typeof parsedResponse.isValid !== 'boolean') {
+        this.logger.error(`[${correlationId}] LLM response missing isValid field`, { agentId: this.id, operation: 'parseValidationResponse' });
+        return { success: false, error: new AgentError('LLM response missing isValid field', 'LLM_PARSE_ERROR', this.id, correlationId) };
+      }
+      return { success: true, data: parsedResponse };
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.error(`[${correlationId}] Failed to parse LLM validation response: ${errorMessage}`, { agentId: this.id, operation: 'parseValidationResponse', originalError: errorMessage });
+      return { success: false, error: new AgentError(`Failed to parse LLM validation response: ${errorMessage}`, 'LLM_PARSE_ERROR', this.id, correlationId, true, { originalError: errorMessage }) };
+    }
+  }
+}

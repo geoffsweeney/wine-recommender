@@ -17,40 +17,41 @@ export abstract class BaseController {
     return res.status(code).json({ message });
   }
 
-  public ok<T>(res: Response, dto?: T) {
+  public ok<T>(res: Response, dto?: T): void {
     if (dto) {
-      return res.status(200).json(dto);
+      res.status(200).json(dto);
+    } else {
+      res.sendStatus(200);
     }
-    return res.sendStatus(200);
   }
 
-  public created(res: Response) {
-    return res.sendStatus(201);
+  public created(res: Response): void {
+    res.sendStatus(201);
   }
 
-  public clientError(res: Response, message?: string) {
-    return BaseController.jsonResponse(res, 400, message || 'Unauthorized');
+  public clientError(res: Response, message?: string): void {
+    BaseController.jsonResponse(res, 400, message || 'Bad Request');
   }
 
-  public unauthorized(res: Response, message?: string) {
-    return BaseController.jsonResponse(res, 401, message || 'Unauthorized');
+  public unauthorized(res: Response, message?: string): void {
+    BaseController.jsonResponse(res, 401, message || 'Unauthorized');
   }
 
-  public forbidden(res: Response, message?: string) {
-    return BaseController.jsonResponse(res, 403, message || 'Forbidden');
+  public forbidden(res: Response, message?: string): void {
+    BaseController.jsonResponse(res, 403, message || 'Forbidden');
   }
 
-  public notFound(res: Response, message?: string) {
-    return BaseController.jsonResponse(res, 404, message || 'Not found');
+  public notFound(res: Response, message?: string): void {
+    BaseController.jsonResponse(res, 404, message || 'Not found');
   }
 
-  public conflict(res: Response, message?: string) {
-    return BaseController.jsonResponse(res, 409, message || 'Conflict');
+  public conflict(res: Response, message?: string): void {
+    BaseController.jsonResponse(res, 409, message || 'Conflict');
   }
 
-  public fail(res: Response, error: Error | string) {
+  public fail(res: Response, error: Error | string, statusCode: number = 500): void {
     console.error(error);
-    return res.status(500).json({
+    res.status(statusCode).json({
       message: error.toString()
     });
   }

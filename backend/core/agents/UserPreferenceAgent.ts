@@ -1,126 +1,237 @@
 import { inject, injectable } from 'tsyringe';
-import { Agent } from './Agent';
-import { AgentCommunicationBus } from '../AgentCommunicationBus';
+import { AgentMessage, createAgentMessage } from './communication/AgentMessage';
+import { CommunicatingAgent, CommunicatingAgentDependencies } from './CommunicatingAgent';
+import { EnhancedAgentCommunicationBus } from './communication/EnhancedAgentCommunicationBus';
+import { DeadLetterProcessor } from '../DeadLetterProcessor';
 import { PreferenceExtractionService } from '../../services/PreferenceExtractionService';
 import { KnowledgeGraphService } from '../../services/KnowledgeGraphService';
-import { PreferenceNormalizationService } from '../../services/PreferenceNormalizationService'; // Import the new service
+import { PreferenceNormalizationService } from '../../services/PreferenceNormalizationService';
 import { PreferenceNode } from '../../types';
+import { TYPES } from '../../di/Types';
+import { ConversationTurn } from '../ConversationHistoryService';
+import { Result } from '../types/Result';
+import { AgentError } from './AgentError';
+import winston from 'winston';
+
+interface PreferenceMessagePayload {
+  input: string;
+  conversationHistory?: ConversationTurn[];
+  userId: string; // Make userId required
+  initialPreferences?: PreferenceNode[];
+}
+
+// Define the configuration interface for UserPreferenceAgent
+export interface UserPreferenceAgentConfig {
+  defaultConfidenceThreshold: number;
+}
 
 @injectable()
-export class UserPreferenceAgent implements Agent {
+export class UserPreferenceAgent extends CommunicatingAgent {
   constructor(
-    @inject("AgentCommunicationBus") private communicationBus: AgentCommunicationBus,
-    @inject('PreferenceExtractionService') private preferenceExtractionService: PreferenceExtractionService,
-    @inject('KnowledgeGraphService') private knowledgeGraphService: KnowledgeGraphService,
-    @inject('PreferenceNormalizationService') private preferenceNormalizationService: PreferenceNormalizationService // Inject the new service
-  ) {}
+    @inject(EnhancedAgentCommunicationBus) private readonly injectedCommunicationBus: EnhancedAgentCommunicationBus,
+    @inject(TYPES.DeadLetterProcessor) private readonly deadLetterProcessor: DeadLetterProcessor,
+    @inject(TYPES.PreferenceExtractionService) private readonly preferenceExtractionService: PreferenceExtractionService,
+    @inject(TYPES.KnowledgeGraphService) private readonly knowledgeGraphService: KnowledgeGraphService,
+    @inject(TYPES.PreferenceNormalizationService) private readonly preferenceNormalizationService: PreferenceNormalizationService,
+    @inject(TYPES.Logger) protected readonly logger: winston.Logger, // Inject logger
+    @inject(TYPES.UserPreferenceAgentConfig) private readonly agentConfig: UserPreferenceAgentConfig // Inject agent config
+  ) {
+    const id = 'user-preference-agent';
+    const dependencies: CommunicatingAgentDependencies = {
+      communicationBus: injectedCommunicationBus,
+      logger: logger,
+      messageQueue: {} as any, // Placeholder for IMessageQueue
+      stateManager: {} as any, // Placeholder for IStateManager
+      config: agentConfig as any // Use the injected config
+    };
+    super(id, agentConfig, dependencies);
+    this.registerHandlers(); // Corrected method name
+    this.logger.info(`[${this.id}] UserPreferenceAgent initialized`, { agentId: this.id, operation: 'initialization' });
+  }
 
   getName(): string {
     return 'UserPreferenceAgent';
   }
 
-  async handleMessage(message: { input: string; conversationHistory: { role: string; content: string }[], userId?: string, initialPreferences?: PreferenceNode[] }): Promise<{ preferences?: PreferenceNode[], error?: string }> {
-    console.log('UserPreferenceAgent received message:', message);
+  getCapabilities(): string[] {
+    return [
+      'preference-extraction',
+      'preference-normalization',
+      'preference-persistence',
+      'fast-extraction',
+      'async-llm-extraction',
+      'preference-broadcasting'
+    ];
+  }
 
-    const { input, conversationHistory, userId, initialPreferences } = message;
-    const currentUserId = userId || 'current_user_id'; // Use a default or handle missing user ID
-
-    // 1. Use initial preferences if provided, otherwise fetch from knowledge graph
-    let persistedPreferences: PreferenceNode[] = [];
-    if (initialPreferences) {
-      persistedPreferences = initialPreferences;
-      console.log('UserPreferenceAgent: Using initial preferences provided.');
-    } else if (currentUserId) {
-      try {
-        // Fetch only active preferences
-        persistedPreferences = await this.knowledgeGraphService.getPreferences(currentUserId, false);
-        console.log('UserPreferenceAgent: Fetched active persisted preferences:', persistedPreferences);
-      } catch (error) {
-        console.error('UserPreferenceAgent: Error fetching persisted preferences:', error);
-        // Continue without persisted preferences if fetching fails
-      }
+  public async handleMessage<T>(message: AgentMessage<T>): Promise<Result<AgentMessage | null, AgentError>> {
+    const correlationId = message.correlationId;
+    if (message.type === 'preference-request') {
+      return this.handlePreferenceRequest(message as AgentMessage<PreferenceMessagePayload>);
     }
+    this.logger.warn(`[${correlationId}] UserPreferenceAgent received unhandled message type: ${message.type}`, {
+      agentId: this.id,
+      operation: 'handleMessage',
+      correlationId: correlationId,
+      messageType: message.type
+    });
+    return {
+      success: false,
+      error: new AgentError(
+        `Unhandled message type: ${message.type}`,
+        'UNHANDLED_MESSAGE_TYPE',
+        this.id,
+        correlationId,
+        false, // Not recoverable, as it's an unhandled type
+        { messageType: message.type }
+      )
+    };
+  }
 
-    // 2. Attempt fast extraction from current input
-    const fastPreferences = await this.preferenceExtractionService.attemptFastExtraction(input);
+  protected registerHandlers(): void {
+    super.registerHandlers();
+    this.communicationBus.registerMessageHandler(
+      this.id,
+      'preference-request',
+      this.handlePreferenceRequest.bind(this) as (message: AgentMessage<unknown>) => Promise<Result<AgentMessage | null, AgentError>> // Cast to expected type
+    );
+  }
 
-    let extractedPreferences: PreferenceNode[] = [];
-    if (fastPreferences) {
-      console.log('UserPreferenceAgent: Result of fast extraction:', fastPreferences);
-      // Convert the fastPreferences object to an array of PreferenceNode
-      extractedPreferences = Object.entries(fastPreferences).map(([type, value]) => ({
-        type,
-        value: value, // Keep original value for normalization
-        source: 'fast-extraction', // Indicate source
-        confidence: 1, // Placeholder confidence, refine later
-        timestamp: new Date().toISOString(),
-        active: true, // Default to active for newly extracted
-      }));
+  private async handlePreferenceRequest(message: AgentMessage<unknown>): Promise<Result<AgentMessage | null, AgentError>> {
+    const correlationId = message.correlationId;
+    this.logger.info(`[${correlationId}] Handling preference request`, { agentId: this.id, operation: 'handlePreferenceRequest' });
 
-      // Normalize and persist the newly extracted preferences
-      const normalizedExtractedPreferences = this.preferenceNormalizationService.normalizePreferences(extractedPreferences); // Use the new service
-      console.log('UserPreferenceAgent: Normalized extracted preferences:', normalizedExtractedPreferences); // Keep existing log
-      console.log('UserPreferenceAgent: Persisting preferences:', normalizedExtractedPreferences); // Add new log before persisting
-      await this.persistPreferences(normalizedExtractedPreferences, currentUserId);
+    try {
+      // Validate and cast payload
+      const payload = message.payload as PreferenceMessagePayload;
+      if (!payload || typeof payload.input !== 'string') { // Basic validation
+        const error = new AgentError('Invalid or missing payload in preference request', 'INVALID_PAYLOAD', this.id, correlationId);
+        await this.deadLetterProcessor.process(message.payload, error, { source: this.id, stage: 'preference-validation', correlationId });
+        return { success: false, error };
+      }
+      
+      const { input, conversationHistory, userId, initialPreferences } = payload;
+      const currentUserId = userId; // userId is now required
 
-      // Merge newly extracted and normalized preferences with persisted ones
-      // Prioritize newly extracted preferences in case of conflicts
-      const mergedPreferences = this.mergePreferences(persistedPreferences, normalizedExtractedPreferences);
-      console.log('UserPreferenceAgent: Merged preferences (persisted + extracted):', mergedPreferences);
+      let persistedPreferences: PreferenceNode[] = [];
+      if (initialPreferences) {
+        persistedPreferences = initialPreferences;
+      } else if (currentUserId) {
+        persistedPreferences = await this.knowledgeGraphService.getPreferences(currentUserId, false);
+      }
 
-      // Send merged preferences to the SommelierCoordinator for recommendation
-      this.communicationBus.sendMessage('SommelierCoordinator', {
-        userId: currentUserId,
-        input: {
-          preferences: mergedPreferences,
-          message: input, // Include the original user input
-        },
-        conversationHistory: conversationHistory,
-      });
+      const fastPreferencesResult = await this.preferenceExtractionService.attemptFastExtraction(input);
 
-      // Return the merged preferences so the UI can display them immediately
-      return { preferences: mergedPreferences };
+      // Check if fastPreferencesResult is not null and is successful
+      if (fastPreferencesResult && fastPreferencesResult.success && fastPreferencesResult.data) {
+        const fastPreferences = fastPreferencesResult.data;
+        const extractedPreferences = Object.entries(fastPreferences).map(([type, value]) => ({
+          type,
+          value: String(value), // Explicitly cast value to string or appropriate type
+          source: 'fast-extraction',
+          confidence: 1,
+          timestamp: new Date().toISOString(),
+          active: true
+        }));
 
-    } else {
-      console.log('UserPreferenceAgent: Fast extraction failed, queuing for async LLM.');
-      this.queueAsyncLLMExtraction(input, conversationHistory, currentUserId);
+        const normalizedExtractedPreferences =
+          this.preferenceNormalizationService.normalizePreferences(extractedPreferences);
+        
+        await this.persistPreferences(normalizedExtractedPreferences, currentUserId);
 
-      // If fast extraction fails, return only the persisted preferences for now
-      // The async LLM result will be persisted later.
-      return { preferences: [], error: 'Analyzing your input for preferences asynchronously.' };
+        const mergedPreferences = this.mergePreferences(
+          persistedPreferences,
+          normalizedExtractedPreferences
+        );
+
+        // Broadcast updated preferences to all interested agents
+        const broadcastMessage = createAgentMessage(
+          'preferences-updated',
+          {
+            userId: currentUserId,
+            preferences: mergedPreferences,
+            source: 'preference-agent'
+          },
+          this.id,
+          correlationId,
+          '*' // Broadcast to all
+        );
+        this.broadcast(broadcastMessage.type, broadcastMessage.payload, broadcastMessage.correlationId); // Corrected broadcast call
+
+        const responseMessage = createAgentMessage(
+          'preference-update-result',
+          {
+            success: true,
+            preferences: mergedPreferences
+          },
+          this.id,
+          correlationId,
+          message.sourceAgent
+        );
+        this.communicationBus.sendResponse(message.sourceAgent, responseMessage);
+        this.logger.info(`[${correlationId}] Preference request processed successfully (fast extraction)`, { agentId: this.id, operation: 'handlePreferenceRequest' });
+        return { success: true, data: responseMessage };
+      } else {
+        // If fast extraction fails or returns no data, queue async LLM extraction
+        await this.queueAsyncLLMExtraction(input, currentUserId, conversationHistory, correlationId);
+        const responseMessage = createAgentMessage(
+          'preference-update-result',
+          {
+            success: false,
+            preferences: [],
+            error: 'Analyzing your input for preferences asynchronously.'
+          },
+          this.id,
+          correlationId,
+          message.sourceAgent
+        );
+        this.communicationBus.sendResponse(message.sourceAgent, responseMessage);
+        this.logger.info(`[${correlationId}] Preference request queued for async LLM extraction`, { agentId: this.id, operation: 'handlePreferenceRequest' });
+        return { success: true, data: responseMessage }; // Still success from this agent's perspective, as it queued the task
+      }
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const agentError = error instanceof AgentError ? error : new AgentError(errorMessage, 'PREFERENCE_PROCESSING_ERROR', this.id, correlationId, true, { originalError: errorMessage });
+      await this.deadLetterProcessor.process(message.payload, agentError, { source: this.id, stage: 'PreferenceProcessing', correlationId });
+      this.logger.error(`[${correlationId}] Error processing preference request: ${errorMessage}`, { agentId: this.id, operation: 'handlePreferenceRequest', originalError: errorMessage });
+      return { success: false, error: agentError };
     }
   }
 
-  // Helper method to merge preferences, prioritizing later sources
   private mergePreferences(existing: PreferenceNode[], incoming: PreferenceNode[]): PreferenceNode[] {
     const merged: { [key: string]: PreferenceNode } = {};
-
-    // Add existing preferences
-    existing.forEach(pref => {
-      merged[pref.type] = pref;
-    });
-
-    // Add or overwrite with incoming preferences
-    incoming.forEach(pref => {
-      merged[pref.type] = pref;
-    });
-
+    existing.forEach(pref => merged[pref.type] = pref);
+    incoming.forEach(pref => merged[pref.type] = pref);
     return Object.values(merged);
   }
 
-  private async persistPreferences(preferences: PreferenceNode[], userId?: string): Promise<void> {
-    const persistenceUserId = userId || 'current_user_id';
+  private async persistPreferences(preferences: PreferenceNode[], userId: string): Promise<void> {
+    const persistenceUserId = userId; // userId is now required
     for (const preferenceNode of preferences) {
       await this.knowledgeGraphService.addOrUpdatePreference(persistenceUserId, preferenceNode);
     }
   }
 
-  private queueAsyncLLMExtraction(userInput: string, conversationHistory?: { role: string; content: string }[], userId?: string): void {
-    const messageUserId = userId || 'placeholder_user_id';
-    this.communicationBus.sendMessage('LLMPreferenceExtractorAgent', {
-      input: userInput,
-      history: conversationHistory,
-      userId: messageUserId,
-    });
+  private async queueAsyncLLMExtraction(
+    userInput: string,
+    userId: string, // userId is now required
+    conversationHistory?: ConversationTurn[],
+    correlationId?: string // Add correlationId
+  ): Promise<void> {
+    const messageUserId = userId; // userId is now required
+    const llmExtractionMessage = createAgentMessage(
+      'llm-preference-extraction',
+      {
+        input: userInput,
+        userId: messageUserId,
+        history: conversationHistory,
+      },
+      this.id, // sourceAgent
+      correlationId || this.generateCorrelationId(), // conversationId
+      correlationId || this.generateCorrelationId(), // correlationId
+      'LLMPreferenceExtractorAgent' // targetAgent
+    );
+    this.communicationBus.publishToAgent('LLMPreferenceExtractorAgent', llmExtractionMessage);
+    this.logger.info(`[${correlationId}] Queued async LLM preference extraction for user: ${messageUserId}`, { agentId: this.id, operation: 'queueAsyncLLMExtraction' });
   }
 }

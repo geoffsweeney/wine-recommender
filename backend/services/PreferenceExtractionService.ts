@@ -1,5 +1,13 @@
-import { injectable } from 'tsyringe';
-import axios from 'axios'; // Import axios
+import { injectable, inject } from 'tsyringe'; // Import injectable and inject
+import { TYPES } from '../di/Types'; // Import TYPES
+import { ILogger } from './LLMService'; // Import ILogger
+
+// Define interface for HTTP client
+interface IHttpClient {
+  post<T>(url: string, data?: any, config?: any): Promise<{ data: T; status: number; statusText: string; headers: any; config: any; request?: any }>;
+  // Add other methods if needed (get, put, delete, etc.)
+}
+
 
 // Define a basic interface for Duckling entities
 interface DucklingEntity {
@@ -18,8 +26,12 @@ interface DucklingEntity {
 
 @injectable()
 export class PreferenceExtractionService {
-  constructor() {
-    console.log('PreferenceExtractionService constructor entered.');
+  constructor(
+    @inject(TYPES.DucklingUrl) private ducklingUrl: string, // Inject Duckling URL
+    @inject(TYPES.HttpClient) private httpClient: IHttpClient, // Inject HTTP client
+    @inject(TYPES.Logger) private logger: ILogger // Inject logger
+  ) {
+    this.logger.info('PreferenceExtractionService constructor entered.');
   }
 
   async attemptFastExtraction(userInput: string): Promise<{ [key: string]: any } | null> {
@@ -30,18 +42,14 @@ export class PreferenceExtractionService {
     const ducklingPreferences = await this.extractWithDuckling(userInput); // Await Duckling extraction
     const combinedPreferences: { [key: string]: any } = {};
 
-    // Prioritize Duckling results
-    if (ducklingPreferences) {
-      Object.assign(combinedPreferences, ducklingPreferences);
+    // Start with Regex results
+    if (regexPreferences) {
+      Object.assign(combinedPreferences, regexPreferences);
     }
 
-    // Merge Regex results, only add if the key doesn't exist from Duckling
-    if (regexPreferences) {
-      for (const key in regexPreferences) {
-        if (regexPreferences.hasOwnProperty(key) && !combinedPreferences[key]) {
-          combinedPreferences[key] = regexPreferences[key];
-        }
-      }
+    // Merge Duckling results, overwriting only if Duckling provides a value
+    if (ducklingPreferences) {
+      Object.assign(combinedPreferences, ducklingPreferences);
     }
 
     // Return combined preferences if any were found, otherwise null
@@ -69,12 +77,10 @@ export class PreferenceExtractionService {
   }
 
   private async extractWithDuckling(userInput: string): Promise<{ [key: string]: any } | null> {
-    console.log('Attempting Duckling extraction for:', userInput);
-
-    const ducklingUrl = 'http://localhost:8000/parse'; // Assuming Duckling server is running locally on port 8000
+    this.logger.info('Attempting Duckling extraction for:', userInput);
 
     try {
-      const response = await axios.post<DucklingEntity[]>(ducklingUrl, `text=${encodeURIComponent(userInput)}&locale=en_AU`, {
+      const response = await this.httpClient.post<DucklingEntity[]>(this.ducklingUrl, `text=${encodeURIComponent(userInput)}&locale=en_AU`, {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded'
         }
@@ -144,7 +150,7 @@ export class PreferenceExtractionService {
         return null;
       }
     } catch (error) {
-      console.error('Error during Duckling extraction:', error);
+      this.logger.error('Error during Duckling extraction:', error);
       return null;
     }
   }

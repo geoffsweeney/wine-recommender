@@ -1,343 +1,226 @@
-import { ConversationTurn } from '../../ConversationHistoryService';
-import "reflect-metadata";
-import { container } from 'tsyringe';
+import { mockDeep } from 'jest-mock-extended';
+import { createAgentMessage } from '../communication/AgentMessage';
+import { AgentError } from '../AgentError';
 import { InputValidationAgent } from '../InputValidationAgent';
-import { AgentCommunicationBus } from '../../AgentCommunicationBus';
-import { LLMService } from '../../../services/LLMService';
-import { DeadLetterProcessor } from '../../DeadLetterProcessor';
 import { BasicDeadLetterProcessor } from '../../BasicDeadLetterProcessor';
 
+import winston from 'winston';
 
-class MockDeadLetterProcessor extends DeadLetterProcessor {
-  constructor() {
-    super({ maxReplayAttempts: 0, retryManager: {} as any }, []);
+// Test wrapper to access protected methods and properties for testing
+class TestInputValidationAgent extends InputValidationAgent {
+  public testValidateInput(input: any, correlationId?: string) {
+    return this.validateInput(input, correlationId);
   }
 
-  protected async handlePermanentFailure(
-    message: unknown,
-    error: Error,
-    metadata: Record<string, unknown>
-  ): Promise<void> {
-    // Mock implementation
+  // Expose protected 'id' for testing purposes
+  public getAgentId(): string {
+    return this.id;
   }
 }
 
-jest.mock('../../AgentCommunicationBus');
+describe('InputValidationAgent', () => {
+  let mockBus: any;
+  let mockDeadLetter: BasicDeadLetterProcessor;
+  let mockLogger: winston.Logger;
+  let agent: TestInputValidationAgent;
+  let mockAgentConfig: any;
 
-const MockAgentCommunicationBus = AgentCommunicationBus as jest.MockedClass<typeof AgentCommunicationBus>;
+  beforeEach(() => {
+    mockBus = mockDeep<any>();
+    mockDeadLetter = mockDeep<BasicDeadLetterProcessor>();
+    mockLogger = mockDeep<winston.Logger>();
+    mockAgentConfig = { // Mock the injected config
+      ingredientDatabasePath: './data/ingredients.json',
+      dietaryRestrictions: ['vegetarian', 'vegan', 'gluten-free', 'kosher', 'halal'],
+      standardIngredients: {
+        'salmon': 'fish',
+        'beef': 'meat',
+      },
+      maxIngredients: 10
+    };
+    agent = new TestInputValidationAgent(mockBus, mockDeadLetter, mockLogger, mockAgentConfig);
 
-describe('InputValidationAgent Integration with AgentCommunicationBus', () => {
-  let agent: InputValidationAgent;
-  let mockCommunicationBusInstance: jest.Mocked<AgentCommunicationBus>;
-  let processSpy: jest.SpyInstance; // Declare processSpy here
+    // Reset mocks before each test to ensure isolation
+    jest.clearAllMocks(); // Clear all mocks before each test
+  });
 
-    let mockDeadLetterProcessor: DeadLetterProcessor; // Declare mockDeadLetterProcessor here
-  
+  describe('validateInput', () => {
+    // Default mock for sendLLMPrompt for validateInput tests
     beforeEach(() => {
-      MockAgentCommunicationBus.mockClear();
-      container.clearInstances();
-  
-      container.register<AgentCommunicationBus>(AgentCommunicationBus, { useClass: MockAgentCommunicationBus });
-      mockDeadLetterProcessor = new MockDeadLetterProcessor(); // Assign to the top-level variable
-      processSpy = jest.spyOn(mockDeadLetterProcessor, 'process'); // Spy on the process method and assign to processSpy
-    container.register<DeadLetterProcessor>('DeadLetterProcessor', { useValue: mockDeadLetterProcessor });
-
-    agent = container.resolve(InputValidationAgent);
-    mockCommunicationBusInstance = MockAgentCommunicationBus.mock.instances[0] as jest.Mocked<AgentCommunicationBus>;
-    // mockDeadLetterProcessorInstance is no longer needed, use processSpy directly
-  });
-
-  afterEach(() => {
-    container.clearInstances();
-  });
-
-  it('should send the user input to the LLMService via the communication bus for validation and return the LLM response', async () => {
-    const testUserInput = 'I want a sweet red wine';
-    const mockLlmResponse = '{"isValid": true, "ingredients": ["grape"], "preferences": {"wineType": "red", "sweetness": "dry"}}';
-
-    mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(mockLlmResponse);
-
-    const result = await agent.handleMessage({ input: testUserInput });
-
-    expect(mockCommunicationBusInstance.sendLLMPrompt).toHaveBeenCalled();
-    const sentPrompt = mockCommunicationBusInstance.sendLLMPrompt.mock.calls[0][0];
-    expect(sentPrompt).toContain(testUserInput);
-    expect(sentPrompt).toContain('Analyze the following user input for a wine recommendation request.');
-
-    expect(result).toEqual({
-      isValid: true,
-      processedInput: {
-        ingredients: ["grape"],
-        preferences: { wineType: 'red', sweetness: 'dry' },
-      },
-    });
-  });
-
-  it('should handle cases where LLMService does not return a response via the communication bus', async () => {
-    const testUserInput = 'Tell me about beer';
-    mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(undefined);
-
-    const result = await agent.handleMessage({ input: testUserInput });
-
-    expect(mockCommunicationBusInstance.sendLLMPrompt).toHaveBeenCalled();
-    expect(result).toEqual({
-      isValid: false,
-      error: 'LLM failed to provide validation response.',
-    });
-  });
-
-  it('should handle errors during LLMService communication via the communication bus', async () => {
-    const testUserInput = 'Invalid query';
-    const mockError = new Error('LLM API error');
-    mockCommunicationBusInstance.sendLLMPrompt.mockRejectedValue(mockError);
-
-    const result = await agent.handleMessage({ input: testUserInput });
-
-    expect(mockCommunicationBusInstance.sendLLMPrompt).toHaveBeenCalled();
-    expect(processSpy).toHaveBeenCalledWith(
-      { input: testUserInput },
-      expect.any(Error),
-      { source: agent.getName(), stage: 'LLMValidation' }
-    );
-    expect(result).toEqual({
-      isValid: false,
-      error: 'Error communicating with LLM for validation.',
-    });
-  });
-
-  it('should handle invalid JSON response format from LLMService via the communication bus', async () => {
-    const testUserInput = 'Another query';
-    const invalidJsonResponse = 'This is not JSON';
-    mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(invalidJsonResponse);
-
-    const result = await agent.handleMessage({ input: testUserInput });
-
-    expect(mockCommunicationBusInstance.sendLLMPrompt).toHaveBeenCalled();
-    expect(result.isValid).toBe(false);
-    expect(result.error).toContain('Error processing LLM validation response:');
-    expect(result.error).toContain('Unexpected token');
-  });
-
-  it('should handle empty or whitespace-only input', async () => {
-    const emptyInput = '';
-    const whitespaceInput = '   ';
-
-    let result = await agent.handleMessage({ input: emptyInput });
-    expect(result).toEqual({
-      isValid: false,
-      error: 'Invalid input: message input must be a non-empty string.',
-    });
-
-    result = await agent.handleMessage({ input: whitespaceInput });
-    expect(result).toEqual({
-      isValid: false,
-      error: 'Invalid input: message input must be a non-empty string.',
-    });
-  });
-
-  it('should handle LLM response with isValid: false and an error message', async () => {
-    const testUserInput = 'This is not a wine query';
-    const mockLlmResponse = '{"isValid": false, "error": "Input is not related to wine."}';
-
-    mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(mockLlmResponse);
-
-    const result = await agent.handleMessage({ input: testUserInput });
-
-    expect(mockCommunicationBusInstance.sendLLMPrompt).toHaveBeenCalled();
-    expect(result).toEqual({
-      isValid: false,
-      error: 'Input is not related to wine.',
-    });
-  });
-
-  it('should handle LLM response with isValid: true but missing optional fields', async () => {
-    const testUserInput = 'Just a general wine question';
-    const mockLlmResponse = '{"isValid": true}';
-
-    mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(mockLlmResponse);
-
-    const result = await agent.handleMessage({ input: testUserInput });
-
-    expect(mockCommunicationBusInstance.sendLLMPrompt).toHaveBeenCalled();
-    expect(result).toEqual({
-      isValid: true,
-      processedInput: {
-        ingredients: undefined,
-        preferences: undefined,
-      },
-    });
-  });
-
-  it('should handle LLM response with isValid: true and empty optional fields', async () => {
-    const testUserInput = 'Any wine will do';
-    const mockLlmResponse = '{"isValid": true, "ingredients": [], "preferences": {}}';
-
-    mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(mockLlmResponse);
-
-    const result = await agent.handleMessage({ input: testUserInput });
-
-    expect(mockCommunicationBusInstance.sendLLMPrompt).toHaveBeenCalled();
-    expect(result).toEqual({
-      isValid: true,
-      processedInput: {
-        ingredients: [],
-        preferences: {},
-      },
-    });
-  });
-
-  it('should handle LLM response with incorrect type for isValid', async () => {
-    const testUserInput = 'Query with invalid isValid type';
-    const mockLlmResponse = '{"isValid": "true", "ingredients": [], "preferences": {}}';
-
-    mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(mockLlmResponse);
-
-    const result = await agent.handleMessage({ input: testUserInput });
-
-    expect(mockCommunicationBusInstance.sendLLMPrompt).toHaveBeenCalled();
-    expect(result.isValid).toBe(false);
-    expect(result.error).toContain('Invalid structure in LLM validation response: missing or invalid "isValid".');
-  });
-
-  it('should handle LLM response with incorrect type for ingredients', async () => {
-    const testUserInput = 'Query with invalid ingredients type';
-    const mockLlmResponse = '{"isValid": true, "ingredients": "grape", "preferences": {}}';
-
-    mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(mockLlmResponse);
-
-    const result = await agent.handleMessage({ input: testUserInput });
-
-    expect(mockCommunicationBusInstance.sendLLMPrompt).toHaveBeenCalled();
-    expect(result.isValid).toBe(false);
-    expect(result.error).toContain('Invalid structure in LLM validation response: "ingredients" is not an array.');
-  });
-
-  it('should handle LLM response with incorrect type for preferences', async () => {
-    const testUserInput = 'Query with invalid preferences type';
-    const mockLlmResponse = '{"isValid": true, "ingredients": [], "preferences": "sweet"}';
-
-    mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(mockLlmResponse);
-
-    const result = await agent.handleMessage({ input: testUserInput });
-
-    expect(mockCommunicationBusInstance.sendLLMPrompt).toHaveBeenCalled();
-    expect(result.isValid).toBe(false);
-    expect(result.error).toContain('Invalid structure in LLM validation response: "preferences" is not an object.');
-  });
-
-  it('should handle LLM response with incorrect type for error when isValid is false', async () => {
-    const testUserInput = 'Query with invalid error type';
-    const mockLlmResponse = '{"isValid": false, "error": 123}';
-
-    mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(mockLlmResponse);
-
-    const result = await agent.handleMessage({ input: testUserInput });
-
-    expect(mockCommunicationBusInstance.sendLLMPrompt).toHaveBeenCalled();
-    expect(result.isValid).toBe(false);
-    expect(result.error).toContain('Invalid structure in LLM validation response: "error" is not a string.');
-  });
-
-  // Additional tests
-
-  it('should handle when AgentCommunicationBus is not available', async () => {
-    // @ts-ignore
-    agent = new InputValidationAgent(undefined, mockDeadLetterProcessor);
-    const result = await agent.handleMessage({ input: 'test' });
-    expect(result).toEqual({ isValid: false, error: 'Communication bus not available' });
-  });
-
-  it('should handle when LLM response is missing isValid field', async () => {
-    const testUserInput = 'Missing isValid';
-    const mockLlmResponse = '{"ingredients": ["grape"], "preferences": {}}';
-    mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(mockLlmResponse);
-
-    const result = await agent.handleMessage({ input: testUserInput });
-
-    expect(result.isValid).toBe(false);
-    expect(result.error).toContain('Invalid structure in LLM validation response: missing or invalid "isValid".');
-  });
-
-  it('should handle when LLM response has extra unexpected fields', async () => {
-    const testUserInput = 'Extra fields';
-    const mockLlmResponse = '{"isValid": true, "ingredients": ["grape"], "preferences": {}, "extra": 123}';
-    mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(mockLlmResponse);
-
-    const result = await agent.handleMessage({ input: testUserInput });
-
-    expect(result.isValid).toBe(true);
-    expect(result.processedInput).toEqual({
-      ingredients: ["grape"],
-      preferences: {},
-    });
-  });
-
-  it('should handle when LLM response has null for optional fields', async () => {
-    const testUserInput = 'Null fields';
-    const mockLlmResponse = '{"isValid": true, "ingredients": null, "preferences": null}';
-    mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(mockLlmResponse);
-
-    const result = await agent.handleMessage({ input: testUserInput });
-
-    // null is not an array/object, so should error
-    expect(result.isValid).toBe(false);
-    expect(result.error).toContain('Invalid structure in LLM validation response: "ingredients" is not an array.');
-  });
-  
-    it('should include conversation history in the prompt sent to the LLM for validation', async () => {
-      const userId = 'history-user-validation';
-
-      const conversationHistory: ConversationTurn[] = [
-        { role: 'user', content: 'My first message.' },
-        { role: 'assistant', content: 'My first response.' },
-      ];
-      const testInput = 'My second message.';
-      const message = {
-        userId: userId,
-        input: testInput,
-        conversationHistory: conversationHistory,
-      };
-  
-      const mockLlmResponse = '{"isValid": true, "processedInput": {}}';
-      mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(mockLlmResponse);
-  
-      await agent.handleMessage(message);
-  
-      // Expect AgentCommunicationBus.sendLLMPrompt to have been called
-      expect(mockCommunicationBusInstance.sendLLMPrompt).toHaveBeenCalled();
-  
-      // Get the prompt that was sent to the LLM
-      const sentPrompt = mockCommunicationBusInstance.sendLLMPrompt.mock.calls[0][0];
-  
-      // Verify that the prompt includes elements from the conversation history and current input
-      expect(sentPrompt).toContain(conversationHistory[0].content);
-      expect(sentPrompt).toContain(conversationHistory[1].content);
-      expect(sentPrompt).toContain(testInput);
-    });
-  
-    it('should handle when LLM response has undefined for optional fields', async () => {
-      const testUserInput = 'Undefined fields';
-      // JSON.stringify omits undefined, so this is same as missing fields
-      const mockLlmResponse = '{"isValid": true}';
-      mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(mockLlmResponse);
-  
-      const result = await agent.handleMessage({ input: testUserInput });
-  
-      expect(result.isValid).toBe(true);
-      expect(result.processedInput).toEqual({
-        ingredients: undefined,
-        preferences: undefined,
+      mockBus.sendLLMPrompt.mockResolvedValue({
+        success: true,
+        data: JSON.stringify({
+          isValid: true,
+          cleanedInput: {
+            ingredients: ['mocked-ingredient'],
+            budget: 100
+          },
+          extractedData: {}
+        })
       });
     });
-  
-    it('should handle when LLM response has empty object', async () => {
-      const testUserInput = 'Empty object';
-      const mockLlmResponse = '{}';
-      mockCommunicationBusInstance.sendLLMPrompt.mockResolvedValue(mockLlmResponse);
-  
-      const result = await agent.handleMessage({ input: testUserInput });
-  
-      expect(result.isValid).toBe(false);
-      expect(result.error).toContain('Invalid structure in LLM validation response: missing or invalid "isValid".');
+
+    it('should accept valid input with all required fields', async () => {
+      const validInput = {
+        ingredients: ['chicken', 'garlic'],
+        budget: 50,
+        dietaryRestrictions: [],
+        correlationId: '123'
+      };
+
+      const result = await agent.testValidateInput(validInput, validInput.correlationId);
+      expect(result.success).toBe(true);
+      if (result.success) { // Narrow the type for data access
+        expect(result.data.isValid).toBe(true);
+      }
+    });
+
+    it('should reject empty ingredients list', async () => {
+      const invalidInput = {
+        ingredients: [],
+        budget: 50,
+        dietaryRestrictions: [],
+        correlationId: '123'
+      };
+
+      const result = await agent.testValidateInput(invalidInput, invalidInput.correlationId);
+      expect(result.success).toBe(false); // Basic validation should fail before LLM call
+      if (!result.success) {
+        expect(result.error.message).toContain('At least one ingredient must be provided');
+        expect(result.error.correlationId).toBe('123');
+      }
+    });
+
+    it('should reject invalid budget values', async () => {
+      const invalidInput = {
+        ingredients: ['chicken'],
+        budget: -10,
+        dietaryRestrictions: [],
+        correlationId: '123'
+      };
+
+      const result = await agent.testValidateInput(invalidInput, invalidInput.correlationId);
+      expect(result.success).toBe(false); // Basic validation should fail before LLM call
+      if (!result.success) {
+        expect(result.error.message).toContain('Budget must be a positive number');
+        expect(result.error.correlationId).toBe('123');
+      }
+    });
+
+    it('should normalize ingredient names', async () => {
+      const input = {
+        ingredients: ['ChIcKeN', 'GARLIC clove'],
+        budget: 50,
+        dietaryRestrictions: [],
+        correlationId: '123'
+      };
+
+      // Specific mock for this test
+      mockBus.sendLLMPrompt.mockResolvedValueOnce({
+        success: true,
+        data: JSON.stringify({
+          isValid: true,
+          cleanedInput: {
+            ingredients: ['chicken', 'garlic clove'],
+            budget: 50
+          },
+          extractedData: {
+            standardizedIngredients: {
+              'chicken': 'chicken',
+              'garlic clove': 'garlic'
+            }
+          }
+        })
+      });
+      const result = await agent.testValidateInput(input, input.correlationId);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.extractedData?.standardizedIngredients).toEqual({
+          'chicken': 'chicken',
+          'garlic clove': 'garlic'
+        });
+      }
+    });
+
+    it('should validate dietary restrictions via LLM', async () => {
+      const input = {
+        ingredients: ['chicken'],
+        budget: 50,
+        dietaryRestrictions: ['invalid-restriction'],
+        correlationId: '123'
+      };
+
+      // Specific mock for this test
+      mockBus.sendLLMPrompt.mockResolvedValueOnce({
+        success: true,
+        data: JSON.stringify({
+          isValid: false,
+          errors: ['Unsupported dietary restriction: invalid-restriction'],
+          cleanedInput: input,
+          extractedData: {}
+        })
+      });
+
+      const result = await agent.testValidateInput(input, input.correlationId);
+      expect(result.success).toBe(true); // The LLM call itself is successful, but the LLM found invalid input
+      if (result.success) {
+        expect(result.data.isValid).toBe(false);
+        expect(result.data.errors).toContain('Unsupported dietary restriction: invalid-restriction');
+      }
     });
   });
+
+  describe('handleMessage (fallback)', () => {
+    it('should return an error for unhandled message types', async () => {
+      const message = createAgentMessage(
+        'unhandled-type', // This message type is not registered
+        { some: 'payload' },
+        'test-agent',
+        'test-conversation-id',
+        'corr-unhandled',
+        'InputValidationAgent',
+        'NORMAL',
+        { sender: 'test-agent', traceId: 'test-trace-unhandled' }
+      );
+
+      const response = await agent.handleMessage(message);
+      expect(response.success).toBe(false);
+      if (!response.success) { // Narrow the type for error access
+        expect(response.error).toBeInstanceOf(AgentError);
+        expect(response.error.code).toBe('UNHANDLED_MESSAGE_TYPE');
+        expect(response.error.correlationId).toBe('corr-unhandled');
+        expect(mockLogger.warn).toHaveBeenCalledWith(
+          expect.stringContaining('InputValidationAgent received unhandled message type: unhandled-type'),
+          expect.objectContaining({
+            agentId: agent.getAgentId(),
+            operation: 'handleMessage',
+            correlationId: 'corr-unhandled',
+            messageType: 'unhandled-type'
+          })
+        );
+      }
+    });
+  });
+
+  describe('error handling', () => {
+    it('should handle AgentError with correlationId', async () => {
+      const message = createAgentMessage(
+        'validate-input',
+        {}, // Invalid payload
+        'test-agent',
+        'test-conversation-id', // Added conversationId
+        'error-test', // correlationId
+        'InputValidationAgent', // Added targetAgent
+        'NORMAL', // priority
+        { sender: 'test-agent', traceId: 'test-trace-123' } // metadata
+      );
+
+      const response = await agent.handleValidationRequest(message); // Use handleValidationRequest
+      expect(response.success).toBe(false);
+      if (!response.success) { // Narrow the type for error access
+        expect(response.error).toBeInstanceOf(AgentError);
+        expect(response.error.correlationId).toBe('error-test');
+      }
+    });
+  });
+});

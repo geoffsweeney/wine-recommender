@@ -27,8 +27,8 @@ module.exports = {
   testMatch: [
     '**/__tests__/**/*.test.ts'
   ],
+  setupFiles: ['<rootDir>/backend/setup-env.ts'],
   setupFilesAfterEnv: ['<rootDir>/backend/test-setup.ts'],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'json', 'node'],
-  collectCoverage: true,
   coverageDirectory: '<rootDir>/coverage',
 }

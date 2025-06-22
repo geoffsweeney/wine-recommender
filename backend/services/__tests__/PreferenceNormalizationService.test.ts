@@ -1,11 +1,19 @@
 import { PreferenceNormalizationService } from '../PreferenceNormalizationService';
+import { inject } from 'tsyringe'; // Import inject
+import { TYPES } from '../../di/Types'; // Import TYPES from centralized location
 import { PreferenceNode } from '../../types';
+import { mockDeep } from 'jest-mock-extended'; // Import mockDeep
+import winston from 'winston'; // Import winston
 
 describe('PreferenceNormalizationService', () => {
   let service: PreferenceNormalizationService;
+  let mockLogger: winston.Logger; // Declare mock logger
 
   beforeEach(() => {
-    service = new PreferenceNormalizationService();
+    // Create mock logger using mockDeep
+    mockLogger = mockDeep<winston.Logger>();
+    // Instantiate service with mock logger
+    service = new PreferenceNormalizationService(mockLogger);
   });
 
   describe('normalizePreferences', () => {

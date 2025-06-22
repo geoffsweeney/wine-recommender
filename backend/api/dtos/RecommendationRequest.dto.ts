@@ -13,7 +13,7 @@ export const RecommendationRequest = z.object({
     message: z.string().optional(), // Keep message optional within input
     ingredients: z.array(z.string()).optional(), // Add ingredients as an optional array of strings
     recommendationSource: z.enum(['knowledgeGraph', 'llm']).optional().default('knowledgeGraph'), // Added recommendationSource
-  }),
+  }).strict(), // Make the input object strict
   conversationHistory: z.array(z.object({
     role: z.enum(['user', 'assistant']),
     content: z.string()

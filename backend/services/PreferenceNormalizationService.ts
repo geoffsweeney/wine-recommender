@@ -1,10 +1,14 @@
-import { injectable } from 'tsyringe';
+import { injectable, inject } from 'tsyringe'; // Import injectable and inject
+import { TYPES } from '../di/Types'; // Import TYPES
+import { ILogger } from './LLMService'; // Import ILogger
 import { PreferenceNode } from '../types';
 
 @injectable()
 export class PreferenceNormalizationService {
-  constructor() {
-    console.log('PreferenceNormalizationService constructor entered.');
+  constructor(
+    @inject(TYPES.Logger) private logger: ILogger // Inject logger
+  ) {
+    this.logger.info('PreferenceNormalizationService constructor entered.');
   }
 
   public normalizePreferences(preferences: PreferenceNode[]): PreferenceNode[] {
@@ -63,22 +67,22 @@ export class PreferenceNormalizationService {
     // Add more synonym registries for other preference types (e.g., oak, tannins, acidity)
 
     return preferences.map(pref => {
-        console.log('normalizePreferences: Processing preference:', pref); // Log the preference being processed
+        this.logger.info('normalizePreferences: Processing preference:', pref); // Log the preference being processed
         // Trim whitespace and lowercase string values
         let value = typeof pref.value === 'string'
             ? pref.value.trim().toLowerCase()
             : pref.value;
-        console.log('normalizePreferences: Trimmed/lowercased value:', value); // Log the value after trimming/lowercasing
+        this.logger.info('normalizePreferences: Trimmed/lowercased value:', value); // Log the value after trimming/lowercasing
 
         // Resolve synonyms using registry
         if (typeof value === 'string' && synonymRegistry.has(pref.type)) {
             const synonyms = synonymRegistry.get(pref.type);
-            console.log('normalizePreferences: Synonym registry for type:', pref.type, synonyms); // Log the synonym registry for the type
+            this.logger.info('normalizePreferences: Synonym registry for type:', pref.type, synonyms); // Log the synonym registry for the type
             if (synonyms && typeof value === 'string' && synonyms.has(value.toLowerCase())) {
-                console.log('normalizePreferences: Synonym found, canonical term:', synonyms.get(value.toLowerCase())); // Log when synonym is found
+                this.logger.info('normalizePreferences: Synonym found, canonical term:', synonyms.get(value.toLowerCase())); // Log when synonym is found
                 value = synonyms.get(value.toLowerCase())!; // Normalize to canonical term
             } else {
-                console.log('normalizePreferences: No synonym found for value:', value); // Log when no synonym is found
+                this.logger.info('normalizePreferences: No synonym found for value:', value); // Log when no synonym is found
             }
         }
 
@@ -89,7 +93,7 @@ export class PreferenceNormalizationService {
                 value = value.slice(4); // Remove 'not ' prefix
             } else {
                 // Handle other types (number, boolean) as needed, e.g., throw an error or log a warning
-                console.warn('Value is not a string, cannot apply slice for negation.');
+                this.logger.warn('Value is not a string, cannot apply slice for negation.');
             }
         } else if (Array.isArray(value) && value.every(item => typeof item === 'string')) {
              const originalArray = value as string[];
@@ -127,7 +131,7 @@ export class PreferenceNormalizationService {
                 } else if (typeof value === 'number') {
                     normalizedValue = [value, value]; // Treat single number as a range
                 } else {
-                    console.warn(`PreferenceNormalizationService: Invalid value type for priceRange:`, value);
+                    this.logger.warn(`PreferenceNormalizationService: Invalid value type for priceRange:`, value);
                     return null; // Discard invalid preference
                 }
                 break;
@@ -138,7 +142,7 @@ export class PreferenceNormalizationService {
                 if (!isNaN(numericAlcohol) && numericAlcohol >= 0 && numericAlcohol <= 25) { // Assuming alcohol content is between 0 and 25%
                     normalizedValue = numericAlcohol;
                 } else {
-                    console.warn(`PreferenceNormalizationService: Invalid value for alcoholContent:`, value);
+                    this.logger.warn(`PreferenceNormalizationService: Invalid value for alcoholContent:`, value);
                     return null; // Discard invalid preference
                 }
                 break;
@@ -150,7 +154,7 @@ export class PreferenceNormalizationService {
                      normalizedValue = `${value} years`; // Assume number is in years, convert to string
                 }
                 else {
-                    console.warn(`PreferenceNormalizationService: Invalid value for aging:`, value);
+                    this.logger.warn(`PreferenceNormalizationService: Invalid value for aging:`, value);
                     return null; // Discard invalid preference
                 }
                 break;
@@ -159,7 +163,7 @@ export class PreferenceNormalizationService {
                  const tempString = String(value).replace(/[^\d.-]/g, '').trim(); // Remove non-numeric except . and -
                  const numericTemperature = Number(tempString);
                  if (tempString === '' || isNaN(numericTemperature)) { // Check if cleaned string is empty or conversion is NaN
-                     console.warn(`PreferenceNormalizationService: Invalid value for servingTemperature:`, value);
+                     this.logger.warn(`PreferenceNormalizationService: Invalid value for servingTemperature:`, value);
                      return null; // Discard invalid preference
                  } else {
                      normalizedValue = numericTemperature;
@@ -172,7 +176,7 @@ export class PreferenceNormalizationService {
                  } else if (typeof value === 'number' && value > 0) {
                       normalizedValue = `${value} ml`; // Assume number is in ml, convert to string
                  } else {
-                     console.warn(`PreferenceNormalizationService: Invalid value for volume:`, value);
+                     this.logger.warn(`PreferenceNormalizationService: Invalid value for volume:`, value);
                      return null; // Discard invalid preference
                  }
                  break;
@@ -184,7 +188,7 @@ export class PreferenceNormalizationService {
                       normalizedValue = value; // Use string value directly
                  }
                  else {
-                     console.warn(`PreferenceNormalizationService: Invalid value for location:`, value);
+                     this.logger.warn(`PreferenceNormalizationService: Invalid value for location:`, value);
                      return null; // Discard invalid preference
                  }
                  break;
@@ -195,7 +199,7 @@ export class PreferenceNormalizationService {
                  } else if (typeof value === 'number' && value >= 0) {
                       normalizedValue = `${value} km`; // Assume number is in km, convert to string
                  } else {
-                     console.warn(`PreferenceNormalizationService: Invalid value for distance:`, value);
+                     this.logger.warn(`PreferenceNormalizationService: Invalid value for distance:`, value);
                      return null; // Discard invalid preference
                  }
                  break;
@@ -204,20 +208,20 @@ export class PreferenceNormalizationService {
                 if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' || Array.isArray(value)) {
                     normalizedValue = value;
                 } else {
-                    console.warn(`PreferenceNormalizationService: Skipping normalization for unsupported value type for preference type "${pref.type}":`, value);
+                    this.logger.warn(`PreferenceNormalizationService: Skipping normalization for unsupported value type for preference type "${pref.type}":`, value);
                     return null; // Discard unsupported value types
                 }
                 break;
         }
 
-        console.log('normalizePreferences: Final value before return:', normalizedValue); // Log the final normalized value
+        this.logger.info('normalizePreferences: Final value before return:', normalizedValue); // Log the final normalized value
         const finalPreference = {
             ...pref,
             value: normalizedValue,
             negated: negated || pref.negated, // Include negated property if handled
             timestamp: pref.timestamp, // Retain original timestamp
         };
-        console.log('normalizePreferences: Returning preference from map:', finalPreference); // Log the preference being returned from map
+        this.logger.info('normalizePreferences: Returning preference from map:', finalPreference); // Log the preference being returned from map
         return finalPreference;
     }).filter(Boolean) as PreferenceNode[]; // Filter out nulls from discarded preferences
   }

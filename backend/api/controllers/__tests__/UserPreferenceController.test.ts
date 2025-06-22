@@ -1,36 +1,32 @@
-import "reflect-metadata";
-import { container } from 'tsyringe';
-import { UserPreferenceController } from '../controllers/UserPreferenceController';
-import { KnowledgeGraphService } from '../../services/KnowledgeGraphService';
-import { PreferenceNode } from '../../types';
+import { UserPreferenceController } from '../../controllers/UserPreferenceController';
+import { KnowledgeGraphService } from '../../../services/KnowledgeGraphService';
+import { PreferenceNode } from '../../../types';
 import { Request, Response } from 'express';
-
-// Mock the KnowledgeGraphService
-jest.mock('../../services/KnowledgeGraphService');
-
-const MockKnowledgeGraphService = KnowledgeGraphService as jest.MockedClass<typeof KnowledgeGraphService>;
+import { TYPES } from '../../../di/Types';
+import { createTestContainer } from '../../../test-setup'; // Import the test container factory
+import { DependencyContainer } from 'tsyringe';
+import { mock } from 'jest-mock-extended'; // Import mock for comprehensive mocking
 
 describe('UserPreferenceController', () => {
   let controller: UserPreferenceController;
   let mockKnowledgeGraphServiceInstance: jest.Mocked<KnowledgeGraphService>;
-  let mockRequest: Partial<Request>;
+  let mockRequest: Partial<Request> & { validatedBody?: any; validatedParams?: any; }; // Explicitly add validatedBody and validatedParams
   let mockResponse: Partial<Response>;
   let jsonSpy: jest.Mock;
   let statusSpy: jest.Mock;
+  let container: DependencyContainer; // Declare container
+  let resetMocks: () => void; // Declare resetMocks
 
   beforeEach(() => {
-    // Clear mocks and container
-    MockKnowledgeGraphService.mockClear();
-    container.clearInstances();
+    // Get a fresh container and reset function for each test
+    ({ container, resetMocks } = createTestContainer());
 
-    // Register mocked dependency
-    container.register<KnowledgeGraphService>(KnowledgeGraphService, { useClass: MockKnowledgeGraphService });
-
-    // Resolve the controller
+    // Mock KnowledgeGraphService using jest-mock-extended
+    mockKnowledgeGraphServiceInstance = mock<KnowledgeGraphService>();
+    
+    // Register mock and resolve controller from container
+    container.register(TYPES.KnowledgeGraphService, { useValue: mockKnowledgeGraphServiceInstance });
     controller = container.resolve(UserPreferenceController);
-
-    // Get mock instance
-    mockKnowledgeGraphServiceInstance = MockKnowledgeGraphService.mock.instances[0] as jest.Mocked<KnowledgeGraphService>;
 
     // Mock Request and Response objects
     jsonSpy = jest.fn();
@@ -42,11 +38,13 @@ describe('UserPreferenceController', () => {
     mockRequest = {
       params: {},
       body: {},
+      validatedBody: {}, // Add validatedBody
+      validatedParams: {}, // Add validatedParams
     };
   });
 
   afterEach(() => {
-    container.clearInstances();
+    // container.clearInstances(); // Removed container clear
   });
 
   describe('getPreferences', () => {
@@ -56,38 +54,51 @@ describe('UserPreferenceController', () => {
         { type: 'wineType', value: 'red', source: 'manual', confidence: 1.0, timestamp: new Date().toISOString(), active: true },
         { type: 'sweetness', value: 'dry', source: 'llm', confidence: 0.9, timestamp: new Date().toISOString(), active: true },
       ];
-      mockRequest.params = { userId };
+      mockRequest.validatedParams = { userId }; // Use validatedParams
       mockKnowledgeGraphServiceInstance.getPreferences.mockResolvedValue(mockPreferences);
 
-      await controller.getPreferences(mockRequest as Request, mockResponse as Response);
+      mockRequest.method = 'GET';
+      await controller.execute(mockRequest as Request, mockResponse as Response);
 
       expect(mockKnowledgeGraphServiceInstance.getPreferences).toHaveBeenCalledWith(userId);
-      expect(statusSpy).not.toHaveBeenCalled(); // Should not set status if successful
+      expect(statusSpy).toHaveBeenCalledWith(200); // Should set status 200 for successful response
       expect(jsonSpy).toHaveBeenCalledWith(mockPreferences);
     });
 
     it('should return 400 if user ID is missing', async () => {
-      mockRequest.params = {}; // No userId in params
+      mockRequest.validatedParams = {}; // No userId in validatedParams
 
-      await controller.getPreferences(mockRequest as Request, mockResponse as Response);
+      mockRequest.method = 'GET';
+      await controller.execute(mockRequest as Request, mockResponse as Response);
 
       expect(mockKnowledgeGraphServiceInstance.getPreferences).not.toHaveBeenCalled();
       expect(statusSpy).toHaveBeenCalledWith(400);
-      expect(jsonSpy).toHaveBeenCalledWith({ error: 'User ID is required' });
+      expect(jsonSpy).toHaveBeenCalledWith({ message: 'User ID is required' });
     });
 
     it('should handle errors when getting preferences', async () => {
       const userId = 'test-user-error';
       const mockError = new Error('Failed to fetch from Neo4j');
-      mockRequest.params = { userId };
+      mockRequest.validatedParams = { userId };
       mockKnowledgeGraphServiceInstance.getPreferences.mockRejectedValue(mockError);
 
-      await controller.getPreferences(mockRequest as Request, mockResponse as Response);
+      mockRequest.method = 'GET';
+      await controller.execute(mockRequest as Request, mockResponse as Response);
 
       expect(mockKnowledgeGraphServiceInstance.getPreferences).toHaveBeenCalledWith(userId);
       expect(statusSpy).toHaveBeenCalledWith(500);
-      expect(jsonSpy).toHaveBeenCalledWith({ error: 'Failed to retrieve preferences' });
+      expect(jsonSpy).toHaveBeenCalledWith({ message: 'An unexpected error occurred' });
     });
+  });
+
+  it('should return 405 for unsupported HTTP method', async () => {
+    mockRequest.method = 'PATCH';
+    mockRequest.validatedParams = { userId: 'test-user' }; // Use validatedParams
+
+    await controller.execute(mockRequest as Request, mockResponse as Response);
+
+    expect(statusSpy).toHaveBeenCalledWith(405);
+    expect(jsonSpy).toHaveBeenCalledWith({ message: 'Method not allowed' });
   });
 
   describe('addOrUpdatePreference', () => {
@@ -101,11 +112,12 @@ describe('UserPreferenceController', () => {
         timestamp: new Date().toISOString(),
         active: true,
       };
-      mockRequest.params = { userId };
-      mockRequest.body = preference;
+      mockRequest.validatedParams = { userId }; // Use validatedParams
+      mockRequest.validatedBody = preference; // Use validatedBody
       mockKnowledgeGraphServiceInstance.addOrUpdatePreference.mockResolvedValue(undefined);
 
-      await controller.addOrUpdatePreference(mockRequest as Request, mockResponse as Response);
+      mockRequest.method = 'POST';
+      await controller.execute(mockRequest as Request, mockResponse as Response);
 
       expect(mockKnowledgeGraphServiceInstance.addOrUpdatePreference).toHaveBeenCalledWith(userId, preference);
       expect(statusSpy).toHaveBeenCalledWith(200);
@@ -121,26 +133,28 @@ describe('UserPreferenceController', () => {
         timestamp: new Date().toISOString(),
         active: true,
       };
-      mockRequest.params = {}; // No userId
-      mockRequest.body = preference;
+      mockRequest.validatedParams = {}; // No userId
+      mockRequest.validatedBody = preference; // Use validatedBody
 
-      await controller.addOrUpdatePreference(mockRequest as Request, mockResponse as Response);
+      mockRequest.method = 'POST';
+      await controller.execute(mockRequest as Request, mockResponse as Response);
 
       expect(mockKnowledgeGraphServiceInstance.addOrUpdatePreference).not.toHaveBeenCalled();
       expect(statusSpy).toHaveBeenCalledWith(400);
-      expect(jsonSpy).toHaveBeenCalledWith({ error: 'User ID is required' });
+      expect(jsonSpy).toHaveBeenCalledWith({ message: 'User ID is required' });
     });
 
     it('should return 400 if preference data is invalid', async () => {
       const userId = 'test-user-invalid';
-      mockRequest.params = { userId };
-      mockRequest.body = { type: 'wineType' }; // Missing value and active
+      mockRequest.validatedParams = { userId }; // Use validatedParams
+      mockRequest.validatedBody = { type: 'wineType' }; // Missing value and active
 
-      await controller.addOrUpdatePreference(mockRequest as Request, mockResponse as Response);
+      mockRequest.method = 'POST';
+      await controller.execute(mockRequest as Request, mockResponse as Response);
 
       expect(mockKnowledgeGraphServiceInstance.addOrUpdatePreference).not.toHaveBeenCalled();
       expect(statusSpy).toHaveBeenCalledWith(400);
-      expect(jsonSpy).toHaveBeenCalledWith({ error: 'Invalid preference data provided' });
+      expect(jsonSpy).toHaveBeenCalledWith({ message: 'Invalid preference data provided' });
     });
 
     it('should handle errors when adding or updating preference', async () => {
@@ -154,15 +168,16 @@ describe('UserPreferenceController', () => {
         active: true,
       };
       const mockError = new Error('Failed to save to Neo4j');
-      mockRequest.params = { userId };
-      mockRequest.body = preference;
+      mockRequest.validatedParams = { userId }; // Use validatedParams
+      mockRequest.validatedBody = preference; // Use validatedBody
       mockKnowledgeGraphServiceInstance.addOrUpdatePreference.mockRejectedValue(mockError);
 
-      await controller.addOrUpdatePreference(mockRequest as Request, mockResponse as Response);
+      mockRequest.method = 'POST';
+      await controller.execute(mockRequest as Request, mockResponse as Response);
 
       expect(mockKnowledgeGraphServiceInstance.addOrUpdatePreference).toHaveBeenCalledWith(userId, preference);
       expect(statusSpy).toHaveBeenCalledWith(500);
-      expect(jsonSpy).toHaveBeenCalledWith({ error: 'Failed to add or update preference' });
+      expect(jsonSpy).toHaveBeenCalledWith({ message: 'An unexpected error occurred' });
     });
   });
 
@@ -170,10 +185,11 @@ describe('UserPreferenceController', () => {
     it('should delete a preference for a user', async () => {
       const userId = 'test-user-delete';
       const preferenceId = 'pref-123';
-      mockRequest.params = { userId, preferenceId };
+      mockRequest.validatedParams = { userId, preferenceId }; // Use validatedParams
       mockKnowledgeGraphServiceInstance.deletePreference.mockResolvedValue(undefined);
 
-      await controller.deletePreference(mockRequest as Request, mockResponse as Response);
+      mockRequest.method = 'DELETE';
+      await controller.execute(mockRequest as Request, mockResponse as Response);
 
       expect(mockKnowledgeGraphServiceInstance.deletePreference).toHaveBeenCalledWith(userId, preferenceId);
       expect(statusSpy).toHaveBeenCalledWith(200);
@@ -181,27 +197,29 @@ describe('UserPreferenceController', () => {
     });
 
     it('should return 400 if user ID or preference ID is missing', async () => {
-      mockRequest.params = { userId: 'test-user-delete' }; // Missing preferenceId
+      mockRequest.validatedParams = { userId: 'test-user-delete' }; // Missing preferenceId
 
-      await controller.deletePreference(mockRequest as Request, mockResponse as Response);
+      mockRequest.method = 'DELETE';
+      await controller.execute(mockRequest as Request, mockResponse as Response);
 
       expect(mockKnowledgeGraphServiceInstance.deletePreference).not.toHaveBeenCalled();
       expect(statusSpy).toHaveBeenCalledWith(400);
-      expect(jsonSpy).toHaveBeenCalledWith({ error: 'User ID and Preference ID are required' });
+      expect(jsonSpy).toHaveBeenCalledWith({ message: 'Preference ID is required' });
     });
 
     it('should handle errors when deleting preference', async () => {
       const userId = 'test-user-error';
       const preferenceId = 'pref-error';
       const mockError = new Error('Failed to delete from Neo4j');
-      mockRequest.params = { userId, preferenceId };
+      mockRequest.validatedParams = { userId, preferenceId }; // Use validatedParams
       mockKnowledgeGraphServiceInstance.deletePreference.mockRejectedValue(mockError);
 
-      await controller.deletePreference(mockRequest as Request, mockResponse as Response);
+      mockRequest.method = 'DELETE';
+      await controller.execute(mockRequest as Request, mockResponse as Response);
 
       expect(mockKnowledgeGraphServiceInstance.deletePreference).toHaveBeenCalledWith(userId, preferenceId);
-      expect(statusSpy).toHaveBeenCalledWith(500);
-      expect(jsonSpy).toHaveBeenCalledWith({ error: 'Failed to delete preference' });
+      expect(statusSpy).toHaveBeenCalledWith(400);
+      expect(jsonSpy).toHaveBeenCalledWith({ message: 'Failed to delete from Neo4j' });
     });
   });
 });

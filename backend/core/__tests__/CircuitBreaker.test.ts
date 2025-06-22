@@ -42,6 +42,11 @@ describe('CircuitBreaker', () => {
     await expect(circuit.execute(failingOperation))
       .rejects.toThrow('Operation failed');
     expect(circuit.getState()).toBe('OPEN');
+
+    // Subsequent call when circuit is open should return fallback
+    const fallbackResult = await circuit.execute(failingOperation);
+    expect(fallbackResult).toBe('fallback');
+    expect(circuit.getState()).toBe('OPEN'); // Still OPEN
   });
 
   test('should use fallback when circuit is open', async () => {

@@ -1,79 +1,75 @@
 import { Request, Response } from 'express';
 import { injectable, inject } from 'tsyringe';
+import { BaseController } from '../BaseController';
+import { TYPES } from '../../di/Types';
 import { KnowledgeGraphService } from '../../services/KnowledgeGraphService';
 import { PreferenceNode } from '../../types';
+import { ILogger } from '../../services/LLMService';
 
 @injectable()
-export class UserPreferenceController {
+export class UserPreferenceController extends BaseController {
   constructor(
-    @inject(KnowledgeGraphService) private readonly knowledgeGraphService: KnowledgeGraphService
-  ) {}
-
-  async getPreferences(req: Request, res: Response): Promise<void> {
-    try {
-      const userId = req.params.userId;
-      if (!userId) {
-        res.status(400).json({ error: 'User ID is required' });
-        return;
-      }
-      const preferences = await this.knowledgeGraphService.getPreferences(userId);
-      res.json(preferences);
-    } catch (error: any) {
-      console.error('Error getting preferences:', error);
-      res.status(500).json({ error: 'Failed to retrieve preferences' });
-    }
+    @inject(TYPES.KnowledgeGraphService) private readonly knowledgeGraphService: KnowledgeGraphService,
+    @inject(TYPES.Logger) private logger: ILogger
+  ) {
+    super();
   }
 
-  async addOrUpdatePreference(req: Request, res: Response): Promise<void> {
-    try {
-      const userId = req.params.userId;
-       if (!userId) {
-        res.status(400).json({ error: 'User ID is required' });
-        return;
-      }
-      const preference: PreferenceNode = req.body;
-      // Basic validation for required preference properties
-      if (!preference || !preference.type || preference.value === undefined || preference.active === undefined) {
-         res.status(400).json({ error: 'Invalid preference data provided' });
-         return;
-      }
-      // Ensure confidence has a default if not provided
-      if (preference.confidence === undefined) {
-          preference.confidence = 1.0; // Default confidence for manually added/updated preferences
-      }
-       // Ensure source has a default if not provided
-      if (!preference.source) {
-          preference.source = 'manual'; // Default source for manually added/updated preferences
-      }
-       // Ensure timestamp is set if not provided
-      if (!preference.timestamp) {
-// Duplicate deletePreference method removed
-// Duplicate deletePreference method removed
-          preference.timestamp = new Date().toISOString();
-      }
+  protected async executeImpl(req: Request, res: Response): Promise<void> {
+    const { method } = req;
+    const userId = req.validatedParams.userId; // Use validatedParams
 
-
-      await this.knowledgeGraphService.addOrUpdatePreference(userId, preference);
-      res.status(200).json({ message: 'Preference added/updated successfully' });
-    } catch (error: any) {
-      console.error('Error adding or updating preference:', error);
-      res.status(500).json({ error: 'Failed to add or update preference' });
+    // No need for manual validation here, as it's handled by middleware
+    if (!userId) {
+      this.fail(res, 'User ID is required', 400);
+      return;
     }
-  }
 
-  async deletePreference(req: Request, res: Response): Promise<void> {
-    try {
-      const userId = req.params.userId;
-      const preferenceId = req.params.preferenceId;
-       if (!userId || !preferenceId) {
-        res.status(400).json({ error: 'User ID and Preference ID are required' });
-        return;
-      }
-      await this.knowledgeGraphService.deletePreference(userId, preferenceId);
-      res.status(200).json({ message: 'Preference deleted successfully' });
-    } catch (error: any) {
-      console.error('Error deleting preference:', error);
-      res.status(500).json({ error: 'Failed to delete preference' });
+    switch (method) {
+      case 'GET':
+        const preferences = await this.knowledgeGraphService.getPreferences(userId);
+        this.ok(res, preferences);
+        break;
+
+      case 'POST':
+      case 'PUT':
+        const preference: PreferenceNode = req.validatedBody; // Use validatedBody
+        // No need for manual validation here, as it's handled by middleware
+        if (!preference || !preference.type ||
+            preference.value === undefined ||
+            preference.active === undefined) {
+          this.fail(res, 'Invalid preference data provided', 400);
+          return;
+        }
+
+        // Set defaults for optional fields (these should ideally be handled by Zod defaults if possible)
+        preference.confidence = preference.confidence ?? 1.0;
+        preference.source = preference.source ?? 'manual';
+        preference.timestamp = preference.timestamp ?? new Date().toISOString();
+
+        await this.knowledgeGraphService.addOrUpdatePreference(userId, preference);
+        this.ok(res, { message: 'Preference added/updated successfully' });
+        break;
+
+      case 'DELETE':
+        const preferenceId = req.validatedParams.preferenceId; // Use validatedParams
+        // No need for manual validation here, as it's handled by middleware
+        if (!preferenceId) {
+          this.fail(res, 'Preference ID is required', 400);
+          return;
+        }
+
+        try {
+          await this.knowledgeGraphService.deletePreference(userId, preferenceId);
+          this.ok(res, { message: 'Preference deleted successfully' });
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : 'Failed to delete preference';
+          this.fail(res, errorMessage, 400); // Return 400 for service-level errors
+        }
+        break;
+
+      default:
+        this.fail(res, 'Method not allowed', 405);
     }
   }
 }

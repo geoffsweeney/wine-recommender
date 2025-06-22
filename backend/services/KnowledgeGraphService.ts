@@ -1,14 +1,19 @@
 import { inject, injectable } from 'tsyringe';
 import { Neo4jService } from './Neo4jService';
-import { RecommendationRequest } from '../api/dtos/RecommendationRequest.dto'; // Import DTO
-import { WineNode, PreferenceNode } from '../types'; // Import WineNode from types
+import { RecommendationRequest } from '../api/dtos/RecommendationRequest.dto';
+import { WineNode, PreferenceNode, UserPreferences } from '../types'; // Import UserPreferences
+import { TYPES } from '../di/Types';
+import winston from 'winston';
 
 
 @injectable()
 export class KnowledgeGraphService {
   constructor(
-    @inject(Neo4jService) private readonly neo4j: Neo4jService
-  ) {}
+    @inject(Neo4jService) private readonly neo4j: Neo4jService,
+    @inject(TYPES.Logger) private readonly logger: winston.Logger
+  ) {
+    this.logger.info('KnowledgeGraphService initialized');
+  }
 
   async createWineNode(wine: WineNode): Promise<void> {
     await this.neo4j.executeQuery(`
@@ -29,24 +34,20 @@ export class KnowledgeGraphService {
 
   async findSimilarWines(wineId: string, limit: number = 5): Promise<WineNode[]> {
     // Ensure limit is a non-negative integer for the query
-    const integerLimit = Math.floor(Math.max(0, parseInt(limit as any, 10)));
+    let integerLimit = Math.floor(Math.max(0, parseInt(limit as any, 10)));
 
     if (isNaN(integerLimit)) {
-       console.warn(`Invalid limit value provided: ${limit}. Defaulting to 5.`);
-       return this.neo4j.executeQuery<WineNode>(`
-         MATCH (w:Wine {id: $wineId})-[:SIMILAR_TO]->(similar:Wine)
-         RETURN similar
-         LIMIT 5
-       `, { wineId });
+       this.logger.warn(`Invalid limit value provided: ${limit}. Defaulting to 5.`);
+       integerLimit = 5; // Set default to 5 if invalid
     }
 
     const similarWines = await this.neo4j.executeQuery<WineNode>(`
       MATCH (w:Wine {id: $wineId})-[:SIMILAR_TO]->(similar:Wine)
       RETURN similar
       LIMIT $limit
-    `, { wineId, limit: integerLimit }); // Pass the ensured integer limit
+    `, { wineId, limit: integerLimit });
 
-    // console.log('KnowledgeGraphService - similarWines after executeQuery:', similarWines); // Debug log
+    this.logger.debug('KnowledgeGraphService - similarWines after executeQuery:', similarWines);
 
     return similarWines;
   }
@@ -65,15 +66,16 @@ export class KnowledgeGraphService {
       RETURN w
     `, { ingredients });
 
-    // console.log('KnowledgeGraphService - findWinesByIngredients after executeQuery:', wines); // Debug log
+    this.logger.debug('KnowledgeGraphService - findWinesByIngredients after executeQuery:', wines);
 
     return wines;
   }
 
-  async findWinesByPreferences(preferences: RecommendationRequest['input']['preferences']): Promise<WineNode[]> {
-    // console.log('KnowledgeGraphService: Finding wines by preferences:', preferences);
-      if (!preferences) {
-        return []; // Return empty array if preferences is undefined
+  async findWinesByPreferences(preferences: UserPreferences): Promise<WineNode[]> { // Use the new UserPreferences interface
+    this.logger.debug('KnowledgeGraphService: Finding wines by preferences:', preferences);
+      if (!preferences || Object.keys(preferences).length === 0) { // Check if preferences object is empty
+        this.logger.debug('KnowledgeGraphService: No specific preferences provided, returning empty array.');
+        return []; // Return empty array if preferences is undefined or empty
       }
       let query = 'MATCH (w:Wine)';
       const parameters: any = {};
@@ -96,7 +98,8 @@ export class KnowledgeGraphService {
     }
 
 
-    // Assuming a relationship between Wine and Food nodes for foodPairing preference
+    // TODO: Enhance foodPairing logic to support multiple ingredients, flavor profiles, and more nuanced matching.
+    // Current implementation assumes a direct match to a single Food node by name.
     if (preferences.foodPairing) {
         // This requires matching a Food node and then finding paired wines
         // This makes a single MATCH clause more complex.
@@ -113,7 +116,7 @@ export class KnowledgeGraphService {
     if (preferences.excludeAllergens && preferences.excludeAllergens.length > 0) {
         // This is more complex and might require a WHERE NOT EXISTS or a separate match and filter
         // For minimum implementation, let's skip excludeAllergens for now or add a basic placeholder
-        // console.warn('Excluding allergens is not yet fully implemented.');
+        this.logger.warn('Excluding allergens is not yet fully implemented.');
         // TODO: Implement allergen exclusion logic
     }
 
@@ -124,13 +127,13 @@ export class KnowledgeGraphService {
 
     query += ' RETURN w';
 
-    // console.log('KnowledgeGraphService - findWinesByPreferences query:', query);
-    // console.log('KnowledgeGraphService - findWinesByPreferences parameters:', parameters);
+    this.logger.debug('KnowledgeGraphService - findWinesByPreferences query:', query);
+    this.logger.debug('KnowledgeGraphService - findWinesByPreferences parameters:', parameters);
 
 
     const wines = await this.neo4j.executeQuery<WineNode>(query, parameters);
 
-    // console.log('KnowledgeGraphService - findWinesByPreferences after executeQuery:', wines); // Debug log
+    this.logger.debug('KnowledgeGraphService - findWinesByPreferences after executeQuery:', wines);
 
     return wines;
   }
@@ -146,7 +149,7 @@ export class KnowledgeGraphService {
       RETURN w
     `, { wineType });
 
-    // console.log('KnowledgeGraphService - findWinesByType after executeQuery:', wines); // Debug log
+    this.logger.debug('KnowledgeGraphService - findWinesByType after executeQuery:', wines);
 
     return wines;
   }

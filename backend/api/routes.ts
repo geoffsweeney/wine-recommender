@@ -1,132 +1,68 @@
-import 'reflect-metadata';
-import express from 'express';
-import { container } from 'tsyringe';
-import { SommelierCoordinator } from '../core/agents/SommelierCoordinator'; // Use @src alias
-import { UserPreferenceController } from '..//api/controllers/UserPreferenceController'; // Import UserPreferenceController
-import { AgentCommunicationBus } from '..//core/AgentCommunicationBus'; // Import AgentCommunicationBus
-import { LLMService } from '..//services/LLMService'; // Import LLMService
+import { Router, Request, Response } from 'express';
+import { v4 as uuidv4 } from 'uuid';
+import { z } from 'zod'; // Import z for schema definition
+import { createAgentMessage, MessageTypes } from '../core/agents/communication/AgentMessage';
+import { DependencyContainer, container } from 'tsyringe'; // Added DependencyContainer
+import { TYPES } from '../di/Types';
+import { SommelierCoordinator } from '../core/agents/SommelierCoordinator';
+import { EnhancedAgentCommunicationBus } from '../core/agents/communication/EnhancedAgentCommunicationBus';
+import type { Result } from '../core/types/Result';
+import type { AgentMessage } from '../core/agents/communication/AgentMessage';
+import type { AgentError } from '../core/agents/AgentError';
+import { validateRequest } from './middleware/validation'; // Import validation middleware
+import { RecommendationRequest as RecommendationRequestSchema } from './dtos/RecommendationRequest.dto'; // Import the DTO schema
 
-// Import validation middleware and schemas using @src alias
-import { validateRequest } from '..//api/middleware/validation';
-import { RecommendationRequest } from '..//api/dtos/RecommendationRequest.dto';
-import { SearchRequest } from '..//api/dtos/SearchRequest.dto';
-//import { BasicDeadLetterProcessor } from '../core/BasicDeadLetterProcessor'; // Import BasicDeadLetterProcessor
+// Export a function that returns the router, allowing dependencies to be resolved at call time
+export default function createRouter(dependencyContainer: DependencyContainer): Router {
+  const router = Router();
 
-const router = express.Router();
+  // Resolve dependencies inside the function, so they are resolved when the function is called
+  // and the container is properly configured.
+  const sommelierCoordinator = dependencyContainer.resolve<SommelierCoordinator>(TYPES.SommelierCoordinator);
+  const communicationBus = dependencyContainer.resolve<EnhancedAgentCommunicationBus>(TYPES.AgentCommunicationBus);
 
-export const createRouter = () => {
-  // Explicitly register AgentCommunicationBus and LLMService if not already registered
-  // This is a workaround for potential container isolation issues in the test environment
-  if (!container.isRegistered(AgentCommunicationBus)) {
-    // Assuming LLMService is a dependency of AgentCommunicationBus
-    if (!container.isRegistered(LLMService)) {
-        // This might not be the correct way to instantiate LLMService if it has complex dependencies
-        // but for the sake of unblocking the E2E tests, we'll try a basic instantiation.
-        // A better long-term solution would be to fix the test environment's container setup.
-        container.registerSingleton(LLMService);
-    }
-    const llmService = container.resolve(LLMService);
-    const agentCommunicationBus = new AgentCommunicationBus(llmService);
-    container.registerInstance(AgentCommunicationBus, agentCommunicationBus);
-  }
-
-
-  // Recommendations endpoint
   router.post(
     '/recommendations',
-    validateRequest(RecommendationRequest, 'body'), // Apply body validation middleware
-    async (req, res) => { // Type annotation removed as validation middleware handles it
-console.log('Received recommendation request:', req.body); // Log the request body
+    validateRequest(RecommendationRequestSchema, 'body'), // Apply validation middleware
+    async (req: Request, res: Response): Promise<void> => {
       try {
-        // Resolve the SommelierCoordinator from the container
-console.log('routes.ts: SommelierCoordinator resolved.');
-        const sommelierCoordinator = container.resolve(SommelierCoordinator);
+        const correlationId = uuidv4();
+        const conversationId = uuidv4();
 
-        // Pass the validated request body to the coordinator
-        const result = await sommelierCoordinator.handleMessage(req.body);
+        // req.validatedBody is now guaranteed to conform to RecommendationRequestSchema due to validation middleware
+        const message = createAgentMessage(
+          MessageTypes.ORCHESTRATE_RECOMMENDATION_REQUEST,
+          req.validatedBody, // Use validated req.body
+          'api',
+          conversationId,
+          correlationId,
+          'sommelier'
+        );
 
-        // The SommelierCoordinator now re-throws errors, so this catch block will be reached on agent errors
-        if (Array.isArray(result) && result.length > 0) {
-          // Manually construct the response array to ensure only necessary properties are included
-          const cleanResult = result.map((wine: any) => ({
-            id: wine.id,
-            name: wine.name,
-            type: wine.type,
-            region: wine.region,
-            vintage: wine.vintage,
-            price: wine.price,
-            rating: wine.rating,
-          }));
-          res.status(200).json({ recommendation: cleanResult }); // Wrap the clean array
+        const result = await communicationBus.sendMessageAndWaitForResponse(
+          'sommelier',
+          message
+        );
+
+        if (!result.success) {
+          res.status(400).json({ error: result.error.message });
+          return;
         }
-        // Optionally, handle a specific case for no recommendations found if the coordinator returns an empty array
-        else if (Array.isArray(result) && result.length === 0) {
-           res.status(200).json({ recommendation: [] }); // Return an empty recommendation array
+
+        if (result.data === null) {
+          res.status(404).json({ error: 'No recommendations found' });
+          return;
         }
-        // Handle other cases (e.g., fallback response object, or unexpected result format)
-        else if (result && result.recommendation) {
-           res.status(200).json(result); // Keep existing logic for fallback response object if needed
+
+        res.status(200).json(result.data.payload);
+      } catch (error: unknown) {
+        if (error instanceof Error) {
+          console.error('Error handling recommendation request:', error.message);
         }
-        else {
-          res.status(500).json({ error: 'Invalid or empty response from recommendation service' });
-        }
-      } catch (error: any) {
-        console.error('Error processing recommendation request:', error); // Log the error
-        // The validation errors are handled by the middleware, so we don't expect ValidationError here
-        res.status(500).json({ error: 'Failed to process recommendation request' });
+        res.status(500).json({ error: 'Internal server error' });
       }
     }
   );
-
-  // Search endpoint
-  router.get(
-    '/search',
-    validateRequest(SearchRequest, 'query'), // Apply query validation middleware
-    async (req, res) => { // Type annotation removed as validation middleware handles it
-      try {
-        // Access validated query parameters from req.query
-        const { query, limit } = req.query;
-
-        // TODO: Implement actual search logic using a SearchService or Agent
-
-        // Placeholder success response for now
-        res.status(200).json({ results: [] }); // Remove return keyword
-
-      } catch (error: any) {
-        console.error('Error processing search:', error);
-        // Catch errors during search processing and return a 500
-        // The validation errors are handled by the middleware, so we don't expect ValidationError here
-        res.status(500).json({ error: 'Failed to process search request' });
-      }
-    }
-  );
-
-  // User Preferences endpoints
-  router.get('/preferences/:userId', async (req, res) => {
-    const controller = container.resolve(UserPreferenceController);
-    await controller.getPreferences(req, res);
-  });
-
-  router.post('/preferences/:userId', async (req, res) => {
-    const controller = container.resolve(UserPreferenceController);
-    await controller.addOrUpdatePreference(req, res);
-  });
-
-  router.put('/preferences/:userId/:preferenceId', async (req, res) => {
-    const controller = container.resolve(UserPreferenceController);
-    await controller.addOrUpdatePreference(req, res); // Reusing addOrUpdate for PUT
-  });
-
-  router.delete('/preferences/:userId/:preferenceId', async (req, res) => {
-    const controller = container.resolve(UserPreferenceController);
-    await controller.deletePreference(req, res);
-  });
-
-
-  // Health check endpoint
-  router.get('/health', (req, res) => {
-    res.status(200).json({ status: 'healthy' });
-  });
 
   return router;
-};
+}

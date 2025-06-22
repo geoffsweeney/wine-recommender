@@ -1,6 +1,8 @@
 import 'reflect-metadata';
 import { KnowledgeGraphService } from '../KnowledgeGraphService';
 import { Neo4jService } from '../Neo4jService';
+import { Neo4jCircuitWrapper } from '../Neo4jCircuitWrapper';
+import winston from 'winston';
 
 jest.mock('../Neo4jService');
 
@@ -9,9 +11,30 @@ describe('KnowledgeGraphService', () => {
   let mockNeo4j: jest.Mocked<Neo4jService>;
 
   beforeEach(() => {
-    mockNeo4j = new Neo4jService() as jest.Mocked<Neo4jService>;
+    // Create proper mock for Neo4jCircuitWrapper
+    const mockCircuitWrapper = {
+      execute: jest.fn(),
+      executeQuery: jest.fn()
+    } as unknown as Neo4jCircuitWrapper;
+
+    const mockLogger = {
+      info: jest.fn(),
+      debug: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn()
+    } as unknown as winston.Logger;
+
+    mockNeo4j = new Neo4jService(
+      'mock-uri',
+      'mock-user',
+      'mock-password',
+      mockCircuitWrapper,
+      mockLogger
+    ) as jest.Mocked<Neo4jService>;
+    
     mockNeo4j.executeQuery.mockImplementation(async () => []);
-    service = new KnowledgeGraphService(mockNeo4j);
+    
+    service = new KnowledgeGraphService(mockNeo4j, mockLogger);
   });
 
   describe('createWineNode', () => {
@@ -171,6 +194,101 @@ describe('KnowledgeGraphService', () => {
       mockNeo4j.executeQuery.mockResolvedValue([]);
       const result = await service.getWineById('w1');
       expect(result).toBeNull();
+    });
+  });
+
+  describe('findWinesByIngredients', () => {
+    it('should return wines matching all ingredients', async () => {
+      const mockResults = [{
+        w: {
+          id: 'w1',
+          name: 'Test Wine',
+          type: 'Red',
+          region: 'Barossa'
+        }
+      }];
+      mockNeo4j.executeQuery.mockResolvedValue(mockResults);
+
+      const results = await service.findWinesByIngredients(['grape', 'oak']);
+      
+      expect(results).toEqual(mockResults);
+      expect(mockNeo4j.executeQuery).toHaveBeenCalledWith(
+        `
+      MATCH (i:Ingredient)
+      WHERE i.name IN $ingredients
+      MATCH (i)-[:PAIRS_WITH]->(w:Wine)
+      WITH w, count(DISTINCT i) as ingredientCount
+      WHERE ingredientCount = size($ingredients)
+      RETURN w
+    `,
+        { ingredients: ['grape', 'oak'] }
+      );
+    });
+
+    it('should return empty array for empty ingredients', async () => {
+      const results = await service.findWinesByIngredients([]);
+      expect(results).toEqual([]);
+      expect(mockNeo4j.executeQuery).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('findWinesByPreferences', () => {
+    it('should build query with wine type preference', async () => {
+      await service.findWinesByPreferences({ wineType: 'red' });
+      
+      expect(mockNeo4j.executeQuery).toHaveBeenCalledWith(
+        expect.stringContaining('w.type = $wineType'),
+        expect.objectContaining({ wineType: 'red' })
+      );
+    });
+
+    it('should build query with price range', async () => {
+      await service.findWinesByPreferences({
+        wineType: 'red',
+        priceRange: [20, 50]
+      });
+      
+      expect(mockNeo4j.executeQuery).toHaveBeenCalledWith(
+        expect.stringContaining('w.price >= $minPrice AND w.price <= $maxPrice'),
+        expect.objectContaining({ minPrice: 20, maxPrice: 50 })
+      );
+    });
+
+    it('should return empty array for undefined preferences', async () => {
+      const results = await service.findWinesByPreferences({}); // Pass an empty object instead of undefined
+      expect(results).toEqual([]);
+      expect(mockNeo4j.executeQuery).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('findWinesByType', () => {
+    it('should return wines of specified type', async () => {
+      const mockResults = [{
+        w: {
+          id: 'w1',
+          name: 'Test Wine',
+          type: 'Red',
+          region: 'Barossa'
+        }
+      }];
+      mockNeo4j.executeQuery.mockResolvedValue(mockResults);
+
+      const results = await service.findWinesByType('Red');
+      
+      expect(results).toEqual(mockResults);
+      expect(mockNeo4j.executeQuery).toHaveBeenCalledWith(
+        `
+      MATCH (w:Wine {type: $wineType})
+      RETURN w
+    `,
+        { wineType: 'Red' }
+      );
+    });
+
+    it('should return empty array for empty type', async () => {
+      const results = await service.findWinesByType('');
+      expect(results).toEqual([]);
+      expect(mockNeo4j.executeQuery).not.toHaveBeenCalled();
     });
   });
 

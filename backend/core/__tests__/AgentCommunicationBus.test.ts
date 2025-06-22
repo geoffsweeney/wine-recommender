@@ -1,10 +1,21 @@
-import { AgentCommunicationBus, type AgentMessage } from '../AgentCommunicationBus';
+import { AgentCommunicationBus } from '../AgentCommunicationBus';
+import { AgentMessage, createAgentMessage } from '../agents/communication/AgentMessage'; // Import AgentMessage and createAgentMessage
+import { LLMService } from '../../services/LLMService';
 
 describe('AgentCommunicationBus', () => {
   let bus: AgentCommunicationBus;
 
+  let mockLLMService: jest.Mocked<LLMService>;
+ 
   beforeEach(() => {
-    bus = new AgentCommunicationBus();
+    mockLLMService = {
+      logger: { info: jest.fn(), error: jest.fn() },
+      sendPrompt: jest.fn(),
+      generateCompletion: jest.fn(),
+      generateEmbedding: jest.fn()
+    } as unknown as jest.Mocked<LLMService>;
+    
+    bus = new AgentCommunicationBus(mockLLMService);
   });
 
   test('should register agents', () => {
@@ -22,16 +33,14 @@ describe('AgentCommunicationBus', () => {
     const mockCallback = jest.fn();
     bus.subscribe('agent1', mockCallback);
 
-    const testMessage: AgentMessage<{test: string}> = {
-      metadata: {
-        traceId: '123',
-        priority: 'NORMAL' as const,
-        timestamp: Date.now(),
-        sender: 'agent2'
-      },
-      payload: { test: 'data' },
-      type: 'TEST_MESSAGE'
-    };
+    const testMessage = createAgentMessage(
+      'TEST_MESSAGE',
+      { test: 'data' },
+      'agent2',
+      'conv-123', // conversationId
+      'corr-123', // correlationId
+      'agent1' // targetAgent
+    );
 
     bus.publish(testMessage);
     expect(mockCallback).toHaveBeenCalledWith(testMessage);
@@ -42,16 +51,15 @@ describe('AgentCommunicationBus', () => {
     bus.subscribe('agent1', mockCallback);
     bus.unsubscribe('agent1', mockCallback);
 
-    bus.publish({
-      metadata: {
-        traceId: '123',
-        priority: 'NORMAL',
-        timestamp: Date.now(),
-        sender: 'agent2'
-      },
-      payload: {},
-      type: 'TEST_MESSAGE'
-    });
+    const testMessage = createAgentMessage(
+      'TEST_MESSAGE',
+      {},
+      'agent2',
+      'conv-456',
+      'corr-456',
+      'agent1'
+    );
+    bus.publish(testMessage);
 
     expect(mockCallback).not.toHaveBeenCalled();
   });
@@ -72,16 +80,15 @@ describe('AgentCommunicationBus', () => {
     bus.subscribe('agent1', globalCallback);
     bus.subscribe('agent1', topicCallback, 'wine');
 
-    bus.publish({
-      metadata: {
-        traceId: '123',
-        priority: 'NORMAL' as const,
-        timestamp: Date.now(),
-        sender: 'agent2'
-      },
-      payload: { test: 'data' },
-      type: 'TEST_MESSAGE'
-    }, 'wine');
+    const testMessage = createAgentMessage(
+      'TEST_MESSAGE',
+      { test: 'data' },
+      'agent2',
+      'conv-789',
+      'corr-789',
+      'agent1'
+    );
+    bus.publish(testMessage, 'wine');
 
     expect(globalCallback).not.toHaveBeenCalled();
     expect(topicCallback).toHaveBeenCalled();

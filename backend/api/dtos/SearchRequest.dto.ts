@@ -2,7 +2,10 @@ import { z } from 'zod';
 
 // Define the input type for the schema, reflecting the expected query parameter types (strings)
 const SearchRequestInput = z.object({
-  query: z.string(),
+  query: z.string().or(z.object({
+    name: z.string().optional(),
+    type: z.string().optional()
+  })),
   limit: z.string().optional(),
   offset: z.string().optional(),
   region: z.string().optional(),
@@ -13,7 +16,10 @@ const SearchRequestInput = z.object({
 
 // Define the output type for the schema, reflecting the desired parsed types
 const SearchRequestOutput = z.object({
-  query: z.string().min(1, 'Search query is required'),
+  query: z.object({
+    name: z.string().optional(),
+    type: z.string().optional()
+  }).or(z.string().min(1, 'Search query is required')),
   limit: z.number().int().min(1).max(100).default(10),
   offset: z.number().int().min(0).default(0),
   region: z.string().optional(),

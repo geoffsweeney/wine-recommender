@@ -1,7 +1,10 @@
-import { injectable } from 'tsyringe';
+import { injectable, inject } from 'tsyringe';
+import { TYPES } from '../di/Types';
 import { EventEmitter } from 'events';
 import { SharedContextMemory, type ContextEntry, type ContextMetadata } from './SharedContextMemory';
 import { LLMService } from '../services/LLMService';
+import { Result } from '../core/types/Result'; // Import Result
+import { AgentError } from '../core/agents/AgentError'; // Import AgentError
 
 interface AgentInfo {
   id: string;
@@ -10,18 +13,10 @@ interface AgentInfo {
   lastSeen: Date;
 }
 
-export type MessagePriority = 'HIGH' | 'NORMAL';
 
-export interface AgentMessage<T = unknown> {
-  metadata: {
-    traceId: string;
-    priority: MessagePriority;
-    timestamp: number;
-    sender: string;
-  };
-  payload: T;
-  type: string;
-}
+import { AgentMessage } from './agents/communication/AgentMessage';
+
+export type MessagePriority = 'HIGH' | 'NORMAL' | 'LOW';
 
 @injectable()
 export class AgentCommunicationBus {
@@ -29,10 +24,10 @@ export class AgentCommunicationBus {
   private agents: Map<string, AgentInfo>;
   private subscriptions: Map<string, Set<string>>;
   private contextMemory: SharedContextMemory;
-  private llmService?: LLMService; // Optional LLM Service
+  private llmService: LLMService;
 
-  constructor(llmService?: LLMService) {
-console.log('AgentCommunicationBus constructor entered.');
+  constructor(@inject(TYPES.LLMService) llmService: LLMService) {
+// console.log('AgentCommunicationBus constructor entered.'); // Temporarily commented out for test clarity
     this.emitter = new EventEmitter();
     this.agents = new Map();
     this.subscriptions = new Map();
@@ -132,12 +127,21 @@ console.log('AgentCommunicationBus constructor entered.');
    * @param prompt The prompt to send to the LLM.
    * @returns A promise that resolves with the LLM's response, or undefined if no LLM service is configured.
    */
-  async sendLLMPrompt(prompt: string): Promise<string | undefined> {
+  async sendLLMPrompt(prompt: string, correlationId: string): Promise<Result<string, AgentError>> {
     if (!this.llmService) {
       console.warn('LLMService is not configured in AgentCommunicationBus.');
-      return undefined;
+      return { success: false, error: new AgentError('LLMService not configured', 'LLM_SERVICE_NOT_CONFIGURED', 'AgentCommunicationBus', correlationId) };
     }
-    return this.llmService.sendPrompt(prompt);
+    try {
+      const llmResponseResult = await this.llmService.sendPrompt(prompt, correlationId);
+      if (!llmResponseResult.success) {
+        return { success: false, error: llmResponseResult.error };
+      }
+      return { success: true, data: llmResponseResult.data };
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return { success: false, error: new AgentError(`Error from LLMService: ${errorMessage}`, 'LLM_SERVICE_ERROR', 'AgentCommunicationBus', correlationId, true, { originalError: errorMessage }) };
+    }
   }
 
   /**

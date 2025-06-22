@@ -6,7 +6,7 @@ Users struggle to find appropriate wine pairings for their meals and often make 
 ## Solution
 An autonomous multi agentic AI agent wine recommendation system that:
 - Analyzes food ingredients to suggest compatible wines
-- Researches price points and availability
+- Researches price points and availability based on merchant data
 - Provides value-based recommendations
 
 ## User Experience Goals

@@ -1,5 +1,5 @@
 import "reflect-metadata";
-import { Neo4jService } from '../src/services/Neo4jService';
+import { Neo4jService } from '../backend/services/Neo4jService';
 import { container } from 'tsyringe';
 
 // Set default Neo4j credentials if none provided

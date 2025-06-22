@@ -12,7 +12,18 @@ export const validateRequest = (schema: any, source: 'body' | 'query' | 'params'
           message: 'Validation failed',
           errors: result.error.errors
         });
+        return; // Terminate the request here
       } else {
+        // Assign validated and transformed data to a new property to avoid issues with getters
+        // The original req.body, req.query, req.params are left untouched.
+        // Controllers should use req.validatedBody, req.validatedQuery, req.validatedParams
+        if (source === 'body') {
+          req.validatedBody = result.data;
+        } else if (source === 'query') {
+          req.validatedQuery = result.data;
+        } else if (source === 'params') {
+          req.validatedParams = result.data;
+        }
         next(); // Proceed to the next middleware
       }
     } catch (err) {

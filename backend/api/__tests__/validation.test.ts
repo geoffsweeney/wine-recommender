@@ -1,12 +1,11 @@
 import { mockDeep } from 'jest-mock-extended';
 import request from 'supertest';
 import express from 'express';
-import { createRouter } from '../routes';
 import { container } from 'tsyringe';
 import { WineRecommendationController } from '../controllers/WineRecommendationController';
 import { SommelierCoordinator } from '../../core/agents/SommelierCoordinator';
 import { InputValidationAgent } from '../../core/agents/InputValidationAgent';
-import { RecommendationAgent } from '../../core/agents/RecommendationAgent';
+import { LLMRecommendationAgent } from '../../core/agents/LLMRecommendationAgent';
 import { KnowledgeGraphService } from '../../services/KnowledgeGraphService';
 import { Neo4jService } from '../../services/Neo4jService';
 import { z } from 'zod';
@@ -58,7 +57,7 @@ describe('API Validation', () => {
 
     container.register(KnowledgeGraphService, { useClass: KnowledgeGraphService });
     container.register(InputValidationAgent, { useClass: InputValidationAgent });
-    container.register(RecommendationAgent, { useClass: RecommendationAgent });
+    container.register(LLMRecommendationAgent, { useClass: LLMRecommendationAgent });
     container.register(SommelierCoordinator, { useClass: SommelierCoordinator });
 
     app = express();
