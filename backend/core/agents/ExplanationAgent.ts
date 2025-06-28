@@ -1,6 +1,6 @@
 import { inject, injectable } from 'tsyringe';
 import { CommunicatingAgent, CommunicatingAgentDependencies } from './CommunicatingAgent';
-import { AgentMessage, createAgentMessage } from './communication/AgentMessage';
+import { AgentMessage, createAgentMessage, MessageTypes } from './communication/AgentMessage';
 import { EnhancedAgentCommunicationBus } from './communication/EnhancedAgentCommunicationBus';
 import { LLMService } from '../../services/LLMService';
 import { DeadLetterProcessor } from '../DeadLetterProcessor';
@@ -78,7 +78,7 @@ export class ExplanationAgent extends CommunicatingAgent {
 
   public async handleMessage<T>(message: AgentMessage<T>): Promise<Result<AgentMessage | null, AgentError>> {
     const correlationId = message.correlationId;
-    if (message.type === 'explanation-request') {
+    if (message.type === MessageTypes.GENERATE_EXPLANATION) {
       return this.handleExplanationRequestInternal(message as AgentMessage<ExplanationMessagePayload>);
     }
     this.logger.warn(`[${correlationId}] ExplanationAgent received unhandled message type: ${message.type}`, {
@@ -104,7 +104,7 @@ export class ExplanationAgent extends CommunicatingAgent {
     super.registerHandlers();
     this.communicationBus.registerMessageHandler(
       this.id,
-      'explanation-request',
+      MessageTypes.GENERATE_EXPLANATION,
       this.handleExplanationRequestInternal.bind(this) as (message: AgentMessage<unknown>) => Promise<Result<AgentMessage | null, AgentError>>
     );
   }
@@ -151,8 +151,9 @@ export class ExplanationAgent extends CommunicatingAgent {
           userId: payload.userId // Pass userId from payload
         },
         this.id,
-        correlationId,
-        message.sourceAgent
+        message.conversationId, // Corrected: conversationId
+        correlationId, // Corrected: correlationId
+        message.sourceAgent // Corrected: targetAgent
       );
       this.communicationBus.sendResponse(message.sourceAgent, responseMessage);
       this.logger.info(
@@ -247,8 +248,9 @@ export class ExplanationAgent extends CommunicatingAgent {
         userId: (message.payload as ExplanationMessagePayload)?.userId // Pass userId from payload
       },
       this.id,
-      correlationId,
-      message.sourceAgent
+      message.conversationId, // Corrected: conversationId
+      correlationId, // Corrected: correlationId
+      message.sourceAgent // Corrected: targetAgent
     );
     this.communicationBus.sendResponse(message.sourceAgent, errorMessage);
     this.logger.error(`[${correlationId}] Error in ExplanationAgent: ${error.message}`, { agentId: this.id, operation: 'handleError', originalError: error.message });

@@ -1,6 +1,7 @@
 import { injectable, inject } from 'tsyringe'; // Import injectable and inject
 import { TYPES } from '../di/Types'; // Import TYPES
 import { ILogger } from './LLMService'; // Import ILogger
+import { Result } from '../core/types/Result'; // Import Result
 
 // Define interface for HTTP client
 interface IHttpClient {
@@ -34,7 +35,7 @@ export class PreferenceExtractionService {
     this.logger.info('PreferenceExtractionService constructor entered.');
   }
 
-  async attemptFastExtraction(userInput: string): Promise<{ [key: string]: any } | null> {
+  async attemptFastExtraction(userInput: string): Promise<Result<{ [key: string]: any } | null, Error>> {
     // 1. Attempt extraction with Regex
     const regexPreferences = this.extractWithRegex(userInput);
 
@@ -43,20 +44,24 @@ export class PreferenceExtractionService {
     const combinedPreferences: { [key: string]: any } = {};
 
     // Start with Regex results
-    if (regexPreferences) {
-      Object.assign(combinedPreferences, regexPreferences);
+    if (regexPreferences.success && regexPreferences.data) {
+      Object.assign(combinedPreferences, regexPreferences.data);
     }
 
     // Merge Duckling results, overwriting only if Duckling provides a value
-    if (ducklingPreferences) {
-      Object.assign(combinedPreferences, ducklingPreferences);
+    if (ducklingPreferences.success && ducklingPreferences.data) {
+      Object.assign(combinedPreferences, ducklingPreferences.data);
     }
 
     // Return combined preferences if any were found, otherwise null
-    return Object.keys(combinedPreferences).length > 0 ? combinedPreferences : null;
+    if (Object.keys(combinedPreferences).length > 0) {
+      return { success: true, data: combinedPreferences };
+    } else {
+      return { success: true, data: null }; // No preferences found, but not an error
+    }
   }
 
-  private extractWithRegex(userInput: string): { [key: string]: any } | null {
+  private extractWithRegex(userInput: string): Result<{ [key: string]: any } | null, Error> {
     const preferences: { [key: string]: any } = {};
     const lowerInput = userInput.toLowerCase();
 
@@ -73,10 +78,14 @@ export class PreferenceExtractionService {
     }
 
     // Return preferences if any were found, otherwise return null
-    return Object.keys(preferences).length > 0 ? preferences : null;
+    if (Object.keys(preferences).length > 0) {
+      return { success: true, data: preferences };
+    } else {
+      return { success: true, data: null };
+    }
   }
 
-  private async extractWithDuckling(userInput: string): Promise<{ [key: string]: any } | null> {
+  private async extractWithDuckling(userInput: string): Promise<Result<{ [key: string]: any } | null, Error>> {
     this.logger.info('Attempting Duckling extraction for:', userInput);
 
     try {
@@ -143,15 +152,19 @@ export class PreferenceExtractionService {
           }
         }
 
-        return Object.keys(preferences).length > 0 ? preferences : null;
+        if (Object.keys(preferences).length > 0) {
+          return { success: true, data: preferences };
+        } else {
+          return { success: true, data: null };
+        }
 
       } else {
-        console.error('Duckling request failed:', response.statusText);
-        return null;
+        this.logger.error('Duckling request failed:', response.statusText);
+        return { success: false, error: new Error(`Duckling request failed: ${response.statusText}`) };
       }
     } catch (error) {
       this.logger.error('Error during Duckling extraction:', error);
-      return null;
+      return { success: false, error: error instanceof Error ? error : new Error(String(error)) };
     }
   }
 }

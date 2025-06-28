@@ -9,6 +9,7 @@ import { logger } from '../../utils/logger'; // Import the logger instance
 import { EnhancedAgentCommunicationBus } from './communication/EnhancedAgentCommunicationBus';
 import { CircuitBreaker } from '../CircuitBreaker';
 import { Agent } from './Agent'; // Import Agent interface
+import { RecommendationResult } from '../../types/agent-outputs'; // Import RecommendationResult
 
 // --- Type Definitions for SommelierCoordinator ---
 
@@ -36,7 +37,7 @@ interface ConversationState {
   agentResponses: Map<string, any>; // Stores responses from other agents
   validatedIngredients: string[] | null;
   userPreferences: any | null; // TODO: Define UserPreferences type
-  recommendations: any | null; // TODO: Define Recommendation type
+  recommendations: RecommendationResult | null; // Now typed as RecommendationResult
   availableWines: any[] | null; // TODO: Define AvailableWine type
   decisions: { timestamp: number; decision: string; reasoning: string; agent: string; phase: string }[];
   errors: AgentError[];
@@ -93,6 +94,7 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
     super(id, config, dependencies);
     this.logger = dependencies.logger;
     this.communicationBus = dependencies.communicationBus; // No need for cast now
+    this.logger.info(`[${this.id}] SommelierCoordinator logger level: ${this.logger.level}`, { agentId: this.id, operation: 'constructor' });
 
     this.circuitBreakers = new Map();
     this.initializeCircuitBreakers();
@@ -119,7 +121,7 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
   }
 
   private initializeCircuitBreakers(): void {
-    const agentsToMonitor = ['InputValidation', 'Preference', 'Recommendation', 'Shopper', 'Fallback'];
+    const agentsToMonitor = ['input-validation-agent', 'user-preference-agent', 'recommendation-agent', 'shopper-agent', 'fallback-agent', 'user-preference-agent', 'explanation-agent'];
     agentsToMonitor.forEach(agentName => {
       this.circuitBreakers.set(agentName, new CircuitBreaker({
         failureThreshold: this.config.circuitBreakerFailureThreshold,
@@ -133,11 +135,11 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
   private getAgentFallback(agentName: string): () => any {
     // TODO: Implement more sophisticated fallbacks based on agent type
     const fallbacks: { [key: string]: () => any } = {
-      'InputValidation': () => ({ validIngredients: [], invalidIngredients: [], success: true }),
-      'Preference': () => ({ preferences: {}, success: true }),
-      'Recommendation': () => ({ wines: [], success: true }),
-      'Shopper': () => ({ availableOptions: [], success: true }),
-      'Fallback': () => ({ suggestions: [], success: true })
+      'input-validation-agent': () => ({ validIngredients: [], invalidIngredients: [], success: true }),
+      'user-preference-agent': () => ({ preferences: {}, success: true }),
+      'recommendation-agent': () => ({ wines: [], success: true }),
+      'shopper-agent': () => ({ availableOptions: [], success: true }),
+      'fallback-agent': () => ({ suggestions: [], success: true })
     };
     return fallbacks[agentName] || (() => ({ success: false, error: 'Unknown fallback' }));
   }
@@ -150,7 +152,7 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
 
   public async handleMessage<T>( // Changed to public
     message: AgentMessage<T>
-  ): Promise<Result<AgentMessage<any> | null, AgentError>> {
+  ): Promise<Result<AgentMessage<any> | null, AgentError>> { // Revert to original return type
     const { correlationId, type, payload, conversationId, sourceAgent } = message; // Added conversationId, sourceAgent
     const logContext = { correlationId, agentId: this.id, operation: `handleMessage:${type}` };
 
@@ -161,7 +163,7 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
         case MessageTypes.ORCHESTRATE_RECOMMENDATION_REQUEST:
           const orchestrationInput = payload as OrchestrationInput;
           const result = await this.orchestrateRecommendation(orchestrationInput.userInput, orchestrationInput.conversationId, orchestrationInput.correlationId);
-          return { success: true, data: createAgentMessage(MessageTypes.FINAL_RECOMMENDATION, result, this.id, orchestrationInput.conversationId, correlationId, sourceAgent) }; // Corrected argument order
+          return { success: true, data: createAgentMessage(MessageTypes.FINAL_RECOMMENDATION, result, this.id, orchestrationInput.conversationId, correlationId, sourceAgent) }; // Create AgentMessage
         // Add cases for handling responses from other agents if they send direct replies
         default:
           this.logger.warn(`[${correlationId}] SommelierCoordinator received unhandled message type: ${type}`, logContext);
@@ -173,7 +175,7 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
         success: false,
         error: new AgentError(
           `Failed to handle message of type ${type}: ${error.message}`,
-          'SOMMELIER_MESSAGE_HANDLE_ERROR',
+          'SOMELIER_MESSAGE_HANDLE_ERROR',
           this.id,
           correlationId,
           false, // Assuming non-recoverable for now, can be refined
@@ -187,7 +189,7 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
    * Handles the initial request to orchestrate a wine recommendation.
    * This method is registered as a message handler for ORCHESTRATE_RECOMMENDATION_REQUEST.
    */
-  private async handleOrchestrationRequest(message: AgentMessage<OrchestrationInput>): Promise<Result<AgentMessage<any> | null, AgentError>> { // Changed return type
+  private async handleOrchestrationRequest(message: AgentMessage<OrchestrationInput>): Promise<Result<AgentMessage<FinalRecommendation> | null, AgentError>> { // Changed return type
     const { payload, conversationId, correlationId, sourceAgent } = message; // Added sourceAgent
     const logContext = { correlationId, agentId: this.id, conversationId, operation: 'handleOrchestrationRequest' };
 
@@ -195,23 +197,10 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
 
     try {
       const finalRecommendation = await this.orchestrateRecommendation(payload.userInput, conversationId, correlationId);
-      // Send the final recommendation back to the original requester or a central bus
-      this.communicationBus.publishToAgent( // Changed to publishToAgent
-        sourceAgent, // Target agent is the source of the request
-        createAgentMessage(MessageTypes.FINAL_RECOMMENDATION, finalRecommendation, this.id, conversationId, correlationId, sourceAgent)
-      );
       this.logger.info(`[${correlationId}] Orchestration completed for conversation: ${conversationId}`, logContext);
-      return { success: true, data: null }; // Return success
+      return { success: true, data: createAgentMessage(MessageTypes.FINAL_RECOMMENDATION, finalRecommendation, this.id, conversationId, correlationId, sourceAgent) }; // Wrap finalRecommendation in an AgentMessage
     } catch (error: any) {
       this.logger.error(`[${correlationId}] Orchestration failed for conversation ${conversationId}: ${error.message}`, { ...logContext, error: error.message, stack: error.stack });
-      // Send an error message back
-      this.communicationBus.publishToAgent( // Changed to publishToAgent
-        sourceAgent, // Target agent is the source of the request
-        createAgentMessage(MessageTypes.ERROR,
-          new AgentError(`Orchestration failed: ${error.message}`, 'ORCHESTRATION_FAILURE', this.id, correlationId),
-          this.id, conversationId, correlationId, sourceAgent
-        )
-      );
       return {
         success: false,
         error: new AgentError(
@@ -237,6 +226,7 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
   ): Promise<FinalRecommendation> {
     const logContext = { correlationId, agentId: this.id, conversationId, operation: 'orchestrateRecommendation' };
     this.logger.info(`[${correlationId}] Starting wine recommendation orchestration.`, logContext);
+    this.logger.info(`[${correlationId}] Initial userInput: ${JSON.stringify(userInput)}`, logContext);
 
     let state: ConversationState = {
       conversationId,
@@ -262,37 +252,40 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
     try {
       // Phase 1: Information Gathering (Parallel Execution)
       this.logger.info(`[${correlationId}] Phase 1: Gathering information in parallel...`, logContext);
+      this.logger.debug(`[${correlationId}] Sending validation and preference messages.`, logContext);
       state.phase = 'VALIDATION_COMPLETE'; // Update phase after parallel operations are conceptually complete
 
       const validationPromise = this.sendMessageToAgentWithCircuitBreaker(
-        'InputValidation',
-        createAgentMessage(MessageTypes.VALIDATE_INPUT, userInput, this.id, conversationId, correlationId, 'InputValidation')
+        'input-validation-agent',
+        createAgentMessage(MessageTypes.VALIDATE_INPUT, userInput.input, this.id, conversationId, this.generateCorrelationId(), 'input-validation-agent', userInput.userId)
       );
       const preferencePromise = this.sendMessageToAgentWithCircuitBreaker(
-        'Preference',
-        createAgentMessage(MessageTypes.GET_PREFERENCES, userInput, this.id, conversationId, correlationId, 'Preference')
+        'user-preference-agent',
+        createAgentMessage(MessageTypes.GET_PREFERENCES, { input: userInput.input.message, userId: userInput.userId, conversationHistory: userInput.conversationHistory }, this.id, conversationId, this.generateCorrelationId(), 'user-preference-agent', userInput.userId)
       );
 
+      this.logger.debug(`[${correlationId}] Awaiting validation and preference results.`, logContext);
       const [validationResult, preferenceResult] = await Promise.all([
         validationPromise,
         preferencePromise
       ]);
+      this.logger.info(`[${correlationId}] Received validation result: ${validationResult.success ? JSON.stringify(validationResult.data) : validationResult.error.message}`, logContext);
+      this.logger.info(`[${correlationId}] Received preference result: ${preferenceResult.success ? JSON.stringify(preferenceResult.data) : preferenceResult.error.message}`, logContext);
 
       if (!validationResult.success) {
         state.errors.push(validationResult.error);
         this.logger.error(`[${correlationId}] InputValidation failed: ${validationResult.error.message}`, logContext);
-        // Potentially trigger fallback or throw
         throw validationResult.error;
       }
       if (!preferenceResult.success) {
         state.errors.push(preferenceResult.error);
         this.logger.error(`[${correlationId}] PreferenceAgent failed: ${preferenceResult.error.message}`, logContext);
-        // Potentially trigger fallback or throw
         throw preferenceResult.error;
       }
 
-      state.validatedIngredients = validationResult.data.validIngredients;
-      state.userPreferences = preferenceResult.data.preferences;
+      state.validatedIngredients = validationResult.data.payload.cleanedInput.ingredients;
+      state.userPreferences = preferenceResult.data.payload.preferences;
+      this.logger.info(`[${correlationId}] State updated: validatedIngredients=${JSON.stringify(state.validatedIngredients)}, userPreferences=${JSON.stringify(state.userPreferences)}`, logContext);
       state.decisions.push({
         timestamp: Date.now(),
         decision: 'Initial information gathered',
@@ -300,22 +293,23 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
         agent: this.id,
         phase: state.phase
       });
+      this.logger.debug(`[${correlationId}] Phase 1 complete.`, logContext);
 
       // Phase 2: Conditional Logic & Decision Making
       this.logger.info(`[${correlationId}] Phase 2: Making decisions based on gathered data...`, logContext);
+      this.logger.debug(`[${correlationId}] Checking for invalid ingredients.`, logContext);
 
       if (validationResult.data.hasInvalidIngredients) {
         this.logger.warn(`[${correlationId}] Invalid ingredients detected, consulting Fallback Agent...`, logContext);
         const fallbackMessage = createAgentMessage(MessageTypes.FALLBACK_REQUEST, {
           invalidIngredients: validationResult.data.invalidIngredients,
           validIngredients: validationResult.data.validIngredients
-        }, this.id, conversationId, correlationId, 'Fallback');
-
-        const fallbackResult = await this.sendMessageToAgentWithCircuitBreaker('Fallback', fallbackMessage);
+        }, this.id, conversationId, this.generateCorrelationId(), 'fallback-agent', userInput.userId); // Added userId
+        this.logger.debug(`[${correlationId}] Sending fallback request.`, logContext);
+        const fallbackResult = await this.sendMessageToAgentWithCircuitBreaker('fallback-agent', fallbackMessage);
+        this.logger.debug(`[${correlationId}] Received fallback result.`, logContext);
 
         if (fallbackResult.success && fallbackResult.data.confidence < 0.7) {
-          // Decision: Should we proceed or ask user for clarification?
-          // For now, we'll throw to indicate a need for clarification or a more robust fallback
           throw new AgentError('Low confidence from Fallback Agent, user clarification needed.', 'LOW_FALLBACK_CONFIDENCE', this.id, correlationId, true);
         }
         if (fallbackResult.success) {
@@ -333,16 +327,17 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
           throw fallbackResult.error;
         }
       }
-
+      this.logger.debug(`[${correlationId}] Checking budget realism.`, logContext);
       // Budget validation (simplified for now)
       if (userInput.budget && !this.isBudgetRealistic(state.ingredients, userInput.budget)) {
         this.logger.warn(`[${correlationId}] Budget mismatch detected, adjusting expectations...`, logContext);
         const budgetAdjustmentMessage = createAgentMessage(MessageTypes.ADJUST_BUDGET_EXPECTATIONS, {
           ingredients: state.ingredients,
           budget: userInput.budget
-        }, this.id, conversationId, correlationId, 'Preference');
-
-        const budgetAdjustmentResult = await this.sendMessageToAgentWithCircuitBreaker('Preference', budgetAdjustmentMessage);
+        }, this.id, conversationId, this.generateCorrelationId(), 'Preference', userInput.userId); // Added userId
+        this.logger.debug(`[${correlationId}] Sending budget adjustment request.`, logContext);
+        const budgetAdjustmentResult = await this.sendMessageToAgentWithCircuitBreaker('user-preference-agent', budgetAdjustmentMessage);
+        this.logger.debug(`[${correlationId}] Received budget adjustment result.`, logContext);
 
         if (budgetAdjustmentResult.success) {
           state.budgetStrategy = budgetAdjustmentResult.data.strategy;
@@ -359,6 +354,7 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
           throw budgetAdjustmentResult.error;
         }
       }
+      this.logger.debug(`[${correlationId}] Phase 2 complete.`, logContext);
 
       // Phase 3: Recommendation Generation (Sequential with Feedback Loop)
       this.logger.info(`[${correlationId}] Phase 3: Generating recommendations...`, logContext);
@@ -370,16 +366,26 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
         state.refinementAttempts = attempt;
         this.logger.info(`[${correlationId}] Recommendation attempt ${attempt + 1}`, logContext);
 
-        const recommendationRequest = {
-          validatedIngredients: state.ingredients,
-          userPreferences: state.userPreferences,
-          budget: state.budget,
-          budgetStrategy: state.budgetStrategy,
-          previousAttempts: state.previousRecommendations
-        };
-
-        const recommendationMessage = createAgentMessage(MessageTypes.GENERATE_RECOMMENDATIONS, recommendationRequest, this.id, conversationId, correlationId, 'Recommendation');
-        recommendationsResult = await this.sendMessageToAgentWithCircuitBreaker('Recommendation', recommendationMessage);
+        this.logger.info(`[${correlationId}] SommelierCoordinator preparing recommendation request.`, logContext);
+        const recommendationMessage = createAgentMessage(
+          MessageTypes.GENERATE_RECOMMENDATIONS,
+          {
+            input: {
+              ingredients: state.ingredients,
+              preferences: state.userPreferences,
+            },
+            conversationHistory: userInput.conversationHistory, // Pass conversation history if available
+            userId: userInput.userId,
+          },
+          this.id,
+          conversationId,
+          this.generateCorrelationId(),
+          'Recommendation',
+          userInput.userId
+        );
+        this.logger.debug(`[${correlationId}] Sending recommendation request.`, logContext);
+        recommendationsResult = await this.sendMessageToAgentWithCircuitBreaker('recommendation-agent', recommendationMessage);
+        this.logger.info(`[${correlationId}] Received recommendation result: ${recommendationsResult.success ? JSON.stringify(recommendationsResult.data) : recommendationsResult.error.message}`, logContext);
 
         if (recommendationsResult.success) {
           const qualityScore = this.evaluateRecommendationQuality(recommendationsResult.data, state);
@@ -391,11 +397,14 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
           } else if (qualityScore > 0.6) {
             this.logger.warn(`[${correlationId}] Moderate quality, attempting to refine recommendations...`, logContext);
             const refinementMessage = createAgentMessage(MessageTypes.REFINE_RECOMMENDATIONS, {
-              currentRecommendations: recommendationsResult.data,
-              qualityIssues: this.identifyQualityIssues(recommendationsResult.data, state)
-            }, this.id, conversationId, correlationId, 'Recommendation');
-
-            const refinementResult = await this.sendMessageToAgentWithCircuitBreaker('Recommendation', refinementMessage);
+              input: {
+                currentRecommendations: recommendationsResult.data,
+                qualityIssues: this.identifyQualityIssues(recommendationsResult.data, state)
+              }
+            }, this.id, conversationId, this.generateCorrelationId(), 'Recommendation', userInput.userId);
+            this.logger.debug(`[${correlationId}] Sending refinement request.`, logContext);
+            const refinementResult = await this.sendMessageToAgentWithCircuitBreaker('recommendation-agent', refinementMessage);
+            this.logger.debug(`[${correlationId}] Received refinement result.`, logContext);
             if (refinementResult.success) {
               recommendationsResult = refinementResult; // Use refined recommendations
               this.logger.info(`[${correlationId}] Recommendations refined successfully.`, logContext);
@@ -411,14 +420,15 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
         } else {
           state.errors.push(recommendationsResult.error);
           this.logger.error(`[${correlationId}] RecommendationAgent failed: ${recommendationsResult.error.message}`, logContext);
-          // Continue to next attempt or break if critical failure
         }
       }
 
       if (!recommendationsResult.success) {
         this.logger.error(`[${correlationId}] All recommendation attempts failed. Using emergency fallback.`, logContext);
-        const emergencyFallbackMessage = createAgentMessage(MessageTypes.EMERGENCY_RECOMMENDATIONS, state, this.id, conversationId, correlationId, 'Fallback');
-        const fallbackResult = await this.sendMessageToAgentWithCircuitBreaker('Fallback', emergencyFallbackMessage);
+        const emergencyFallbackMessage = createAgentMessage(MessageTypes.EMERGENCY_RECOMMENDATIONS, { error: state }, this.id, conversationId, this.generateCorrelationId(), 'Fallback', userInput.userId);
+        this.logger.debug(`[${correlationId}] Sending emergency fallback request.`, logContext);
+        const fallbackResult = await this.sendMessageToAgentWithCircuitBreaker('fallback-agent', emergencyFallbackMessage);
+        this.logger.debug(`[${correlationId}] Received emergency fallback result.`, logContext);
         if (fallbackResult.success) {
           state.recommendations = fallbackResult.data;
         } else {
@@ -427,27 +437,31 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
           throw fallbackResult.error;
         }
       } else {
-        state.recommendations = recommendationsResult.data;
+        state.recommendations = recommendationsResult.data.payload;
       }
+      this.logger.debug(`[${correlationId}] Phase 3 complete.`, logContext);
 
       // Phase 4: Shopping & Availability (Parallel with Prioritization)
       this.logger.info(`[${correlationId}] Phase 4: Finding available wines...`, logContext);
       state.phase = 'SHOPPING_COMPLETE';
+      this.logger.debug(`[${correlationId}] Preparing shopping promises.`, logContext);
 
-      const wineRecommendations = state.recommendations.wines || [];
-      const shoppingPromises = wineRecommendations.map((wine: any, index: number) =>
+      // Ensure recommendations exist and have the 'recommendations' array
+      const wineRecommendations = state.recommendations?.recommendations || [];
+      const shoppingPromises = wineRecommendations.map((wine: any, index: number) => // wine is now any, as it's a Wine object
         this.sendMessageToAgentWithCircuitBreaker(
-          'Shopper',
+          'shopper-agent',
           createAgentMessage(MessageTypes.FIND_WINES, {
-            wine: wine,
+            wine: wine.name, // Pass the wine name as a string
             budget: state.budget,
             priority: index,
             maxResults: index === 0 ? 10 : 5
-          }, this.id, conversationId, correlationId, 'Shopper')
+          }, this.id, conversationId, this.generateCorrelationId(), 'shopper-agent', userInput.userId) // Added userId
         )
       );
-
+      this.logger.debug(`[${correlationId}] Awaiting shopping results.`, logContext);
       const shoppingResults = await Promise.all(shoppingPromises);
+      this.logger.debug(`[${correlationId}] Received shopping results.`, logContext);
       const availableOptions = this.processShoppingResults(shoppingResults, state);
 
       if (availableOptions.length === 0) {
@@ -456,24 +470,27 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
           originalCriteria: state.recommendations,
           budget: state.budget * 1.2,
           alternativeVarietals: true
-        }, this.id, conversationId, correlationId, 'Shopper');
-
-        const expandedSearchResult = await this.sendMessageToAgentWithCircuitBreaker('Shopper', expandedSearchMessage);
+        }, this.id, conversationId, this.generateCorrelationId(), 'Shopper', userInput.userId); // Added userId
+        this.logger.debug(`[${correlationId}] Sending expanded search request.`, logContext);
+        const expandedSearchResult = await this.sendMessageToAgentWithCircuitBreaker('shopper-agent', expandedSearchMessage);
+        this.logger.debug(`[${correlationId}] Received expanded search result.`, logContext);
         if (expandedSearchResult.success) {
-          availableOptions.push(...expandedSearchResult.data.wines);
+          availableOptions.push(...expandedSearchResult.data.payload.wines);
         } else {
           state.errors.push(expandedSearchResult.error);
           this.logger.error(`[${correlationId}] Expanded search failed: ${expandedSearchResult.error.message}`, logContext);
-          // Decide if this is a critical failure or if we can proceed with no wines
         }
       }
+      this.logger.debug(`[${correlationId}] availableOptions before assigning to state: ${JSON.stringify(availableOptions)}`, logContext);
       state.availableWines = availableOptions;
+      this.logger.debug(`[${correlationId}] Phase 4 complete.`, logContext);
 
       // Phase 5: Final Assembly & Presentation
       this.logger.info(`[${correlationId}] Phase 5: Assembling final recommendation...`, logContext);
       state.phase = 'FINALIZED';
-
+      this.logger.debug(`[${correlationId}] Finalizing recommendation.`, logContext);
       const finalRecommendation = await this.finalizeRecommendation(state, correlationId);
+      this.logger.debug(`[${correlationId}] Final recommendation assembled.`, logContext);
 
       this.logger.info(`[${correlationId}] Wine recommendation orchestration completed successfully.`, logContext);
       return finalRecommendation;
@@ -511,7 +528,7 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
 
     try {
       const response = await circuitBreaker.execute(async () => {
-        const result = await this.communicationBus.sendMessageAndWaitForResponse(message.targetAgent || '', message);
+        const result = await this.communicationBus.sendMessageAndWaitForResponse(agentName, message);
         if (result.success) {
           return result.data;
         } else {
@@ -522,6 +539,7 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
       return { success: true, data: response };
     } catch (error: any) {
       this.logger.error(`[${message.correlationId}] Failed to get response from ${agentName}: ${error.message}`, { ...logContext, error: error.message, stack: error.stack });
+      this.logger.debug(`[${message.correlationId}] Caught error in sendMessageToAgentWithCircuitBreaker: ${JSON.stringify(error)}`);
       return {
         success: false,
         error: new AgentError(
@@ -545,16 +563,21 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
     return true; // Placeholder
   }
 
-  private evaluateRecommendationQuality(recommendations: any, state: ConversationState): number {
+  private evaluateRecommendationQuality(recommendations: RecommendationResult, state: ConversationState): number {
     // TODO: Implement logic to evaluate the quality of recommendations
     // Factors: relevance to ingredients, user preferences, budget, diversity, etc.
     this.logger.debug(`Evaluating recommendation quality for conversation: ${state.conversationId}`);
-    return 0.9; // Placeholder
+    // Placeholder: Use confidence from the recommendation result
+    return recommendations.confidence;
   }
 
-  private identifyQualityIssues(recommendations: any, state: ConversationState): string[] {
+  private identifyQualityIssues(recommendations: RecommendationResult, state: ConversationState): string[] {
     // TODO: Implement logic to identify specific quality issues
     this.logger.debug(`Identifying quality issues for conversation: ${state.conversationId}`);
+    // Placeholder: Example of identifying an issue if confidence is low
+    if (recommendations.confidence < 0.7) {
+      return ['Low confidence in recommendation.'];
+    }
     return []; // Placeholder
   }
 
@@ -563,13 +586,18 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
     this.logger.debug(`Processing shopping results for conversation: ${state.conversationId}`);
     const available: any[] = [];
     shoppingResults.forEach(result => {
-      if (result.success && result.data.availableOptions) {
-        available.push(...result.data.availableOptions);
+      if (result.success) {
+        if (result.data.payload.availableOptions) {
+          available.push(...result.data.payload.availableOptions);
+        } else if (result.data.payload.wines) { // Check for 'wines' property
+          available.push(...result.data.payload.wines);
+        }
       } else if (!result.success) { // Corrected type narrowing
         state.errors.push(result.error);
         this.logger.error(`Error in shopping result: ${result.error.message}`);
       }
     });
+    this.logger.debug(`[${state.conversationId}] processShoppingResults returning available: ${JSON.stringify(available)}`, { agentId: this.id, operation: 'processShoppingResults' });
     return available; // Placeholder
   }
 
@@ -585,12 +613,12 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
 
     // Learning: Update preferences based on recommendation (fire and forget message)
     this.communicationBus.publishToAgent( // Changed to publishToAgent
-      'Preference', // Target agent
+      'user-preference-agent', // Target agent
       createAgentMessage(MessageTypes.UPDATE_RECOMMENDATION_HISTORY, {
         userId: state.userId,
         recommendation: primaryRecommendation,
         context: state
-      }, this.id, state.conversationId, correlationId, 'Preference')
+      }, this.id, state.conversationId, this.generateCorrelationId(), 'user-preference-agent')
     );
 
     return {
@@ -607,10 +635,14 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
     // TODO: Call ExplanationAgent to generate a natural language explanation
     this.logger.debug(`[${correlationId}] Generating explanation for wine: ${wine?.name}`);
     const explanationMessage = createAgentMessage(MessageTypes.GENERATE_EXPLANATION, {
-      wine, ingredients, preferences
-    }, this.id, state.conversationId, correlationId, 'Explanation');
+      recommendedWines: wine ? [wine] : [], // ExplanationAgent expects an array of recommendedWines
+      recommendationContext: {
+        ingredients: ingredients,
+        preferences: preferences
+      }
+    }, this.id, state.conversationId, this.generateCorrelationId(), 'Explanation');
 
-    const explanationResult = await this.sendMessageToAgentWithCircuitBreaker('Explanation', explanationMessage);
+    const explanationResult = await this.sendMessageToAgentWithCircuitBreaker('explanation-agent', explanationMessage);
     if (explanationResult.success) {
       return explanationResult.data.explanation;
     } else {
@@ -623,5 +655,8 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
     // TODO: Implement logic to calculate overall confidence based on quality score, errors, etc.
     this.logger.debug(`Calculating confidence for conversation: ${state.conversationId}`);
     return state.qualityScore; // Placeholder
+  }
+  protected generateCorrelationId(): string {
+    return `${this.id}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
   }
 }

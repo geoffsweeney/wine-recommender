@@ -23,22 +23,31 @@ import { ExplanationAgent } from '../core/agents/ExplanationAgent';
 import { FallbackAgent } from '../core/agents/FallbackAgent';
 import { LLMPreferenceExtractorAgent } from '../core/agents/LLMPreferenceExtractorAgent';
 import { MCPAdapterAgent } from '../core/agents/MCPAdapterAgent';
+import { ShopperAgent } from '../core/agents/ShopperAgent'; // Import ShopperAgent
+import { AgentRegistry } from '../core/agents/AgentRegistry';
+import { CommunicatingAgent } from '../core/agents/CommunicatingAgent';
 import { UserProfileService } from '../services/UserProfileService';
 import { ConversationHistoryService } from '../core/ConversationHistoryService';
 import { BasicDeadLetterProcessor } from '../core/BasicDeadLetterProcessor';
+import { Neo4jWineRepository } from '../services/Neo4jWineRepository'; // Import Neo4jWineRepository
+import { SimpleSearchStrategy } from '../services/SimpleSearchStrategy'; // Import SimpleSearchStrategy
+import { RecommendationStrategyProvider } from '../services/strategies/RecommendationStrategyProvider'; // Import RecommendationStrategyProvider
+import { UserPreferencesStrategy } from '../services/strategies/UserPreferencesStrategy'; // Import UserPreferencesStrategy
+import { CollaborativeFilteringStrategy } from '../services/strategies/CollaborativeFilteringStrategy'; // Import CollaborativeFilteringStrategy
+import { PopularWinesStrategy } from '../services/strategies/PopularWinesStrategy'; // Import PopularWinesStrategy
 
 export function setupContainer() {
   // Environment configuration
   const neo4jUri = process.env.NEO4J_URI || 'bolt://localhost:7687';
   const neo4jUser = process.env.NEO4J_USER || 'neo4j';
   const neo4jPassword = process.env.NEO4J_PASSWORD || 'password';
-  const llmApiUrl = process.env.LLM_API_URL || 'http://localhost:5000';
+  const llmApiUrl = process.env.LLM_API_URL || 'http://localhost:11434';
   const llmApiKey = process.env.LLM_API_KEY || '';
-  const llmModel = process.env.LLM_MODEL || 'gpt-3.5-turbo';
+  const llmModel = process.env.LLM_MODEL || 'llama3.1:latest';
 
   // Logger setup
   const logger = winston.createLogger({
-    level: process.env.LOG_LEVEL || 'info',
+    level: process.env.LOG_LEVEL || 'debug',
     format: winston.format.combine(
       winston.format.timestamp(),
       winston.format.errors({ stack: true }),
@@ -107,6 +116,20 @@ export function setupContainer() {
   container.registerSingleton(TYPES.PreferenceExtractionService, PreferenceExtractionService);
   container.registerSingleton(TYPES.PreferenceNormalizationService, PreferenceNormalizationService);
 
+  // Register Wine Repository
+  container.registerSingleton(TYPES.WineRepository, Neo4jWineRepository);
+
+  // Register Search Strategy
+  container.registerSingleton(TYPES.ISearchStrategy, SimpleSearchStrategy);
+
+  // Register individual Recommendation Strategies
+  container.registerSingleton(TYPES.UserPreferencesStrategy, UserPreferencesStrategy);
+  container.registerSingleton(TYPES.CollaborativeFilteringStrategy, CollaborativeFilteringStrategy);
+  container.registerSingleton(TYPES.PopularWinesStrategy, PopularWinesStrategy);
+
+  // Register Recommendation Strategy Provider
+  container.registerSingleton(TYPES.IRecommendationStrategy, RecommendationStrategyProvider);
+
   // Register UserProfileService and ConversationHistoryService as singletons
   container.registerSingleton(UserProfileService);
   container.registerSingleton(ConversationHistoryService);
@@ -126,8 +149,10 @@ export function setupContainer() {
     maxIngredients: 10
   };
 
-  // Register communication bus and agents
-  container.registerSingleton(TYPES.AgentCommunicationBus, EnhancedAgentCommunicationBus);
+  // Register communication bus as a strict singleton
+  const bus = container.resolve(EnhancedAgentCommunicationBus);
+  container.registerInstance(TYPES.AgentCommunicationBus, bus);
+  container.registerInstance(EnhancedAgentCommunicationBus, bus);
   container.registerInstance(TYPES.InputValidationAgentConfig, inputValidationAgentConfig);
   container.registerSingleton(TYPES.InputValidationAgent, InputValidationAgent);
 
@@ -187,6 +212,13 @@ export function setupContainer() {
   container.registerInstance(TYPES.MCPAdapterAgentConfig, mcpAdapterAgentConfig);
   container.registerSingleton(TYPES.MCPAdapterAgent, MCPAdapterAgent);
 
+  // Define ShopperAgentConfig
+  const shopperAgentConfig = {
+    // Add any specific configuration for ShopperAgent here
+  };
+  container.registerInstance(TYPES.ShopperAgentConfig, shopperAgentConfig);
+  container.registerSingleton(TYPES.ShopperAgent, ShopperAgent);
+
   // Register generic AgentId and AgentConfig
   container.registerInstance(TYPES.AgentId, 'default-agent-id');
   container.registerInstance(TYPES.AgentConfig, {}); // Empty object for generic config
@@ -225,7 +257,7 @@ export function setupContainer() {
   // Register SommelierCoordinatorDependencies
   container.register(TYPES.SommelierCoordinatorDependencies, {
     useFactory: (c: DependencyContainer) => ({
-      communicationBus: c.resolve(TYPES.AgentCommunicationBus),
+      communicationBus: c.resolve(TYPES.AgentCommunicationBus) as EnhancedAgentCommunicationBus,
       logger: c.resolve(TYPES.Logger),
       deadLetterProcessor: c.resolve(TYPES.DeadLetterProcessor),
       userProfileService: c.resolve(UserProfileService),
@@ -238,6 +270,28 @@ export function setupContainer() {
 
   // Register SommelierCoordinator
   container.registerSingleton(TYPES.SommelierCoordinator, SommelierCoordinator);
+
+  // Register AgentRegistry
+  container.registerSingleton(TYPES.AgentRegistry, AgentRegistry);
+
+  // Resolve all agents first to ensure they're instantiated
+  container.resolve(InputValidationAgent);
+  container.resolve(RecommendationAgent);
+  container.resolve(LLMRecommendationAgent);
+  container.resolve(ValueAnalysisAgent);
+  container.resolve(LLMPreferenceExtractorAgent); // Resolve LLMPreferenceExtractorAgent first
+  container.resolve(UserPreferenceAgent); // Then UserPreferenceAgent
+  container.resolve(ExplanationAgent);
+  container.resolve(FallbackAgent);
+  container.resolve(MCPAdapterAgent);
+  container.resolve(ShopperAgent); // Resolve ShopperAgent
+  container.resolve(SommelierCoordinator);
+
+  // Initialize AgentRegistry after all agents are instantiated
+  const registry = container.resolve(AgentRegistry);
+  registry.registerAgents(container.resolve(EnhancedAgentCommunicationBus));
+
+  // The AgentRegistry registration and agent constructors will handle handler registration
 
   return container;
 }

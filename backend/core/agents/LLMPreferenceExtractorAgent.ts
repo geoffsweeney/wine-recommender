@@ -1,7 +1,7 @@
 import { inject, injectable } from 'tsyringe';
 import { CommunicatingAgent, CommunicatingAgentDependencies } from './CommunicatingAgent';
 import { EnhancedAgentCommunicationBus } from './communication/EnhancedAgentCommunicationBus';
-import { AgentMessage, createAgentMessage } from './communication/AgentMessage';
+import { AgentMessage, createAgentMessage, MessageTypes } from './communication/AgentMessage';
 import { DeadLetterProcessor } from '../DeadLetterProcessor';
 import { LLMService } from '../../services/LLMService';
 import { KnowledgeGraphService } from '../../services/KnowledgeGraphService';
@@ -79,7 +79,7 @@ export class LLMPreferenceExtractorAgent extends CommunicatingAgent {
     super.registerHandlers();
     this.communicationBus.registerMessageHandler(
       this.id,
-      'preference-extraction-request',
+      MessageTypes.PREFERENCE_EXTRACTION_REQUEST,
       this.handleExtractionRequest.bind(this) as (message: AgentMessage<unknown>) => Promise<Result<AgentMessage | null, AgentError>>
     );
   }
@@ -123,28 +123,22 @@ export class LLMPreferenceExtractorAgent extends CommunicatingAgent {
        
        for (let attempt = 0; attempt < retries; attempt++) {
          try {
-           const llmResponseResult = await this.llmService.sendPrompt(llmPrompt);
+           const llmResponseResult = await this.llmService.sendStructuredPrompt<any>(llmPrompt, PreferenceExtractionSchema, null, correlationId);
            if (!llmResponseResult.success) {
              throw llmResponseResult.error;
            }
-           const llmResponse = llmResponseResult.data;
- 
-           const extractedPreferencesResult = await this.parseLLMResponse(llmResponse, input);
-           if (!extractedPreferencesResult.success) {
-             throw extractedPreferencesResult.error;
-           }
-           const extractedPreferences = extractedPreferencesResult.data;
+           const extractedPreferences = llmResponseResult.data;
            
            const responseMessage = createAgentMessage(
              'preference-extraction-response',
              extractedPreferences,
              this.id,
-             correlationId,
-             message.sourceAgent
+             message.conversationId, // Corrected: conversationId
+             correlationId, // Corrected: correlationId
+             message.sourceAgent // Corrected: targetAgent
            );
-           this.communicationBus.sendResponse(message.sourceAgent, responseMessage);
            this.logger.info(`[${correlationId}] Preference extraction successful on attempt ${attempt + 1}`, { agentId: this.id, operation: 'handleExtractionRequestWithRetry' });
-           return { success: true, data: responseMessage };
+           return { success: true, data: responseMessage }; // Return the message, don't send it via sendResponse
          } catch (error: unknown) {
            if (error instanceof AgentError) {
              lastError = error; // Rethrow if already an AgentError
@@ -167,25 +161,6 @@ export class LLMPreferenceExtractorAgent extends CommunicatingAgent {
        const agentError = error instanceof AgentError ? error : new AgentError(String(error), 'UNEXPECTED_ERROR', this.id, correlationId);
        await this.handleError(message, agentError, correlationId);
        return { success: false, error: agentError };
-     }
-   }
- 
-   private async parseLLMResponse(response: string | undefined, input: string): Promise<Result<any, AgentError>> {
-     if (!response) {
-       return { success: false, error: new AgentError('No response from LLM', 'LLM_NO_RESPONSE', this.id, '') };
-     }
- 
-     try {
-       const jsonMatch = response.match(/```json\n([\s\S]*?)\n```/);
-       const jsonString = jsonMatch?.[1] || response;
-       const result = JSON.parse(jsonString);
-       
-       // Calculate confidence score based on response quality
-       const confidence = this.calculateConfidenceScore(result, input);
-       return { success: true, data: { ...result, confidence } };
-     } catch (error: unknown) {
-       const errorMessage = error instanceof Error ? error.message : String(error);
-       return { success: false, error: new AgentError(`Failed to parse LLM response: ${errorMessage}`, 'LLM_PARSE_ERROR', this.id, '', true, { originalError: errorMessage }) };
      }
    }
  
@@ -224,10 +199,57 @@ export class LLMPreferenceExtractorAgent extends CommunicatingAgent {
        'error-response',
        { error: error.message, code: error.code },
        this.id,
-       correlationId,
-       message.sourceAgent
+       message.conversationId, // Corrected: conversationId
+       correlationId, // Corrected: correlationId
+       message.sourceAgent // Corrected: targetAgent
      );
-     await this.communicationBus.sendResponse(message.sourceAgent, errorMessage);
      this.logger.error(`[${correlationId}] Error in LLMPreferenceExtractorAgent: ${error.message}`, { agentId: this.id, operation: 'handleError', originalError: error.message });
+     // The error message should be returned, not sent via sendResponse
+   }
+ 
+   private buildPreferenceExtractionPrompt(payload: LLMPreferenceExtractorMessagePayload): string {
+     const examples = [
+       'Example 1:',
+       'Input: "I prefer bold red wines under $30"',
+       'Output: { "isValid": true, "preferences": { "style": "bold", "color": "red", "priceRange": [0,30] }, "ingredients": [] }',
+       '\nExample 2:',
+       'Input: "Looking for a wine to pair with chicken and mushrooms"',
+       'Output: { "isValid": true, "ingredients": ["chicken", "mushrooms"], "preferences": {} }'
+     ].join('\n');
+ 
+     return `Analyze this wine request and extract structured preferences:\n${examples}\n\nCurrent request: "${payload.input}"\n\n${
+       payload.conversationHistory ? 'Conversation context:\n' + payload.conversationHistory.map(turn => `${turn.role}: ${turn.content}`).join('\n') : ''
+     }\n\nOutput JSON matching the examples exactly:`;
    }
  }
+ 
+ export const PreferenceExtractionSchema = {
+   type: "object",
+   properties: {
+     isValid: { type: "boolean" },
+     preferences: {
+       type: "object",
+       properties: {
+         style: { type: "string" },
+         color: { type: "string" },
+         priceRange: {
+           type: "array",
+           items: { type: "number" },
+           minItems: 2,
+           maxItems: 2,
+           nullable: true
+         },
+         ingredients: {
+           type: "array",
+           items: { type: "string" }
+         }
+       },
+       required: []
+     },
+     ingredients: {
+       type: "array",
+       items: { type: "string" }
+     }
+   },
+   required: ["isValid", "preferences", "ingredients"]
+ };

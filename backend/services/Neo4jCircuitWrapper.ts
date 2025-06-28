@@ -46,6 +46,7 @@ export class Neo4jCircuitWrapper implements INeo4jCircuitWrapper<Driver> {
         
         try {
           session = this.driver.session();
+          this.logger.debug('Neo4jCircuitWrapper: Calling session.run with query and params:', { query, params }); // New log
           const result = await session.run(query, params || {});
           
           if (!result?.records) {
@@ -54,14 +55,20 @@ export class Neo4jCircuitWrapper implements INeo4jCircuitWrapper<Driver> {
           }
 
           return result.records.map((record: Record) => {
+            this.logger.debug('Processing Neo4j record:', { recordKeys: record.keys, recordValues: record.toObject() });
             try {
-              const obj = record.toObject();
-              
-              if (obj.n && obj.n.properties) {
-                return obj.n.properties as T;
+              // Attempt to extract properties from a node, regardless of its alias
+              for (const key of record.keys) {
+                const value = record.get(key);
+                this.logger.debug(`Checking key: ${String(key)}, value: ${JSON.stringify(value)}`);
+                if (value && value.properties) {
+                  this.logger.debug(`Found node properties for key ${String(key)}: ${JSON.stringify(value.properties)}`);
+                  return value.properties as T;
+                }
               }
-              
-              return obj as T;
+              // If no node with properties is found, return the whole object
+              this.logger.debug('No node properties found, returning full object.');
+              return record.toObject() as T;
             } catch (parseError) {
               this.logger.error('Failed to parse Neo4j record', {
                 error: parseError,

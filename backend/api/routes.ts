@@ -12,6 +12,12 @@ import type { AgentError } from '../core/agents/AgentError';
 import { validateRequest } from './middleware/validation'; // Import validation middleware
 import { RecommendationRequest as RecommendationRequestSchema } from './dtos/RecommendationRequest.dto'; // Import the DTO schema
 
+// Define a local interface to extend Request with validatedBody/Query
+interface ValidatedRequest extends Request {
+  validatedBody?: any;
+  validatedQuery?: any;
+}
+
 // Export a function that returns the router, allowing dependencies to be resolved at call time
 export default function createRouter(dependencyContainer: DependencyContainer): Router {
   const router = Router();
@@ -24,7 +30,7 @@ export default function createRouter(dependencyContainer: DependencyContainer): 
   router.post(
     '/recommendations',
     validateRequest(RecommendationRequestSchema, 'body'), // Apply validation middleware
-    async (req: Request, res: Response): Promise<void> => {
+    async (req: ValidatedRequest, res: Response): Promise<void> => { // Cast req to ValidatedRequest
       try {
         const correlationId = uuidv4();
         const conversationId = uuidv4();
@@ -32,15 +38,15 @@ export default function createRouter(dependencyContainer: DependencyContainer): 
         // req.validatedBody is now guaranteed to conform to RecommendationRequestSchema due to validation middleware
         const message = createAgentMessage(
           MessageTypes.ORCHESTRATE_RECOMMENDATION_REQUEST,
-          req.validatedBody, // Use validated req.body
+          { userInput: req.validatedBody }, // Wrap validated body in userInput object
           'api',
           conversationId,
           correlationId,
-          'sommelier'
+          'sommelier-coordinator' // Corrected target agent ID
         );
 
         const result = await communicationBus.sendMessageAndWaitForResponse(
-          'sommelier',
+          'sommelier-coordinator', // Corrected target agent ID
           message
         );
 
@@ -49,12 +55,12 @@ export default function createRouter(dependencyContainer: DependencyContainer): 
           return;
         }
 
-        if (result.data === null) {
+        if (result.data === null || result.data.payload === null) { // Check for null data or null payload
           res.status(404).json({ error: 'No recommendations found' });
           return;
         }
 
-        res.status(200).json(result.data.payload);
+        res.status(200).json(result.data.payload); // Access the payload property
       } catch (error: unknown) {
         if (error instanceof Error) {
           console.error('Error handling recommendation request:', error.message);

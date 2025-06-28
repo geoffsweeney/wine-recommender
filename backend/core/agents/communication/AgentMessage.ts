@@ -31,7 +31,9 @@ export const MessageTypes = {
   UPDATE_RECOMMENDATION_HISTORY: 'update_recommendation_history',
   GENERATE_EXPLANATION: 'generate_explanation',
   ORCHESTRATE_RECOMMENDATION_REQUEST: 'orchestrate_recommendation_request',
+  PREFERENCE_EXTRACTION_REQUEST: 'preference-extraction-request', // Added
   ERROR: 'error',
+  PREFERENCE_UPDATE: 'preference-update', // Added
   // Add other message types as needed
 } as const;
 
@@ -43,6 +45,7 @@ export function createAgentMessage<T>(
   conversationId: string, // Added conversationId
   correlationId: string, // Made correlationId required for creation
   targetAgent?: string,
+  userId?: string, // Add userId parameter
   priority: 'LOW' | 'NORMAL' | 'HIGH' = 'NORMAL',
   metadata?: {
     sender?: string;
@@ -57,6 +60,7 @@ export function createAgentMessage<T>(
     correlationId, // Use provided correlationId
     sourceAgent,
     targetAgent,
+    userId, // Assign userId
     conversationId, // Assign conversationId
     priority,
     metadata,

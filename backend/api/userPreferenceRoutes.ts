@@ -30,35 +30,6 @@ export default function createUserPreferenceRouter(dependencyContainer: Dependen
   const router = Router();
   const userPreferenceController = dependencyContainer.resolve(UserPreferenceController);
 
-  // GET /users/:userId/preferences
-  router.get(
-    '/users/:userId/preferences',
-    validateRequest(userIdParamSchema, 'params'),
-    (req, res) => userPreferenceController.execute(req, res)
-  );
-
-  // POST /users/:userId/preferences
-  router.post(
-    '/users/:userId/preferences',
-    validateRequest(userIdParamSchema, 'params'),
-    validateRequest(preferenceBodySchema, 'body'),
-    (req, res) => userPreferenceController.execute(req, res)
-  );
-
-  // PUT /users/:userId/preferences
-  router.put(
-    '/users/:userId/preferences',
-    validateRequest(userIdParamSchema, 'params'),
-    validateRequest(preferenceBodySchema, 'body'),
-    (req, res) => userPreferenceController.execute(req, res)
-  );
-
-  // DELETE /users/:userId/preferences/:preferenceId
-  router.delete(
-    '/users/:userId/preferences/:preferenceId',
-    validateRequest(preferenceIdParamSchema, 'params'),
-    (req, res) => userPreferenceController.execute(req, res)
-  );
 
   return router;
 }

@@ -1,4 +1,11 @@
 import { Request, Response } from 'express';
+
+// Define a local interface to extend Request with validatedBody/Query/Params
+interface ValidatedRequest extends Request {
+  validatedBody?: any;
+  validatedQuery?: any;
+  validatedParams?: any;
+}
 import { BaseController } from '../BaseController';
 import { inject, injectable } from 'tsyringe';
 import { TYPES } from '../../di/Types';
@@ -20,7 +27,7 @@ export class WineRecommendationController extends BaseController {
     super();
   }
 
-  protected async executeImpl(req: Request, res: Response): Promise<void> {
+  protected async executeImpl(req: ValidatedRequest, res: Response): Promise<void> { // Cast req to ValidatedRequest
     const { method } = req;
     this.logger.info(`Received wine recommendation request [${method}]`, { body: req.body, query: req.query });
 

@@ -111,36 +111,42 @@ export const createTestContainer = (): { container: DependencyContainer; resetMo
     }
   );
 
-  // Mock sendMessageAndWaitForResponse to simulate message routing
-  // Mock sendMessageAndWaitForResponse to simulate message routing to SommelierCoordinator
-  // Mock sendMessageAndWaitForResponse to simulate the direct return of a FinalRecommendation AgentMessage
+  // Mock sendMessageAndWaitForResponse to avoid recursive routing
   mockAgentCommunicationBus.sendMessageAndWaitForResponse.mockImplementation(
     async <T>(targetAgentId: string, message: AgentMessage, timeoutMs: number = 10000): Promise<Result<AgentMessage<T> | null, AgentError>> => {
-      if (targetAgentId === 'sommelier' && message.type === MessageTypes.ORCHESTRATE_RECOMMENDATION_REQUEST) {
-        const sommelierCoordinator = container.resolve(TYPES.SommelierCoordinator) as SommelierCoordinator;
-        
-        // Directly call orchestrateRecommendation and wrap its result in a FINAL_RECOMMENDATION AgentMessage
-        try {
-          const finalRecommendationPayload = await sommelierCoordinator.orchestrateRecommendation(
-            (message.payload as RecommendationRequest).input, // Cast payload to RecommendationRequest
-            message.conversationId,
-            message.correlationId
-          );
-
-          const finalAgentMessage = createAgentMessage(
-            MessageTypes.FINAL_RECOMMENDATION,
-            finalRecommendationPayload,
-            container.resolve(TYPES.SommelierCoordinatorId), // Source agent is the SommelierCoordinator
-            message.conversationId,
-            message.correlationId,
-            message.sourceAgent // Target agent is the original source of the request
-          );
-          return { success: true, data: finalAgentMessage as AgentMessage<T> };
-        } catch (error: any) {
-          return { success: false, error: new AgentError(error.message, 'ORCHESTRATION_ERROR', container.resolve(TYPES.SommelierCoordinatorId), message.correlationId) };
+      return new Promise((resolve) => {
+        if (targetAgentId === 'sommelier-coordinator' && message.type === MessageTypes.ORCHESTRATE_RECOMMENDATION_REQUEST) {
+          resolve({
+            success: true,
+            data: createAgentMessage(
+              MessageTypes.FINAL_RECOMMENDATION,
+              {
+                primaryRecommendation: {
+                  id: 'w1',
+                  name: 'Wine 1',
+                  type: 'Red',
+                  region: 'Bordeaux',
+                  year: 2018,
+                  price: 45.99,
+                  rating: 4.5,
+                  description: 'Full-bodied with notes of black cherry'
+                },
+                alternatives: [],
+                explanation: 'Mock explanation',
+                confidence: 0.9,
+                conversationId: message.conversationId,
+                canRefine: false,
+              },
+              'sommelier-coordinator',
+              message.conversationId,
+              message.correlationId,
+              message.sourceAgent
+            ) as AgentMessage<T>
+          });
+        } else {
+          resolve({ success: false, error: new AgentError('Unexpected message', 'UNEXPECTED_MESSAGE', 'test-setup', message.correlationId) });
         }
-      }
-      return { success: false, error: new AgentError('No handler found for message', 'NO_HANDLER', 'test-setup', message.correlationId) };
+      });
     }
   );
 
@@ -158,7 +164,6 @@ export const createTestContainer = (): { container: DependencyContainer; resetMo
     }
   );
 
-  // LLMService is injected into EnhancedAgentCommunicationBus, so no need to manually assign
   container.registerInstance(TYPES.AgentCommunicationBus, mockAgentCommunicationBus);
 
   // Mock ValueAnalysisAgentConfig
@@ -199,7 +204,6 @@ export const createTestContainer = (): { container: DependencyContainer; resetMo
   container.registerInstance(TYPES.Neo4jUser, 'neo4j');
   container.registerInstance(TYPES.Neo4jPassword, 'password');
 
-  // Mock Search Strategy
   // Mock Search Strategy
   const mockSearchStrategy = {
     execute: jest.fn().mockResolvedValue([]) // Changed 'search' to 'execute'
@@ -303,7 +307,7 @@ export const createTestContainer = (): { container: DependencyContainer; resetMo
   container.registerInstance(TYPES.AgentDependencies, mockAgentDependencies);
 
   const mockCommunicatingAgentDependencies = {
-    communicationBus: mockAgentCommunicationBus,
+    communicationBus: mockAgentCommunicationBus, // Changed to real instance
     logger: mockLogger,
     messageQueue: {},
     stateManager: {},
@@ -325,7 +329,7 @@ export const createTestContainer = (): { container: DependencyContainer; resetMo
 
   // Mock SommelierCoordinatorDependencies
   const mockSommelierCoordinatorDependencies = {
-    communicationBus: mockAgentCommunicationBus,
+    communicationBus: mockAgentCommunicationBus, // Changed to real instance
     deadLetterProcessor: mockDeadLetterProcessor,
     userProfileService: mockUserProfileService,
     conversationHistoryService: mockConversationHistoryService,

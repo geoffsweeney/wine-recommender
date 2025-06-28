@@ -71,10 +71,13 @@ export const TYPES = {
     LLMPreferenceExtractorAgentConfig: Symbol.for('LLMPreferenceExtractorAgentConfig'), // New symbol for LLMPreferenceExtractorAgentConfig
     MCPAdapterAgent: Symbol.for('MCPAdapterAgent'),
     MCPAdapterAgentConfig: Symbol.for('MCPAdapterAgentConfig'), // New symbol for MCPAdapterAgentConfig
+    ShopperAgent: Symbol.for('ShopperAgent'), // Added
+    ShopperAgentConfig: Symbol.for('ShopperAgentConfig'), // Added
     AgentDependencies: Symbol.for('AgentDependencies'), // New symbol for AgentDependencies
     CommunicatingAgentDependencies: Symbol.for('CommunicatingAgentDependencies'), // Added
     UserProfileService: Symbol.for('UserProfileService'), // Added
     ConversationHistoryService: Symbol.for('ConversationHistoryService'), // Added
+    AgentRegistry: Symbol.for('AgentRegistry'), // Added for AgentRegistry
 } as const;
 
 export type TypeKeys = keyof typeof TYPES;

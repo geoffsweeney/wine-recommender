@@ -3,6 +3,9 @@ import { TYPES } from '../di/Types'; // Import the TYPES symbol
 import { Result } from '../core/types/Result'; // Import Result type
 import { AgentError } from '../core/agents/AgentError'; // Import AgentError
 import winston from 'winston'; // Import winston for logger type
+import { OllamaStructuredClient } from '../utils/ollama_structured_output'; // Import the new client
+import { z } from 'zod'; // Import Zod
+import { zodToJsonSchema } from 'zod-to-json-schema'; // Import zodToJsonSchema
 
 /**
  * Interface for logger dependency.
@@ -19,25 +22,29 @@ interface LLMResponse {
 
 @injectable()
 export class LLMService {
-    private apiUrl: string;
+    private ollamaClient: OllamaStructuredClient; // Use the new structured client
     private model: string;
-    private apiKey?: string;
     private maxRetries: number;
     private retryDelayMs: number;
 
     constructor(
-        @inject(TYPES.LlmApiUrl) apiUrl: string,
+        @inject(TYPES.LlmApiUrl) private apiUrl: string, // Keep apiUrl for OllamaStructuredClient
         @inject(TYPES.LlmModel) model: string,
         @inject(TYPES.LlmApiKey) apiKey: string = '',
         @inject(TYPES.Logger) public logger: ILogger,
         @inject(TYPES.LlmMaxRetries) maxRetries: number = 3, // Default to 3 retries
         @inject(TYPES.LlmRetryDelayMs) retryDelayMs: number = 1000 // Default to 1000ms delay
     ) {
-        this.apiUrl = apiUrl;
         this.model = model;
-        this.apiKey = apiKey;
         this.maxRetries = maxRetries;
         this.retryDelayMs = retryDelayMs;
+        this.ollamaClient = new OllamaStructuredClient({
+            host: apiUrl,
+            model: model,
+            apiKey: apiKey,
+            temperature: 0.1, // Default temperature for structured output
+            numPredict: 2048 // Default num_predict
+        });
         this.logger.info(`LLMService initialized for Ollama at ${this.apiUrl} with model: ${this.model}, maxRetries: ${this.maxRetries}, retryDelayMs: ${this.retryDelayMs}`);
     }
 
@@ -48,70 +55,80 @@ export class LLMService {
      * @param correlationId The correlation ID for tracing.
      * @returns A promise that resolves with a Result containing the LLM's response (string) or an AgentError.
      */
+    /**
+     * Sends an unstructured prompt to the LLM and returns the raw string response.
+     * This method is for general text generation, not structured output.
+     * @param prompt The prompt to send to the LLM.
+     * @param correlationId The correlation ID for tracing.
+     * @returns A promise that resolves with a Result containing the LLM's response (string) or an AgentError.
+     */
     async sendPrompt(prompt: string, correlationId: string = 'N/A'): Promise<Result<string, AgentError>> {
-        this.logger.debug(`Sending prompt to LLM: ${prompt} (Correlation ID: ${correlationId})`);
-        this.logger.info(`LLM Call: Model - ${this.model}, Prompt Length - ${prompt.length} characters. Correlation ID: ${correlationId}`);
-
-        for (let attempt = 0; attempt < this.maxRetries; attempt++) {
-            try {
-                const response = await fetch(`${this.apiUrl}/api/generate`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        ...(this.apiKey && { 'Authorization': `Bearer ${this.apiKey}` })
-                    },
-                    body: JSON.stringify({
-                        model: this.model,
-                        prompt: prompt,
-                        stream: false
-                    })
-                });
-
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    this.logger.error(`Ollama API error: ${response.status} - ${errorText} (Correlation ID: ${correlationId}, Attempt: ${attempt + 1}/${this.maxRetries})`);
-                    
-                    // Only retry on specific transient errors (e.g., 5xx, 429 Too Many Requests)
-                    if (response.status >= 500 || response.status === 429) {
-                        if (attempt < this.maxRetries - 1) {
-                            this.logger.warn(`Retrying LLM call in ${this.retryDelayMs}ms... (Attempt ${attempt + 1}/${this.maxRetries})`);
-                            await new Promise(resolve => setTimeout(resolve, this.retryDelayMs));
-                            continue; // Continue to next attempt
-                        }
-                    }
-                    // For non-retryable errors or last attempt, return failure
-                    return { success: false, error: new AgentError(`Ollama API error: ${response.status} - ${errorText}`, 'LLM_API_ERROR', 'LLMService', correlationId, true, { statusCode: response.status, responseBody: errorText }) };
+        this.logger.debug(`Sending unstructured prompt to LLM: ${prompt} (Correlation ID: ${correlationId})`);
+        this.logger.info(`LLM Call (unstructured): Model - ${this.model}, Prompt Length - ${prompt.length} characters. Correlation ID: ${correlationId}`);
+ 
+        try {
+            const response = await this.ollamaClient.ollama.generate({
+                model: this.model,
+                prompt: prompt,
+                stream: false,
+                options: {
+                    temperature: this.ollamaClient.defaultOptions.temperature,
+                    num_predict: this.ollamaClient.defaultOptions.num_predict
                 }
-
-                const data = await response.json() as LLMResponse;
-                if (data && typeof data.response === 'string') {
-                    this.logger.debug(`Received Ollama response: ${data.response}`);
-                    this.logger.info(`LLM Response: Length - ${data.response.length} characters.`);
-                    return { success: true, data: data.response };
-                } else {
-                    this.logger.error(`Invalid response format from Ollama API (Correlation ID: ${correlationId}, Attempt: ${attempt + 1}/${this.maxRetries})`);
-                    return { success: false, error: new AgentError('Invalid response format from Ollama API', 'LLM_INVALID_RESPONSE_FORMAT', 'LLMService', correlationId, true, { responseBody: data }) };
-                }
-
-            } catch (error: unknown) {
-                const errorMessage = error instanceof Error ? error.message : String(error);
-                this.logger.debug(`Caught error in sendPrompt (Correlation ID: ${correlationId}, Attempt: ${attempt + 1}/${this.maxRetries}).`);
-                this.logger.error(`Error sending prompt to LLM: ${errorMessage}`);
-
-                // Only retry on network errors (TypeError)
-                if (error instanceof TypeError) {
-                    if (attempt < this.maxRetries - 1) {
-                        this.logger.warn(`Retrying LLM call due to network error in ${this.retryDelayMs}ms... (Attempt ${attempt + 1}/${this.maxRetries})`);
-                        await new Promise(resolve => setTimeout(resolve, this.retryDelayMs));
-                        continue; // Continue to next attempt
-                    }
-                    return { success: false, error: new AgentError(`Network error communicating with LLM: ${errorMessage}`, 'LLM_NETWORK_ERROR', 'LLMService', correlationId, false, { originalError: errorMessage }) };
-                }
-                // For non-retryable errors or last attempt, return failure
-                return { success: false, error: new AgentError(`Unexpected error in LLMService: ${errorMessage}`, 'LLM_UNEXPECTED_ERROR', 'LLMService', correlationId, false, { originalError: errorMessage }) };
+            });
+ 
+            if (response && response.response) {
+                this.logger.debug(`Received unstructured Ollama response: ${response.response}`);
+                this.logger.info(`LLM Response (unstructured): Length - ${response.response.length} characters.`);
+                return { success: true, data: response.response };
+            } else {
+                this.logger.error(`Invalid unstructured response format from Ollama API (Correlation ID: ${correlationId})`);
+                return { success: false, error: new AgentError('Invalid unstructured response format from Ollama API', 'LLM_INVALID_RESPONSE_FORMAT', 'LLMService', correlationId, true, { responseBody: response }) };
             }
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            this.logger.error(`Error sending unstructured prompt to LLM: ${errorMessage} (Correlation ID: ${correlationId})`);
+            return { success: false, error: new AgentError(`Error in LLMService (unstructured): ${errorMessage}`, 'LLM_UNEXPECTED_ERROR', 'LLMService', correlationId, false, { originalError: errorMessage }) };
         }
-        // Should not be reached if maxRetries is 0 or more, but for type safety
-        return { success: false, error: new AgentError('Max retries reached for LLM call', 'LLM_MAX_RETRIES_REACHED', 'LLMService', correlationId, false) };
+    }
+ 
+    /**
+     * Sends a structured prompt to the LLM with a JSON schema and returns the parsed object.
+     * @param prompt The prompt to send to the LLM.
+     * @param schema The JSON schema for the expected output.
+     * @param zodSchema Optional Zod schema for additional validation.
+     * @param correlationId The correlation ID for tracing.
+     * @returns A promise that resolves with a Result containing the parsed LLM's response (object) or an AgentError.
+     */
+    async sendStructuredPrompt<T>(prompt: string, schema: object | z.ZodObject<any, any, any>, zodSchema: z.ZodObject<any, any, any> | null = null, correlationId: string = 'N/A'): Promise<Result<T, AgentError>> {
+        let jsonSchema: object;
+        let validationSchema: z.ZodObject<any, any, any> | null;
+
+        if (schema instanceof z.ZodObject) {
+            jsonSchema = zodToJsonSchema(schema); // Convert Zod schema to JSON schema
+            validationSchema = schema;
+        } else {
+            jsonSchema = schema;
+            validationSchema = zodSchema;
+        }
+
+        this.logger.debug(`Sending structured prompt to LLM: ${prompt} (Correlation ID: ${correlationId}) with schema: ${JSON.stringify(jsonSchema)}`);
+        this.logger.info(`LLM Call (structured): Model - ${this.model}, Prompt Length - ${prompt.length} characters. Correlation ID: ${correlationId}`);
+ 
+        try {
+            const parsedResponse = await this.ollamaClient.generateStructured(prompt, jsonSchema, validationSchema, {
+                options: {
+                    temperature: this.ollamaClient.defaultOptions.temperature,
+                    num_predict: this.ollamaClient.defaultOptions.num_predict
+                }
+            });
+            this.logger.debug(`Received structured Ollama response: ${JSON.stringify(parsedResponse)}`);
+            this.logger.info(`LLM Response (structured): Length - ${JSON.stringify(parsedResponse).length} characters.`);
+            return { success: true, data: parsedResponse as T };
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            this.logger.error(`Error sending structured prompt to LLM: ${errorMessage} (Correlation ID: ${correlationId})`);
+            return { success: false, error: new AgentError(`Error in LLMService (structured): ${errorMessage}`, 'LLM_UNEXPECTED_ERROR', 'LLMService', correlationId, false, { originalError: errorMessage }) };
+        }
     }
 }

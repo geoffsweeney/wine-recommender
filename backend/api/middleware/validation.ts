@@ -1,8 +1,15 @@
 import { Request, Response, NextFunction, RequestHandler } from 'express';
 import { z } from 'zod';
 
+// Define a local interface to extend Request with validatedBody/Query/Params
+interface ValidatedRequest extends Request {
+  validatedBody?: any;
+  validatedQuery?: any;
+  validatedParams?: any;
+}
+
 export const validateRequest = (schema: any, source: 'body' | 'query' | 'params'): RequestHandler => {
-  return (req: Request, res: Response, next: NextFunction): void => {
+  return (req: ValidatedRequest, res: Response, next: NextFunction): void => { // Cast req to ValidatedRequest
     console.log('Validating:', req[source]); // Log the incoming request body or query
     try {
       const result = schema.safeParse(req[source]);

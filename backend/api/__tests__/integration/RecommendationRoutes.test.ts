@@ -72,14 +72,14 @@ describe('RecommendationRoutes', () => {
       expect(response.body).toEqual(mockRecommendationPayload);
       expect(mockCommunicationBus.sendMessageAndWaitForResponse).toHaveBeenCalledTimes(1);
       expect(mockCommunicationBus.sendMessageAndWaitForResponse).toHaveBeenCalledWith(
-        'sommelier',
+        'sommelier-coordinator',
         expect.objectContaining({
           type: MessageTypes.ORCHESTRATE_RECOMMENDATION_REQUEST,
           payload: {
             userId: 'test-user-123',
             input: { preferences: { wineType: 'red' }, recommendationSource: 'knowledgeGraph' },
           },
-          targetAgent: 'sommelier',
+          targetAgent: 'sommelier-coordinator',
         })
       );
     });
@@ -201,14 +201,14 @@ describe('RecommendationRoutes', () => {
       expect(response.status).toBe(200);
       expect(response.body).toEqual(mockRecommendationPayload);
       expect(mockCommunicationBus.sendMessageAndWaitForResponse).toHaveBeenCalledWith(
-        'sommelier',
+        'sommelier-coordinator',
         expect.objectContaining({
           type: MessageTypes.ORCHESTRATE_RECOMMENDATION_REQUEST,
           payload: {
             userId: 'test-user-fp',
             input: { preferences: { foodPairing: 'steak', wineType: 'red' }, recommendationSource: 'knowledgeGraph' },
           },
-          targetAgent: 'sommelier',
+          targetAgent: 'sommelier-coordinator',
         })
       );
     });
@@ -242,14 +242,14 @@ describe('RecommendationRoutes', () => {
       expect(response.status).toBe(200);
       expect(response.body).toEqual(mockRecommendationPayload);
       expect(mockCommunicationBus.sendMessageAndWaitForResponse).toHaveBeenCalledWith(
-        'sommelier',
+        'sommelier-coordinator',
         expect.objectContaining({
           type: MessageTypes.ORCHESTRATE_RECOMMENDATION_REQUEST,
           payload: {
             userId: 'test-user-ing',
             input: { ingredients: ['chicken', 'mushrooms'], recommendationSource: 'knowledgeGraph' },
           },
-          targetAgent: 'sommelier',
+          targetAgent: 'sommelier-coordinator',
         })
       );
     });
@@ -287,7 +287,7 @@ describe('RecommendationRoutes', () => {
       expect(response.status).toBe(200);
       expect(response.body).toEqual(mockRecommendationPayload);
       expect(mockCommunicationBus.sendMessageAndWaitForResponse).toHaveBeenCalledWith(
-        'sommelier',
+        'sommelier-coordinator',
         expect.objectContaining({
           type: MessageTypes.ORCHESTRATE_RECOMMENDATION_REQUEST,
           payload: {
@@ -298,7 +298,7 @@ describe('RecommendationRoutes', () => {
               { role: 'assistant', content: 'Sure, what are you looking for?' },
             ],
           },
-          targetAgent: 'sommelier',
+          targetAgent: 'sommelier-coordinator',
         })
       );
     });

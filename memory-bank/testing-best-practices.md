@@ -130,9 +130,10 @@ When writing integration tests for API endpoints that interact with the `Enhance
     *   **Agents Handling Multiple Message Types**: Ensure that the `handleMessage` method correctly dispatches all expected message types to their respective handlers. A common pitfall is to only handle the primary message type, leading to other messages being incorrectly routed to the `UNHANDLED_MESSAGE_TYPE` fallback.
     *   **Insufficient Payload Validation**: Failing to thoroughly validate incoming message payloads can lead to unexpected runtime errors and make debugging difficult. Always ensure that required fields exist and have the correct types.
     *   **Mocking Communication Bus Interactions**: When using dependency injection (e.g., `tsyringe`) with deep mocking libraries (e.g., `jest-mock-extended`), `toHaveBeenCalled` assertions on communication bus methods (like `sendResponse` or `sendMessageAndWaitForResponse`) may not reliably track calls, even when the methods are confirmed to be executed internally. This can lead to misleading test failures. In such cases, consider:
-        *   Relying on integration tests to verify end-to-end communication flows.
-        *   Focusing unit tests on the agent's internal logic and state changes, rather than direct assertions on communication method calls.
-        *   **Testing Services Returning `Result` Types**: When testing services that return `Result` objects, ensure your mocks are configured to return `Result` objects (e.g., `{ success: true, data: mockData }` or `{ success: false, error: mockError }`) and that your assertions correctly check the `success` property and the `data` or `error` property.
+    *   Relying on integration tests to verify end-to-end communication flows.
+    *   Focusing unit tests on the agent's internal logic and state changes, rather than direct assertions on communication method calls.
+    *   **Ensuring Correct Message Construction**: A common source of communication issues is incorrect `AgentMessage` construction. Always ensure that `createAgentMessage` is called with the correct `correlationId` (from the incoming request for responses) and `userId` (when user context is needed). Mismatches in these fields can lead to messages not being routed or processed correctly by the `EnhancedAgentCommunicationBus`.
+    *   **Testing Services Returning `Result` Types**: When testing services that return `Result` objects, ensure your mocks are configured to return `Result` objects (e.g., `{ success: true, data: mockData }` or `{ success: false, error: mockError }`) and that your assertions correctly check the `success` property and the `data` or `error` property.
 
 5.  **Best Practices**:
     *   Focus on behavior over implementation.

@@ -7,6 +7,7 @@ export interface WineNode {
   price?: number; // Added price property
   rating?: number;
 }
+
 export interface PreferenceNode {
   id?: string; // Optional ID for Neo4j
   type: string;

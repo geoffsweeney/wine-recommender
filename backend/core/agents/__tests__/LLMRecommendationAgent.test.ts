@@ -7,6 +7,7 @@ import winston from 'winston';
 import { createAgentMessage } from '../communication/AgentMessage';
 import { EnhancedAgentCommunicationBus } from '../communication/EnhancedAgentCommunicationBus';
 
+import { RecommendationResult } from '../../../types/agent-outputs';
 // Test wrapper to access protected properties for testing
 class TestLLMRecommendationAgent extends LLMRecommendationAgent {
   public getAgentId(): string {
@@ -96,34 +97,42 @@ describe('LLMRecommendationAgent', () => {
 
       (mockLLMService.sendPrompt as jest.Mock).mockResolvedValueOnce({
         success: true,
-        data: '{"wines": ["Cabernet Sauvignon"], "confidence": 0.9}'
+        data: JSON.stringify({
+          recommendations: ['Cabernet Sauvignon', 'Malbec'],
+          confidence: 0.9,
+          reasoning: 'These full-bodied reds pair well with red meat'
+        } as RecommendationResult)
       });
-
-      const result = await agent.handleMessage(message);
-
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(mockLLMService.sendPrompt).toHaveBeenCalledTimes(1);
-        expect(mockBus.sendResponse).toHaveBeenCalledTimes(1);
-        expect(mockBus.sendResponse).toHaveBeenCalledWith(
-          'source-agent',
-          expect.objectContaining({
-            type: 'llm-recommendation-response',
-            payload: expect.objectContaining({
-              recommendation: '{"wines": ["Cabernet Sauvignon"], "confidence": 0.9}',
-              confidenceScore: mockAgentConfig.defaultConfidenceScore
-            })
-          })
-        );
-        expect(mockLogger.info).toHaveBeenCalledWith(
-          expect.stringContaining('[corr-success] Processing recommendation request'),
-          expect.any(Object)
-        );
-        expect(mockLogger.info).toHaveBeenCalledWith(
-          expect.stringContaining('[corr-success] Recommendation request processed successfully'),
-          expect.any(Object)
-        );
-      }
+ 
+       const result = await agent.handleMessage(message);
+ 
+       expect(result.success).toBe(true);
+       if (result.success) {
+         expect(mockLLMService.sendPrompt).toHaveBeenCalledTimes(1);
+         expect(mockBus.sendResponse).toHaveBeenCalledTimes(1);
+         expect(mockBus.sendResponse).toHaveBeenCalledWith(
+           'source-agent',
+           expect.objectContaining({
+             type: 'llm-recommendation-response',
+             payload: expect.objectContaining({
+               recommendation: {
+                 recommendations: ['Cabernet Sauvignon', 'Malbec'],
+                 confidence: 0.9,
+                 reasoning: 'These full-bodied reds pair well with red meat'
+               },
+               confidenceScore: mockAgentConfig.defaultConfidenceScore
+             })
+           })
+         );
+         expect(mockLogger.info).toHaveBeenCalledWith(
+           expect.stringContaining('[corr-success] Processing recommendation request'),
+           expect.any(Object)
+         );
+         expect(mockLogger.info).toHaveBeenCalledWith(
+           expect.stringContaining('[corr-success] Recommendation request processed successfully'),
+           expect.any(Object)
+         );
+       }
     });
 
     it('should return an error if payload is missing', async () => {
@@ -247,6 +256,84 @@ describe('LLMRecommendationAgent', () => {
       }
     });
   });
+
+   it('should handle LLM response with malformed JSON', async () => {
+     const messagePayload = {
+       message: 'test message'
+     };
+     const message = createAgentMessage(
+       'llm-recommendation-request',
+       messagePayload,
+       'source-agent',
+       'conv-malformed-json',
+       'corr-malformed-json',
+       'llm-recommendation'
+     );
+
+     (mockLLMService.sendPrompt as jest.Mock).mockResolvedValueOnce({
+       success: true,
+       data: '{"recommendations": ["Cabernet Sauvignon"], "confidence": 0.9, "reasoning": "Pairs well with steak",' // Malformed JSON
+     });
+
+     const result = await agent.handleMessage(message);
+
+     expect(result.success).toBe(false);
+     if (!result.success) {
+       expect(result.error).toBeInstanceOf(AgentError);
+       expect(result.error.code).toBe('LLM_PARSE_ERROR');
+       expect(result.error.correlationId).toBe('corr-malformed-json');
+       expect(result.error.recoverable).toBe(true);
+       expect(mockDeadLetter.process).toHaveBeenCalledTimes(1);
+       expect(mockDeadLetter.process).toHaveBeenCalledWith(
+         messagePayload,
+         expect.objectContaining({ code: 'LLM_PARSE_ERROR' }),
+         expect.objectContaining({ stage: 'recommendation-parse-failure' })
+       );
+       expect(mockLogger.error).toHaveBeenCalledWith(
+         expect.stringContaining('[corr-malformed-json] Failed to process LLM recommendation request: Failed to parse LLM response as JSON'),
+         expect.any(Object)
+       );
+     }
+   });
+
+   it('should handle LLM response with valid JSON but incorrect RecommendationResult structure', async () => {
+     const messagePayload = {
+       message: 'test message'
+     };
+     const message = createAgentMessage(
+       'llm-recommendation-request',
+       messagePayload,
+       'source-agent',
+       'conv-invalid-structure',
+       'corr-invalid-structure',
+       'llm-recommendation'
+     );
+
+     (mockLLMService.sendPrompt as jest.Mock).mockResolvedValueOnce({
+       success: true,
+       data: '{"recommendations": ["Cabernet Sauvignon"], "anotherField": 123}' // Valid JSON, but not RecommendationResult
+     });
+
+     const result = await agent.handleMessage(message);
+
+     expect(result.success).toBe(false);
+     if (!result.success) {
+       expect(result.error).toBeInstanceOf(AgentError);
+       expect(result.error.code).toBe('LLM_PARSE_ERROR');
+       expect(result.error.correlationId).toBe('corr-invalid-structure');
+       expect(result.error.recoverable).toBe(true);
+       expect(mockDeadLetter.process).toHaveBeenCalledTimes(1);
+       expect(mockDeadLetter.process).toHaveBeenCalledWith(
+         messagePayload,
+         expect.objectContaining({ code: 'LLM_PARSE_ERROR' }),
+         expect.objectContaining({ stage: 'recommendation-parse-validation-failure' })
+       );
+       expect(mockLogger.error).toHaveBeenCalledWith(
+         expect.stringContaining('[corr-invalid-structure] Failed to process LLM recommendation request: LLM response did not match expected RecommendationResult format'),
+         expect.any(Object)
+       );
+     }
+   });
 
   describe('buildPrompt', () => {
     it('should build a prompt with message only', () => {

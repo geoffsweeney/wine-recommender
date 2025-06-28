@@ -1,7 +1,7 @@
 import { inject, injectable } from 'tsyringe';
 import { CommunicatingAgent, CommunicatingAgentDependencies } from './CommunicatingAgent';
 import { EnhancedAgentCommunicationBus } from './communication/EnhancedAgentCommunicationBus';
-import { AgentMessage, createAgentMessage } from './communication/AgentMessage';
+import { AgentMessage, createAgentMessage, MessageTypes } from './communication/AgentMessage';
 import { DeadLetterProcessor } from '../DeadLetterProcessor';
 import { LLMService } from '../../services/LLMService';
 import { TYPES } from '../../di/Types';
@@ -91,7 +91,12 @@ export class FallbackAgent extends CommunicatingAgent {
     super.registerHandlers();
     this.communicationBus.registerMessageHandler(
       this.id,
-      'fallback-request',
+      MessageTypes.FALLBACK_REQUEST, // Use MessageTypes.FALLBACK_REQUEST
+      this.handleFallbackRequest.bind(this) as (message: AgentMessage<unknown>) => Promise<Result<AgentMessage | null, AgentError>>
+    );
+    this.communicationBus.registerMessageHandler(
+      this.id,
+      MessageTypes.EMERGENCY_RECOMMENDATIONS, // Use MessageTypes.EMERGENCY_RECOMMENDATIONS
       this.handleFallbackRequest.bind(this) as (message: AgentMessage<unknown>) => Promise<Result<AgentMessage | null, AgentError>>
     );
   }

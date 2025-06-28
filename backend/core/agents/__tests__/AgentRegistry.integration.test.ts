@@ -1,6 +1,7 @@
 import { AgentRegistry } from '../AgentRegistry';
 import { Agent } from '../Agent';
 import { AgentCommunicationBus } from '../../AgentCommunicationBus';
+import { EnhancedAgentCommunicationBus } from '../communication/EnhancedAgentCommunicationBus'; // Import EnhancedAgentCommunicationBus
 import { InputValidationAgent } from '../InputValidationAgent';
 import { RecommendationAgent } from '../RecommendationAgent';
 import { LLMRecommendationAgent } from '../LLMRecommendationAgent';
@@ -10,6 +11,7 @@ import { ExplanationAgent } from '../ExplanationAgent';
 import { MCPAdapterAgent } from '../MCPAdapterAgent';
 import { FallbackAgent } from '../FallbackAgent';
 import { testContainer } from '../../../test-setup'; // Import the testContainer
+import { mock } from 'jest-mock-extended';
 
 beforeEach(() => {
   // Register agent classes with the testContainer
@@ -21,15 +23,10 @@ beforeEach(() => {
 
 describe('AgentRegistry Integration', () => {
   let registry: AgentRegistry;
-  let mockBus: jest.Mocked<AgentCommunicationBus>;
+  let mockBus: jest.Mocked<EnhancedAgentCommunicationBus>;
 
   beforeEach(() => {
-    mockBus = {
-      registerAgent: jest.fn(),
-      registerMessageHandler: jest.fn(),
-      sendResponse: jest.fn(),
-      sendLLMPrompt: jest.fn()
-    } as any;
+    mockBus = mock<EnhancedAgentCommunicationBus>(); // Use jest-mock-extended to create a comprehensive mock
 
     registry = testContainer.resolve(AgentRegistry);
   });

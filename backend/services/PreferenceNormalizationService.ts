@@ -1,21 +1,22 @@
 import { injectable, inject } from 'tsyringe'; // Import injectable and inject
 import { TYPES } from '../di/Types'; // Import TYPES
-import { ILogger } from './LLMService'; // Import ILogger
+import { ILogger, LLMService } from './LLMService'; // Import ILogger and LLMService
 import { PreferenceNode } from '../types';
+import { z } from 'zod'; // Import Zod for schema definition
 
 @injectable()
 export class PreferenceNormalizationService {
+  private synonymRegistry: Map<string, Map<string, string>>;
+
   constructor(
-    @inject(TYPES.Logger) private logger: ILogger // Inject logger
+    @inject(TYPES.Logger) private logger: ILogger, // Inject logger
+    @inject(TYPES.LLMService) private llmService: LLMService // Inject LLMService
   ) {
     this.logger.info('PreferenceNormalizationService constructor entered.');
-  }
-
-  public normalizePreferences(preferences: PreferenceNode[]): PreferenceNode[] {
-    const synonymRegistry = new Map<string, Map<string, string>>();
+    this.synonymRegistry = new Map<string, Map<string, string>>();
 
     // Synonym mappings for various preference types
-    synonymRegistry.set('wineType', new Map([
+    this.synonymRegistry.set('wineType', new Map([
         ['red', 'red'],
         ['reds', 'red'], // Add synonym mapping for 'reds'
         ['white', 'white'],
@@ -32,7 +33,7 @@ export class PreferenceNormalizationService {
         // Add more wine type synonyms as needed
     ]));
 
-    synonymRegistry.set('sweetness', new Map([
+    this.synonymRegistry.set('sweetness', new Map([
         ['dry', 'dry'],
         ['sweet', 'sweet'],
         ['off-dry', 'off-dry'],
@@ -43,7 +44,7 @@ export class PreferenceNormalizationService {
         // Add more sweetness synonyms
     ]));
 
-    synonymRegistry.set('body', new Map([
+    this.synonymRegistry.set('body', new Map([
         ['light', 'light'],
         ['medium', 'medium'],
         ['full', 'full'],
@@ -53,7 +54,7 @@ export class PreferenceNormalizationService {
         // Add more body synonyms
     ]));
 
-    synonymRegistry.set('region', new Map([
+    this.synonymRegistry.set('region', new Map([
         ['france', 'France'],
         ['italy', 'Italy'],
         ['spain', 'Spain'],
@@ -65,25 +66,84 @@ export class PreferenceNormalizationService {
     ]));
 
     // Add more synonym registries for other preference types (e.g., oak, tannins, acidity)
+  }
 
-    return preferences.map(pref => {
+  // Define the Zod schema for the LLM's synonym resolution output
+  private readonly SynonymResolutionSchema = z.object({
+    canonicalTerm: z.string().describe("The canonical, normalized term for the given input synonym."),
+  }).describe("Schema for resolving a synonym to its canonical term using an LLM.");
+
+  /**
+   * Resolves a given synonym to its canonical term using an LLM.
+   * This method is called when a synonym is not found in the local registry.
+   * @param type The type of preference (e.g., 'wineType', 'sweetness').
+   * @param synonym The synonym to resolve.
+   * @returns A Promise that resolves to the canonical term or the original synonym if LLM resolution fails.
+   */
+  private async resolveSynonymWithLlm(type: string, synonym: string): Promise<string> {
+    this.logger.info(`Attempting to resolve synonym "${synonym}" for type "${type}" with LLM.`);
+    const prompt = `Given the preference type "${type}" and the user's input "${synonym}", identify the most appropriate canonical term. The canonical term should be a standardized, widely recognized term within the wine domain for this preference. If the input is already a canonical term or cannot be mapped, return the input as is.
+
+    Examples:
+    - type: "wineType", input: "reds" -> canonicalTerm: "red"
+    - type: "wineType", input: "shiraz" -> canonicalTerm: "syrah"
+    - type: "sweetness", input: "bone dry" -> canonicalTerm: "dry"
+    - type: "region", input: "california" -> canonicalTerm: "USA"
+    - type: "wineType", input: "merlot" -> canonicalTerm: "merlot"
+
+    Your response MUST be a JSON object matching the following schema:
+    ${JSON.stringify(this.SynonymResolutionSchema.parse({}), null, 2)}
+    `;
+
+    try {
+      const result = await this.llmService.sendStructuredPrompt<z.infer<typeof this.SynonymResolutionSchema>>(
+        prompt,
+        this.SynonymResolutionSchema
+      );
+
+      if (result.success) {
+        const canonicalTerm = result.data.canonicalTerm.trim().toLowerCase();
+        this.logger.info(`LLM resolved "${synonym}" to canonical term "${canonicalTerm}" for type "${type}".`);
+        // Cache the LLM-resolved synonym for future use
+        if (!this.synonymRegistry.has(type)) {
+          this.synonymRegistry.set(type, new Map());
+        }
+        this.synonymRegistry.get(type)?.set(synonym.toLowerCase(), canonicalTerm);
+        return canonicalTerm;
+      } else {
+        this.logger.warn(`LLM failed to resolve synonym "${synonym}" for type "${type}": ${result.error.message}`);
+        return synonym; // Return original synonym if LLM fails
+      }
+    } catch (error) {
+      this.logger.error(`Error during LLM synonym resolution for "${synonym}" (${type}):`, error);
+      return synonym; // Return original synonym on error
+    }
+  }
+
+  public async normalizePreferences(preferences: PreferenceNode[]): Promise<PreferenceNode[]> {
+
+    const normalized = await Promise.all(preferences.map(async pref => {
         this.logger.info('normalizePreferences: Processing preference:', pref); // Log the preference being processed
         // Trim whitespace and lowercase string values
         let value = typeof pref.value === 'string'
             ? pref.value.trim().toLowerCase()
             : pref.value;
-        this.logger.info('normalizePreferences: Trimmed/lowercased value:', value); // Log the value after trimming/lowercasing
+        this.logger.info(`normalizePreferences: Trimmed/lowercased value: ${JSON.stringify(value)}`); // Log the value after trimming/lowercasing
 
-        // Resolve synonyms using registry
-        if (typeof value === 'string' && synonymRegistry.has(pref.type)) {
-            const synonyms = synonymRegistry.get(pref.type);
-            this.logger.info('normalizePreferences: Synonym registry for type:', pref.type, synonyms); // Log the synonym registry for the type
+        // Resolve synonyms using registry or LLM
+        if (typeof value === 'string' && this.synonymRegistry.has(pref.type)) {
+            const synonyms = this.synonymRegistry.get(pref.type);
+            this.logger.info(`normalizePreferences: Synonym registry for type: ${pref.type}, Synonyms: ${JSON.stringify(synonyms)}`); // Log the synonym registry for the type
             if (synonyms && typeof value === 'string' && synonyms.has(value.toLowerCase())) {
-                this.logger.info('normalizePreferences: Synonym found, canonical term:', synonyms.get(value.toLowerCase())); // Log when synonym is found
+                this.logger.info(`normalizePreferences: Synonym found, canonical term: ${JSON.stringify(synonyms.get(value.toLowerCase()))}`); // Log when synonym is found
                 value = synonyms.get(value.toLowerCase())!; // Normalize to canonical term
             } else {
-                this.logger.info('normalizePreferences: No synonym found for value:', value); // Log when no synonym is found
+                this.logger.info(`normalizePreferences: No synonym found in registry for value: ${JSON.stringify(value)}. Attempting LLM resolution.`); // Log when no synonym is found
+                value = await this.resolveSynonymWithLlm(pref.type, value); // Attempt LLM resolution
             }
+        } else if (typeof value === 'string') { // If type not in registry, try LLM anyway
+            this.logger.info(`normalizePreferences: Preference type "${pref.type}" not in synonym registry. Attempting LLM resolution for value: ${JSON.stringify(value)}.`);
+            value = await this.resolveSynonymWithLlm(pref.type, value); // Attempt LLM resolution
         }
 
         // Handle negations
@@ -223,6 +283,6 @@ export class PreferenceNormalizationService {
         };
         this.logger.info('normalizePreferences: Returning preference from map:', finalPreference); // Log the preference being returned from map
         return finalPreference;
-    }).filter(Boolean) as PreferenceNode[]; // Filter out nulls from discarded preferences
+    })); return normalized.filter(Boolean) as PreferenceNode[]; // Filter out nulls from discarded preferences
   }
 }

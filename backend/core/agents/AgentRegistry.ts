@@ -1,6 +1,7 @@
 import { inject, injectable } from 'tsyringe';
 import { Agent } from './Agent';
 import { AgentCommunicationBus } from '../AgentCommunicationBus';
+import { EnhancedAgentCommunicationBus } from '../agents/communication/EnhancedAgentCommunicationBus';
 import { InputValidationAgent } from './InputValidationAgent';
 import { RecommendationAgent } from './RecommendationAgent';
 import { LLMRecommendationAgent } from './LLMRecommendationAgent';
@@ -10,6 +11,7 @@ import { ExplanationAgent } from './ExplanationAgent';
 import { MCPAdapterAgent } from './MCPAdapterAgent';
 import { FallbackAgent } from './FallbackAgent';
 import { SommelierCoordinator } from './SommelierCoordinator';
+import { ShopperAgent } from './ShopperAgent'; // Import ShopperAgent
 
 export interface IAgentRegistry {
   registerAgents(bus: AgentCommunicationBus): void;
@@ -29,7 +31,8 @@ export class AgentRegistry implements IAgentRegistry {
     @inject(ExplanationAgent) private readonly explanationAgent: ExplanationAgent,
     @inject(MCPAdapterAgent) private readonly mcpAdapterAgent: MCPAdapterAgent,
     @inject(FallbackAgent) private readonly fallbackAgent: FallbackAgent,
-    @inject(SommelierCoordinator) private readonly sommelierCoordinator: SommelierCoordinator
+@inject(SommelierCoordinator) private readonly sommelierCoordinator: SommelierCoordinator,
+    @inject(ShopperAgent) private readonly shopperAgent: ShopperAgent // Inject ShopperAgent
   ) {
     this.agents.set(inputValidationAgent.getName(), inputValidationAgent);
     this.agents.set(recommendationAgent.getName(), recommendationAgent);
@@ -40,6 +43,7 @@ export class AgentRegistry implements IAgentRegistry {
     this.agents.set(mcpAdapterAgent.getName(), mcpAdapterAgent);
     this.agents.set(fallbackAgent.getName(), fallbackAgent);
     this.agents.set(sommelierCoordinator.getName(), sommelierCoordinator);
+    this.agents.set(shopperAgent.getName(), shopperAgent); // Register ShopperAgent
   }
 
   getAgent<T extends Agent>(name: string): T {

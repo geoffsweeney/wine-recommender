@@ -42,10 +42,10 @@ export class KnowledgeGraphService {
     }
 
     const similarWines = await this.neo4j.executeQuery<WineNode>(`
-      MATCH (w:Wine {id: $wineId})-[:SIMILAR_TO]->(similar:Wine)
-      RETURN similar
-      LIMIT $limit
-    `, { wineId, limit: integerLimit });
+       MATCH (w:Wine {id: $wineId})-[:SIMILAR_TO]->(similar:Wine)
+       RETURN similar
+       LIMIT $limit
+     `, { wineId, limit: integerLimit });
 
     this.logger.debug('KnowledgeGraphService - similarWines after executeQuery:', similarWines);
 
@@ -58,13 +58,13 @@ export class KnowledgeGraphService {
     }
 
     const wines = await this.neo4j.executeQuery<WineNode>(`
-      MATCH (i:Ingredient)
-      WHERE i.name IN $ingredients
-      MATCH (i)-[:PAIRS_WITH]->(w:Wine)
-      WITH w, count(DISTINCT i) as ingredientCount
-      WHERE ingredientCount = size($ingredients)
-      RETURN w
-    `, { ingredients });
+       MATCH (i:Ingredient)
+       WHERE i.name IN $ingredients
+       MATCH (i)-[:PAIRS_WITH]->(w:Wine)
+       WITH w, count(DISTINCT i) as ingredientCount
+       WHERE ingredientCount = size($ingredients)
+       RETURN w
+     `, { ingredients });
 
     this.logger.debug('KnowledgeGraphService - findWinesByIngredients after executeQuery:', wines);
 
@@ -73,10 +73,10 @@ export class KnowledgeGraphService {
 
   async findWinesByPreferences(preferences: UserPreferences): Promise<WineNode[]> { // Use the new UserPreferences interface
     this.logger.debug('KnowledgeGraphService: Finding wines by preferences:', preferences);
-      if (!preferences || Object.keys(preferences).length === 0) { // Check if preferences object is empty
-        this.logger.debug('KnowledgeGraphService: No specific preferences provided, returning empty array.');
-        return []; // Return empty array if preferences is undefined or empty
-      }
+       if (!preferences || Object.keys(preferences).length === 0) { // Check if preferences object is empty
+         this.logger.debug('KnowledgeGraphService: No specific preferences provided, returning empty array.');
+         return []; // Return empty array if preferences is undefined or empty
+       }
       let query = 'MATCH (w:Wine)';
       const parameters: any = {};
     const conditions: string[] = [];
@@ -145,67 +145,41 @@ export class KnowledgeGraphService {
     }
 
     const wines = await this.neo4j.executeQuery<WineNode>(`
-      MATCH (w:Wine {type: $wineType})
-      RETURN w
-    `, { wineType });
+       MATCH (w:Wine {type: $wineType})
+       RETURN w
+     `, { wineType });
 
     this.logger.debug('KnowledgeGraphService - findWinesByType after executeQuery:', wines);
 
     return wines;
   }
 
+  async findWinesByName(wineNames: string[]): Promise<WineNode[]> {
+    if (!wineNames || wineNames.length === 0) {
+      return [];
+    }
+    const wines = await this.neo4j.executeQuery<WineNode>(`
+       MATCH (w:Wine)
+       WHERE w.name IN $wineNames
+       RETURN w
+     `, { wineNames });
+
+    this.logger.debug('KnowledgeGraphService - findWinesByName after executeQuery:', wines);
+    return wines;
+  }
+
   async getWinePairings(wineId: string): Promise<WineNode[]> {
     return this.neo4j.executeQuery<WineNode>(`
-      MATCH (w:Wine {id: $wineId})-[:PAIRS_WITH]->(pairing:Wine)
-      RETURN pairing
-    `, { wineId });
+       MATCH (w:Wine {id: $wineId})-[:PAIRS_WITH]->(pairing:Wine)
+       RETURN pairing
+     `, { wineId });
   }
 
   async getWineById(wineId: string): Promise<WineNode | null> {
     const results = await this.neo4j.executeQuery<WineNode>(`
-      MATCH (w:Wine {id: $wineId})
-      RETURN w
-    `, { wineId });
+       MATCH (w:Wine {id: $wineId})
+       RETURN w
+     `, { wineId });
     return results[0] || null;
-  }
-async addOrUpdatePreference(userId: string, preference: PreferenceNode): Promise<void> {
-    const query = `
-      MERGE (u:User {id: $userId})
-      MERGE (p:Preference {type: $type, value: $value})
-      ON CREATE SET p.source = $source, p.confidence = $confidence, p.timestamp = $timestamp, p.active = $active
-      ON MATCH SET p.source = $source, p.confidence = $confidence, p.timestamp = $timestamp, p.active = $active
-      MERGE (u)-[:HAS_PREFERENCE]->(p)
-    `;
-    await this.neo4j.executeQuery(query, {
-      userId,
-      type: preference.type,
-      value: preference.value,
-      source: preference.source,
-      confidence: preference.confidence,
-      timestamp: preference.timestamp,
-      active: preference.active,
-    });
-  }
-
-  async getPreferences(userId: string, includeInactive: boolean = false): Promise<PreferenceNode[]> {
-    let query = `
-      MATCH (u:User {id: $userId})-[:HAS_PREFERENCE]->(p:Preference)
-    `;
-    if (!includeInactive) {
-      query += ` WHERE p.active = true`;
-    }
-    query += ` RETURN p`;
-
-    const results = await this.neo4j.executeQuery<PreferenceNode>(query, { userId });
-    return results.map((record: any) => record.p as PreferenceNode);
-  }
-
-  async deletePreference(userId: string, preferenceId: string): Promise<void> {
-    const query = `
-      MATCH (u:User {id: $userId})-[r:HAS_PREFERENCE]->(p:Preference)
-      WHERE p.id = $preferenceId
-      DELETE r, p
-    `;
-    await this.neo4j.executeQuery(query, { userId, preferenceId });
   }
 }

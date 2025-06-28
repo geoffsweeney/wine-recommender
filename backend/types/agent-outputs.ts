@@ -35,11 +35,9 @@ export interface ValueAnalysisResult {
  * This aligns with the structured output requested from the LLM.
  */
 export interface RecommendationResult {
-    wineName: string;
-    wineType: string;
+    recommendations: string[]; // Array of wine names
+    confidence: number;
     reasoning: string;
-    foodPairing: string;
-    // Add other relevant recommendation details as needed
 }
 
 /**

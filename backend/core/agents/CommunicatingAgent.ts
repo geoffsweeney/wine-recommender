@@ -53,37 +53,20 @@ export abstract class CommunicatingAgent extends BaseAgent<any, any> { // TConfi
   }
 
   protected registerHandlers(): void {
-    this.communicationBus.registerMessageHandler(
-      this.id, // Use this.id as targetAgent
-      'direct-message',
-      this.handleDirectMessage.bind(this)
-    );
-
-    this.communicationBus.registerMessageHandler(
-      this.id, // Use this.id as targetAgent
-      'broadcast',
-      this.handleBroadcast.bind(this)
-    );
+    // Concrete agents will register their specific handlers.
+    // This base class does not register generic direct-message or broadcast handlers.
   }
 
   protected async handleDirectMessage(
     message: AgentMessage
-  ): Promise<Result<AgentMessage, AgentError>> {
+  ): Promise<Result<AgentMessage | null, AgentError>> {
     const traceId = message.correlationId; // Use correlationId as traceId for consistency
     try {
       this.logger.info(`[${traceId}] Handling direct message for ${this.id}: ${message.type}`);
       const result = await this.handleMessage(message); // Pass the full message
       
       if (result.success) {
-        const responseMessage = createAgentMessage(
-          'direct-response',
-          result.data,
-          this.id,
-          traceId,
-          message.sourceAgent // Respond to the sender
-        );
-        this.communicationBus.sendResponse(message.sourceAgent, responseMessage);
-        return { success: true, data: responseMessage };
+        return result; // Simply return the result from the concrete agent's handleMessage
       } else {
         const errorMessage = createAgentMessage(
           'error-response',
@@ -106,15 +89,7 @@ export abstract class CommunicatingAgent extends BaseAgent<any, any> { // TConfi
         true, // Assuming recoverable for now
         { originalError: errorMessage }
       );
-      const responseErrorMessage = createAgentMessage(
-        'error-response',
-        { error: agentError.message, code: agentError.code },
-        this.id,
-        traceId,
-        message.sourceAgent
-      );
-      this.communicationBus.sendResponse(message.sourceAgent, responseErrorMessage);
-      return { success: false, error: agentError };
+      return { success: false, error: agentError }; // Simply return the error
     }
   }
   

@@ -35,7 +35,7 @@ describe('Recommendations API', () => {
 
     // Mock sendMessageAndWaitForResponse to return a successful recommendation
     (communicationBus.sendMessageAndWaitForResponse as jest.Mock).mockImplementation(async (targetAgentId: string, message: AgentMessage) => {
-      if (targetAgentId === 'sommelier' && message.type === MessageTypes.ORCHESTRATE_RECOMMENDATION_REQUEST) {
+      if (targetAgentId === 'sommelier-coordinator' && message.type === MessageTypes.ORCHESTRATE_RECOMMENDATION_REQUEST) {
         return {
           success: true,
           data: createAgentMessage(

@@ -9,6 +9,7 @@ import winston from 'winston';
 import { Result } from '../types/Result';
 import { AgentError } from './AgentError';
 import { LogContext } from '../../types/LogContext';
+import { RecommendationResult } from '../../types/agent-outputs'; // Import RecommendationResult
 
 interface LLMRecommendationRequestPayload {
   preferences?: Record<string, any>;
@@ -110,18 +111,19 @@ export class LLMRecommendationAgent extends CommunicatingAgent {
         return { success: false, error };
       }
 
-      const llmResponseResult = await this.llmService.sendPrompt(prompt);
+      const llmResponseResult = await this.llmService.sendStructuredPrompt<RecommendationResult>(prompt, RecommendationSchema, null, correlationId);
       if (!llmResponseResult.success) {
         const error = new AgentError(`LLM service failed: ${llmResponseResult.error.message}`, 'LLM_SERVICE_ERROR', this.id, correlationId, true, { originalError: llmResponseResult.error.message });
         await this.deadLetterProcessor.process(message.payload, error, { source: this.id, stage: 'recommendation-llm-failure', correlationId });
         return { success: false, error };
       }
-      const llmResponse = llmResponseResult.data;
+      const parsedRecommendation = llmResponseResult.data;
+      this.logger.debug(`[${correlationId}] Successfully parsed LLM response into RecommendationResult: ${JSON.stringify(parsedRecommendation)}`);
 
       const responseMessage = createAgentMessage(
         'llm-recommendation-response',
         {
-          recommendation: llmResponse,
+          recommendation: parsedRecommendation, // Send the parsed object
           confidenceScore: this.agentConfig.defaultConfidenceScore // Use injected config
         },
         this.id,
@@ -175,3 +177,16 @@ export class LLMRecommendationAgent extends CommunicatingAgent {
     return prompt;
   }
 }
+
+export const RecommendationSchema = {
+  type: "object",
+  properties: {
+    recommendations: {
+      type: "array",
+      items: { type: "string" }
+    },
+    confidence: { type: "number" },
+    reasoning: { type: "string" }
+  },
+  required: ["recommendations", "confidence", "reasoning"]
+};

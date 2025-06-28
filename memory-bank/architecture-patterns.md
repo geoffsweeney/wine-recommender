@@ -4,8 +4,12 @@ This document outlines key architectural patterns and best practices for develop
 
 #### Agent Communication Protocol
 Agents should implement specific message handlers for expected message types and use the `handleMessage` method as a generic fallback for unhandled messages. This ensures clear separation of concerns and robust error handling for unexpected inputs.
-
+ 
 **Best Practice:** When registering message handlers, if the handler function expects a more specific payload type than `AgentMessage<unknown>`, explicitly cast the function using `as (message: AgentMessage<unknown>) => Promise<Result<AgentMessage | null, AgentError>>` to satisfy TypeScript.
+ 
+**Key Considerations for `AgentMessage` Structure:**
+*   **`correlationId`**: Essential for matching requests to responses in asynchronous communication. Ensure the `correlationId` of a response message is always the `correlationId` of the original request message.
+*   **`userId`**: Crucial for maintaining user context across agent interactions and for persisting user-specific data (e.g., preferences). Ensure `userId` is consistently passed in `AgentMessage` when user context is relevant.
 
 ```typescript
 // Message routing pattern
@@ -161,10 +165,10 @@ Trace IDs are essential for correlating logs across multiple agents in distribut
 ##### Propagation Rules
 1. The originating agent generates the initial `correlationId` (used as `traceId`).
 2. All subsequent agents must preserve the original `correlationId`.
-3. `correlationId`s must be propagated through all message metadata.
+3. `correlationId`s and `userId` (when applicable) must be propagated through all message metadata and `AgentMessage` parameters.
 4. External service calls must include `correlationId` in headers (e.g., `X-Trace-Id`).
-
-**Best Practice:** Always perform null/undefined checks when accessing optional properties of `AgentMessage.metadata` (e.g., `message.metadata?.traceId`).
+ 
+**Best Practice:** Always perform null/undefined checks when accessing optional properties of `AgentMessage.metadata` (e.g., `message.metadata?.traceId`) or `AgentMessage.userId`.
 
 ##### Logging Requirements
 - Every log statement must include `correlationId` (used as `traceId`) in the log context.
@@ -216,6 +220,33 @@ const response = await fetch(serviceUrl, {
 - Include `correlationId` in all error responses.
 - Configure log aggregators to index by `correlationId`.
 - Validate `correlationId` propagation in integration tests.
+
+#### Learnings from SommelierCoordinator Debugging (June 2025)
+
+During the development and debugging of the `SommelierCoordinator` agent, critical insights were gained regarding the management of `correlationId`s within an orchestrated agent communication flow. These learnings are crucial for preventing premature callback clearing and ensuring robust message routing.
+
+**Key Principle: Correlation ID Scoping**
+
+*   **External Communication (API to Orchestrator):** The `correlationId` provided by the initial external request (e.g., from the API layer to the `SommelierCoordinator`) **MUST** be preserved and used only for the *final response* back to that external caller. This `correlationId` is the key for the external caller's `sendMessageAndWaitForResponse` callback.
+*   **Internal Communication (Orchestrator to Sub-Agents):** When an orchestrator agent (like `SommelierCoordinator`) sends messages to its sub-agents (e.g., `InputValidationAgent`, `RecommendationAgent`, `ShopperAgent`, `ExplanationAgent`, `UserPreferenceAgent` for history updates), these internal messages **MUST** use a *newly generated* `correlationId`.
+    *   **Rationale:** If internal messages re-use the external `correlationId`, and the sub-agent's handler calls `sendResponse` (which is common for acknowledging receipt or returning results), it will prematurely trigger and clear the external caller's callback in the `EnhancedAgentCommunicationBus`. This leads to the external caller timing out or receiving an incomplete response.
+    *   **Implementation:** Always use `this.generateCorrelationId()` for messages sent from the orchestrator to its sub-agents.
+
+**Impact on `EnhancedAgentCommunicationBus`:**
+
+The `EnhancedAgentCommunicationBus`'s `sendMessageAndWaitForResponse` mechanism relies on a unique `correlationId` to manage its internal `responseCallbacks` map. When a response is received for a given `correlationId`, the corresponding callback is executed and then *deleted*. If multiple messages share the same `correlationId` but are part of different logical request-response flows, this deletion can cause unexpected behavior.
+
+**Specific Debugging Case (`SommelierCoordinator`):**
+
+Initially, the `SommelierCoordinator` was incorrectly re-using the external `correlationId` for internal messages, specifically:
+1.  `UserPreferenceAgent`'s `UPDATE_RECOMMENDATION_HISTORY` message (a fire-and-forget message).
+2.  `ExplanationAgent`'s `GENERATE_EXPLANATION` message.
+
+In both cases, when these sub-agents responded (even with an ACK for the history update), they used the re-used `correlationId`. This caused the `EnhancedAgentCommunicationBus` to find and clear the callback associated with the *original API request*, leading to the API layer not receiving the final recommendation and logging "No callback found for correlationId".
+
+**Resolution:**
+
+The fix involved ensuring that all messages sent from the `SommelierCoordinator` to its internal sub-agents (including fire-and-forget messages and those for explanation generation) use a `this.generateCorrelationId()` unique to that internal interaction. The original `correlationId` is now exclusively reserved for the final `FINAL_RECOMMENDATION` message sent back to the API.
 
 #### Agent Configuration Pattern
 Agent-specific configurations should be externalized and injected via Dependency Injection. This promotes modularity, testability, and allows for easy modification of agent behavior without code changes.

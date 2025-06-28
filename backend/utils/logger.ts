@@ -11,7 +11,7 @@ class NullTransport extends Transport {
 }
 
 export const logger = winston.createLogger({
-  level: process.env.NODE_ENV === 'test' ? 'silent' : 'info', // Set level to 'silent' in test environment
+  level: process.env.NODE_ENV === 'test' ? 'silent' : (process.env.LOG_LEVEL || 'debug'), // Allow log level to be set via LOG_LEVEL env var, default to 'debug'
   format: winston.format.combine(
     winston.format.timestamp(),
     winston.format.json()

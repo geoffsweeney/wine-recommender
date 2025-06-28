@@ -2,13 +2,13 @@ import { inject, injectable } from 'tsyringe';
 import { TYPES } from '../../di/Types';
 import { CommunicatingAgent, CommunicatingAgentDependencies } from './CommunicatingAgent';
 import { EnhancedAgentCommunicationBus } from './communication/EnhancedAgentCommunicationBus';
-import { AgentMessage, createAgentMessage } from './communication/AgentMessage'; // Added
+import { AgentMessage, createAgentMessage, MessageTypes } from './communication/AgentMessage'; // Added MessageTypes
 import { BasicDeadLetterProcessor } from '../BasicDeadLetterProcessor';
 import { Result } from '../types/Result';
 import { AgentError } from './AgentError';
 import winston from 'winston';
-import { UserPreferences } from '../../types'; // Import UserPreferences
-
+import { UserPreferences, PreferenceNode } from '../../types'; // Import UserPreferences, PreferenceNode
+import { LLMService } from '../../services/LLMService'; // Import LLMService
 
 export interface ValidationResult {
   isValid: boolean;
@@ -39,7 +39,8 @@ export class InputValidationAgent extends CommunicatingAgent {
     @inject(EnhancedAgentCommunicationBus) private readonly injectedCommunicationBus: EnhancedAgentCommunicationBus,
     @inject(TYPES.DeadLetterProcessor) private readonly deadLetterProcessor: BasicDeadLetterProcessor,
     @inject(TYPES.Logger) protected readonly logger: winston.Logger,
-    @inject(TYPES.InputValidationAgentConfig) private readonly agentConfig: InputValidationAgentConfig // Inject the specific agent config
+    @inject(TYPES.InputValidationAgentConfig) private readonly agentConfig: InputValidationAgentConfig, // Inject the specific agent config
+    @inject(LLMService) private readonly llmService: LLMService // Inject LLMService
   ) {
     const id = 'input-validation-agent';
     // Pass the injected agentConfig to the super constructor as the agent's config
@@ -69,15 +70,16 @@ export class InputValidationAgent extends CommunicatingAgent {
     // Register for validation requests
     this.communicationBus.registerMessageHandler(
       this.id, // Corrected to this.id
-      'validate-input',
-      this.handleValidationRequest.bind(this)
+      MessageTypes.VALIDATE_INPUT,
+      this.handleValidationRequest.bind(this) as (message: AgentMessage<unknown>) => Promise<Result<AgentMessage | null, AgentError>>
     );
   }
 
-  async handleValidationRequest(message: AgentMessage<unknown>): Promise<Result<AgentMessage | null, AgentError>> {
+  async handleValidationRequest(message: AgentMessage<{ message: string; recommendationSource: string }>): Promise<Result<AgentMessage | null, AgentError>> {
     const correlationId = message.correlationId;
     try {
-      const validationResult = await this.validateInput(message.payload, message.correlationId);
+      const inputMessage = message.payload.message;
+      const validationResult = await this.validateInput(inputMessage, message.correlationId);
       
       if (!validationResult.success) {
         await this.deadLetterProcessor.process(message.payload,
@@ -96,37 +98,47 @@ export class InputValidationAgent extends CommunicatingAgent {
         'validation-result',
         resultPayload,
         this.id,
-        correlationId,
-        message.sourceAgent
+        message.conversationId, // conversationId
+        message.correlationId, // correlationId
+        message.sourceAgent, // targetAgent
+        message.userId // userId
       );
-      this.communicationBus.sendResponse(message.sourceAgent, responseMessage);
+      // Removed direct call to this.communicationBus.sendResponse
+      // The response will be sent by the EnhancedAgentCommunicationBus after this handler returns
 
       // If validation successful and contains preferences, notify UserPreferenceAgent
       if (resultPayload.isValid && resultPayload.extractedData?.preferences) {
+        // Convert UserPreferences object to an array of PreferenceNode
+        const preferencesAsNodes: PreferenceNode[] = Object.entries(resultPayload.extractedData.preferences).map(([type, value]) => ({
+          type: type,
+          value: String(value), // Ensure value is string or number
+          source: this.id,
+          confidence: 1, // Default confidence
+          timestamp: new Date().toISOString(),
+          active: true
+        }));
+
         const preferenceUpdateMessage = createAgentMessage(
           'preference-update',
           {
-            preferences: resultPayload.extractedData.preferences,
+            preferences: preferencesAsNodes, // Send as PreferenceNode[]
             context: 'from-validation'
           },
-          this.id,
-          correlationId,
-          'UserPreferenceAgent' // Target agent
+          this.id, // sourceAgent
+          message.conversationId, // conversationId
+          message.correlationId, // correlationId
+          'user-preference-agent', // targetAgent
+          message.userId // userId
         );
-        const sendResult = await this.communicationBus.sendMessageAndWaitForResponse('UserPreferenceAgent', preferenceUpdateMessage);
-        if (!sendResult.success) {
-          this.logger.error(`[${correlationId}] Failed to send preference update to UserPreferenceAgent: ${sendResult.error.message}`, {
-            agentId: this.id,
-            operation: 'handleValidationRequest',
-            correlationId: correlationId,
-            targetAgent: 'UserPreferenceAgent',
-            originalError: sendResult.error.message
-          });
-          // Optionally, send to dead letter queue or return error
-          // For now, we'll just log and continue, as preference update might not be critical for the main flow
-        }
+        this.communicationBus.publishToAgent('user-preference-agent', preferenceUpdateMessage);
+        this.logger.info(`[${correlationId}] Queued preference update for UserPreferenceAgent (fire-and-forget)`, {
+          agentId: this.id,
+          operation: 'handleValidationRequest',
+          correlationId: correlationId,
+          targetAgent: 'UserPreferenceAgent'
+        });
       }
-      return { success: true, data: responseMessage };
+      return { success: true, data: responseMessage }; // Ensure the response message is returned
 
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -171,49 +183,34 @@ export class InputValidationAgent extends CommunicatingAgent {
     };
   }
 
-  protected async validateInput(input: any, correlationId: string = ''): Promise<Result<ValidationResult, AgentError>> {
-    // Basic validation
-    if (!input || typeof input !== 'object') {
-      return { success: false, error: new AgentError('Input must be an object', 'INVALID_INPUT_TYPE', this.id, correlationId) };
-    }
-
-    if (!input.ingredients || !Array.isArray(input.ingredients) || input.ingredients.length === 0) {
-      return {
-        success: false,
-        error: new AgentError('At least one ingredient must be provided', 'MISSING_INGREDIENTS', this.id, correlationId)
-      };
-    }
-
-    if (input.ingredients.length > this.config.maxIngredients) {
-      return {
-        success: false,
-        error: new AgentError(
-          `Maximum ${this.config.maxIngredients} ingredients allowed`,
-          'TOO_MANY_INGREDIENTS',
-          this.id,
-          correlationId
-        )
-      };
-    }
-
-    if (typeof input.budget !== 'number' || input.budget <= 0) {
-      return {
-        success: false,
-        error: new AgentError('Budget must be a positive number', 'INVALID_BUDGET', this.id, correlationId)
-      };
-    }
-
+  protected async validateInput(inputMessage: string, correlationId: string = ''): Promise<Result<ValidationResult, AgentError>> {
     try {
-      const llmResponseResult = await this.communicationBus.sendLLMPrompt(this.buildValidationPrompt(input), correlationId);
+      const prompt = this.buildValidationPrompt(inputMessage);
+      const llmResponseResult = await this.llmService.sendStructuredPrompt<ValidationResult>(prompt, InputValidationSchema, null, correlationId);
+
       if (!llmResponseResult.success) {
         return { success: false, error: llmResponseResult.error };
       }
-      const llmResponse = llmResponseResult.data;
 
-      if (llmResponse === undefined || llmResponse === null) {
-        return { success: false, error: new AgentError('LLM service not configured or returned no response', 'LLM_NO_RESPONSE', this.id, correlationId) };
+      const parsedResponse = llmResponseResult.data;
+
+      // Basic structural validation of the parsed response (redundant if Zod is used, but good for safety)
+      const isValid = typeof parsedResponse.isValid === 'boolean' ? parsedResponse.isValid : false;
+      if (typeof parsedResponse.isValid !== 'boolean') {
+        this.logger.warn(`[${correlationId}] LLM response missing or invalid 'isValid' field. Defaulting to ${isValid}.`, { agentId: this.id, operation: 'validateInput' });
       }
-      return this.parseValidationResponse(llmResponse, correlationId);
+
+      const cleanedInput = parsedResponse.cleanedInput || { ingredients: [], budget: 0, occasion: undefined };
+      const extractedData = parsedResponse.extractedData || { standardizedIngredients: {}, dietaryRestrictions: [], preferences: {} };
+      const errors = parsedResponse.errors || [];
+
+      const finalResult: ValidationResult = {
+        isValid: isValid,
+        errors: errors,
+        cleanedInput: cleanedInput,
+        extractedData: extractedData
+      };
+      return { success: true, data: finalResult };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error(`[${correlationId}] Error during LLM validation: ${errorMessage}`, {
@@ -226,45 +223,64 @@ export class InputValidationAgent extends CommunicatingAgent {
     }
   }
 
-  private buildValidationPrompt(input: any): string {
-    return `Analyze these ingredients for wine pairing:
-Ingredients: ${input.ingredients.join(', ')}
-Budget: $${input.budget}
-${input.occasion ? `Occasion: ${input.occasion}` : ''}
+  private buildValidationPrompt(inputMessage: string): string {
+    // The schema is now passed directly to sendStructuredPrompt, so we just need the prompt text
+    return `Analyze the following user input for wine pairing:
+User Input: "${inputMessage}"
 
 Tasks:
-1. Validate ingredients exist and are food items
-2. Standardize ingredient names (e.g. "salmon" → "fish")
-3. Check for dietary restrictions
-4. Return JSON with:
-{
-  "isValid": boolean,
-  "errors": string[],
-  "cleanedInput": { // Renamed from sanitizedInput
-    "ingredients": string[],
-    "budget": number,
-    "occasion": string
-  },
-  "extractedData": { // Renamed from processedInput
-    "standardizedIngredients": Record<string, string>,
-    "dietaryRestrictions": string[]
-  }
-}`;
-  }
-
-  private parseValidationResponse(response: string, correlationId: string): Result<ValidationResult, AgentError> {
-    try {
-      const parsedResponse = JSON.parse(response);
-      // Basic structural validation of the parsed response
-      if (typeof parsedResponse.isValid !== 'boolean') {
-        this.logger.error(`[${correlationId}] LLM response missing isValid field`, { agentId: this.id, operation: 'parseValidationResponse' });
-        return { success: false, error: new AgentError('LLM response missing isValid field', 'LLM_PARSE_ERROR', this.id, correlationId) };
-      }
-      return { success: true, data: parsedResponse };
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      this.logger.error(`[${correlationId}] Failed to parse LLM validation response: ${errorMessage}`, { agentId: this.id, operation: 'parseValidationResponse', originalError: errorMessage });
-      return { success: false, error: new AgentError(`Failed to parse LLM validation response: ${errorMessage}`, 'LLM_PARSE_ERROR', this.id, correlationId, true, { originalError: errorMessage }) };
-    }
+1. Extract ingredients, budget, and occasion from the user input.
+2. Validate if the extracted ingredients are food items.
+3. Standardize ingredient names (e.g., "salmon" -> "fish").
+4. Check for dietary restrictions mentioned.
+5. Return ONLY the JSON object, with no additional text or markdown formatting.`;
   }
 }
+
+export const InputValidationSchema = {
+  type: "object",
+  properties: {
+    isValid: { type: "boolean" },
+    errors: {
+      type: "array",
+      items: { type: "string" }
+    },
+    cleanedInput: {
+      type: "object",
+      properties: {
+        ingredients: {
+          type: "array",
+          items: { type: "string" }
+        },
+        budget: { type: "number", nullable: true },
+        occasion: { type: "string", nullable: true }
+      },
+      required: ["ingredients", "budget"]
+    },
+    extractedData: {
+      type: "object",
+      properties: {
+        standardizedIngredients: {
+          type: "object",
+          additionalProperties: { type: "string" }
+        },
+        dietaryRestrictions: {
+          type: "array",
+          items: { type: "string" }
+        },
+        preferences: {
+          type: "object",
+          properties: {
+            wineType: { type: "string" },
+            body: { type: "string" },
+            flavorProfile: { type: "string" },
+            pairing: { type: "string" }
+          },
+          required: []
+        }
+      },
+      required: ["standardizedIngredients", "dietaryRestrictions", "preferences"]
+    }
+  },
+  required: ["isValid", "errors", "cleanedInput", "extractedData"]
+};
