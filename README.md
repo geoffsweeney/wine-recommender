@@ -24,7 +24,7 @@ The system is built on a modular, agent-based architecture, where different AI a
 7.  **Shopping & Availability (Phase 4):** Once recommendations are generated, the `SommelierCoordinator` sends `FIND_WINES` messages to the `ShopperAgent` for each recommended wine to check its availability. If no wines are found, it might send an `EXPANDED_SEARCH` message to the `ShopperAgent`.
 8.  **Final Assembly & Presentation (Phase 5):** The `SommelierCoordinator` assembles the final recommendation, including the primary wine, alternatives, and an explanation. It sends a `GENERATE_EXPLANATION` message to the `ExplanationAgent` to get a natural language explanation for the recommendation.
 9.  **History Update (Fire and Forget):** The `SommelierCoordinator` publishes an `UPDATE_RECOMMENDATION_HISTORY` message to the `UserPreferenceAgent` using `publishToAgent`. This is a "fire and forget" message, meaning the `SommelierCoordinator` does not wait for a response, as it's primarily for logging or background processing.
-10. **Response to Client:** Finally, the `SommelierCoordinator` sends the `FINAL_RECOMMENDATION` back to the `WineRecommendationController` via the `EnhancedAgentCommunicationBus`, which then sends the recommendation as an HTTP response back to the user.
+10. **Response to Client:** Finally, the `SommelierCoordinator` sends the `FINAL_RECOMMENDATION` back to the `WineRecommendationController` via the `EnhancedAgentCommunicationBus`, which then sends the recommendation as an HTTP response back to the user. This response now includes detailed wine information, such as grape varieties and their percentages, within the `primaryRecommendation` and `alternatives` objects.
 
 ### Key Components and Communication Patterns:
 
@@ -46,7 +46,7 @@ The system is designed with robustness in mind, incorporating several mechanisms
 ## Key Features and Functionality
 
 *   **Intelligent Natural Language Processing:** Understands complex and nuanced user requests for wine recommendations.
-*   **Contextual and Personalized Recommendations:** Leverages user preferences, conversation history, and specific ingredients to provide highly relevant wine suggestions.
+*   **Contextual and Personalized Recommendations:** Leverages user preferences, conversation history, and specific ingredients to provide highly relevant wine suggestions, now including detailed grape variety information.
 *   **LLM-Powered Core:** Integrates Large Language Models for advanced reasoning, preference extraction, and recommendation generation.
 *   **Modular and Scalable Architecture:** The agent-based design allows for easy extension and maintenance of individual components.
 *   **Robust Error Handling:** Built-in mechanisms for fault tolerance and resilience ensure a stable user experience.
