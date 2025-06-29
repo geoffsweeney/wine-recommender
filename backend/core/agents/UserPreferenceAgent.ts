@@ -12,6 +12,7 @@ import { ConversationTurn } from '../ConversationHistoryService';
 import { Result } from '../types/Result';
 import { AgentError } from './AgentError';
 import winston from 'winston';
+import { PreferenceExtractionResultPayload } from '../../types/agent-outputs'; // Import the new payload type
 
 interface PreferenceMessagePayload {
   input: string;
@@ -65,30 +66,32 @@ export class UserPreferenceAgent extends CommunicatingAgent {
 
   public async handleMessage<T>(message: AgentMessage<T>): Promise<Result<AgentMessage | null, AgentError>> {
     const correlationId = message.correlationId;
-    if (message.type === MessageTypes.GET_PREFERENCES) {
-      return this.handlePreferenceRequest(message as AgentMessage<PreferenceMessagePayload>);
-    } else if (message.type === MessageTypes.PREFERENCE_UPDATE) {
-      return this.handlePreferenceUpdate(message as AgentMessage<{ preferences: PreferenceNode[]; context: string; }>);
-    } else if (message.type === MessageTypes.UPDATE_RECOMMENDATION_HISTORY) {
-      return this.handleUpdateRecommendationHistory(message as AgentMessage<any>);
-    }
-    this.logger.warn(`[${correlationId}] UserPreferenceAgent received unhandled message type: ${message.type}`, {
+    switch (message.type) {
+      case MessageTypes.GET_PREFERENCES:
+        return this.handlePreferenceRequest(message as AgentMessage<PreferenceMessagePayload>);
+      case MessageTypes.PREFERENCE_UPDATE:
+        return this.handlePreferenceUpdate(message as AgentMessage<{ preferences: PreferenceNode[]; context: string; }>);
+      case MessageTypes.UPDATE_RECOMMENDATION_HISTORY:
+        return this.handleUpdateRecommendationHistory(message as AgentMessage<any>);
+      default:
+        this.logger.warn(`[${correlationId}] UserPreferenceAgent received unhandled message type: ${message.type}`, {
       agentId: this.id,
       operation: 'handleMessage',
       correlationId: correlationId,
       messageType: message.type
-    });
-    return {
-      success: false,
-      error: new AgentError(
-        `Unhandled message type: ${message.type}`,
-        'UNHANDLED_MESSAGE_TYPE',
-        this.id,
-        correlationId,
-        false, // Not recoverable, as it's an unhandled type
-        { messageType: message.type }
-      )
-    };
+        });
+        return {
+          success: false,
+          error: new AgentError(
+            `Unhandled message type: ${message.type}`,
+            'UNHANDLED_MESSAGE_TYPE',
+            this.id,
+            correlationId,
+            false, // Not recoverable, as it's an unhandled type
+            { messageType: message.type }
+          )
+        };
+    }
   }
 
   protected registerHandlers(): void {
@@ -145,7 +148,7 @@ export class UserPreferenceAgent extends CommunicatingAgent {
           this.logger.debug(`[${correlationId}] Mapping preference - type: ${type}, value: ${value}`, { agentId: this.id, operation: 'handlePreferenceRequest' });
           return {
             type,
-            value: String(value), // Explicitly cast value to string or appropriate type
+            value: this.mapPreferenceValue(type, value), // Use helper to map value to appropriate type
             source: 'fast-extraction',
             confidence: 1,
             timestamp: new Date().toISOString(),
@@ -173,11 +176,11 @@ export class UserPreferenceAgent extends CommunicatingAgent {
           },
           this.id,
           message.conversationId, // conversationId
-          message.correlationId, // correlationId
+          this.generateCorrelationId(), // Generate a new correlationId for this broadcast
           '*', // Broadcast to all
           message.userId // userId
         );
-        this.broadcast(broadcastMessage.type, broadcastMessage.payload, broadcastMessage.correlationId); // Corrected broadcast call
+        this.broadcast(broadcastMessage.type, broadcastMessage.payload, broadcastMessage.correlationId);
 
         const responseMessage = createAgentMessage(
           'preference-update-result',
@@ -191,28 +194,99 @@ export class UserPreferenceAgent extends CommunicatingAgent {
           message.sourceAgent, // targetAgent
           message.userId // userId
         );
-        this.communicationBus.sendResponse(message.sourceAgent, responseMessage);
         this.logger.info(`[${correlationId}] Preference request processed successfully (fast extraction)`, { agentId: this.id, operation: 'handlePreferenceRequest' });
         return { success: true, data: responseMessage };
       } else {
-        // If fast extraction fails or returns no data, queue async LLM extraction
-        await this.queueAsyncLLMExtraction(input, currentUserId, conversationHistory, correlationId);
+        // If fast extraction fails or returns no data, perform LLM extraction directly
+        this.logger.info(`[${correlationId}] Fast extraction failed or returned no data. Attempting LLM extraction.`, { agentId: this.id, operation: 'handlePreferenceRequest' });
+        const llmExtractionResult = await this.preferenceExtractionService.extractPreferencesWithLLM(input, conversationHistory, userId, correlationId);
+
+        if (!llmExtractionResult.success) {
+          const error = new AgentError(
+            `LLM preference extraction failed: ${llmExtractionResult.error?.message}`,
+            'LLM_EXTRACTION_FAILED',
+            this.id,
+            correlationId,
+            true,
+            { originalError: llmExtractionResult.error?.message }
+          );
+          await this.deadLetterProcessor.process(message.payload, error, { source: this.id, stage: 'llm-extraction-failure', correlationId });
+          return { success: false, error };
+        }
+
+        const llmExtractedData = llmExtractionResult.data;
+        const extractedPreferences: PreferenceNode[] = [];
+
+        // Process preferences from llmExtractedData.preferences
+        if (llmExtractedData.preferences) {
+          for (const key in llmExtractedData.preferences) {
+            if (Object.prototype.hasOwnProperty.call(llmExtractedData.preferences, key)) {
+              const rawValue = (llmExtractedData.preferences as any)[key];
+
+              // Skip empty strings for style and color
+              if ((key === 'style' || key === 'color') && typeof rawValue === 'string' && rawValue.trim() === '') {
+                continue;
+              }
+
+              // Skip [0,0] for priceRange
+              if (key === 'priceRange' && Array.isArray(rawValue) && rawValue.length === 2 && rawValue[0] === 0 && rawValue[1] === 0) {
+                continue;
+              }
+
+              // Skip ingredients if it's an empty array or if we prefer the top-level ingredients
+              // Assuming top-level ingredients is the canonical source for ingredients
+              if (key === 'ingredients' && Array.isArray(rawValue) && rawValue.length === 0) {
+                continue;
+              }
+
+              // Add other preferences
+              extractedPreferences.push({
+                type: key,
+                value: this.mapPreferenceValue(key, rawValue), // Use helper to map value to appropriate type
+                source: 'llm-extraction',
+                confidence: 0.8,
+                timestamp: new Date().toISOString(),
+                active: true
+              });
+            }
+          }
+        }
+
+        // Process top-level ingredients separately to avoid duplication and ensure it's handled
+        if (llmExtractedData.ingredients && llmExtractedData.ingredients.length > 0) {
+          // Check if 'ingredients' was already added from 'preferences' and if its value is the same
+          const newIngredientValue = llmExtractedData.ingredients.join(',');
+          const existingIngredientPref = extractedPreferences.find(p => p.type === 'ingredients' && p.value === newIngredientValue);
+
+          if (!existingIngredientPref) { // Only add if not already present with the same value
+            extractedPreferences.push({
+              type: 'ingredients',
+              value: newIngredientValue,
+              source: 'llm-extraction',
+              confidence: 0.8,
+              timestamp: new Date().toISOString(),
+              active: true
+            });
+          }
+        }
+
+        const normalizedExtractedPreferences = await this.preferenceNormalizationService.normalizePreferences(extractedPreferences);
+        const mergedPreferences = this.mergePreferences(persistedPreferences, normalizedExtractedPreferences);
+
         const responseMessage = createAgentMessage(
           'preference-update-result',
           {
-            success: false,
-            preferences: [],
-            error: 'Analyzing your input for preferences asynchronously.'
+            success: true,
+            preferences: mergedPreferences
           },
-          this.id, // sourceAgent
-          message.conversationId, // conversationId
-          message.correlationId, // correlationId
-          message.sourceAgent, // targetAgent
-          message.userId // userId
+          this.id,
+          message.conversationId,
+          message.correlationId,
+          message.sourceAgent,
+          message.userId
         );
-        this.communicationBus.sendResponse(message.sourceAgent, responseMessage);
-        this.logger.info(`[${correlationId}] Preference request queued for async LLM extraction`, { agentId: this.id, operation: 'handlePreferenceRequest' });
-        return { success: true, data: responseMessage }; // Still success from this agent's perspective, as it queued the task
+        this.logger.info(`[${correlationId}] Preference request processed successfully (LLM extraction)`, { agentId: this.id, operation: 'handlePreferenceRequest' });
+        return { success: true, data: responseMessage };
       }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -259,29 +333,6 @@ export class UserPreferenceAgent extends CommunicatingAgent {
   }
 
 
-  private async queueAsyncLLMExtraction(
-    userInput: string,
-    userId: string, // userId is now required
-    conversationHistory?: ConversationTurn[],
-    correlationId?: string // Add correlationId
-  ): Promise<void> {
-    const messageUserId = userId; // userId is now required
-    const llmExtractionMessage = createAgentMessage(
-      MessageTypes.PREFERENCE_EXTRACTION_REQUEST,
-      {
-        input: userInput,
-        userId: messageUserId,
-        history: conversationHistory,
-      },
-      this.id, // sourceAgent
-      correlationId || this.generateCorrelationId(), // conversationId
-      correlationId || this.generateCorrelationId(), // correlationId
-      'LLMPreferenceExtractorAgent', // targetAgent
-      userId // userId
-    );
-    this.communicationBus.publishToAgent('llm-preference-extractor', llmExtractionMessage);
-    this.logger.info(`[${correlationId}] Queued async LLM preference extraction for user: ${messageUserId}`, { agentId: this.id, operation: 'queueAsyncLLMExtraction' });
-  }
 
   private async handleUpdateRecommendationHistory(message: AgentMessage<any>): Promise<Result<AgentMessage | null, AgentError>> {
     const correlationId = message.correlationId;
@@ -297,7 +348,32 @@ export class UserPreferenceAgent extends CommunicatingAgent {
       message.sourceAgent,
       message.userId
     );
-    this.communicationBus.sendResponse(message.sourceAgent, responseMessage);
-    return { success: true, data: responseMessage };
+    return { success: true, data: null };
+  }
+  private mapPreferenceValue(type: string, rawValue: any): PreferenceNode['value'] {
+    switch (type) {
+        case 'priceRange':
+            // Ensure it's an array of two numbers
+            return Array.isArray(rawValue) && rawValue.length === 2 && typeof rawValue[0] === 'number' && typeof rawValue[1] === 'number'
+                ? rawValue as [number, number]
+                : String(rawValue); // Fallback to string if malformed
+        case 'pairingConfidence':
+            return rawValue; // Now expected to be a number from PreferenceExtractionService
+        case 'foodPairingActive':
+            return rawValue; // Now expected to be a boolean from PreferenceExtractionService
+        case 'regions':
+        case 'grapes':
+        case 'detectedFoods':
+        case 'suggestedPairings':
+        case 'style':
+        case 'bodyWeight':
+        case 'tannins':
+        case 'acidity':
+        case 'sweetness':
+        case 'color':
+            return rawValue; // Now expected to be an array from PreferenceExtractionService
+        default:
+            return String(rawValue); // Default to string for all others
+    }
   }
 }

@@ -32,6 +32,7 @@ export const MessageTypes = {
   GENERATE_EXPLANATION: 'generate_explanation',
   ORCHESTRATE_RECOMMENDATION_REQUEST: 'orchestrate_recommendation_request',
   PREFERENCE_EXTRACTION_REQUEST: 'preference-extraction-request', // Added
+  PREFERENCE_EXTRACTION_RESPONSE: 'preference-extraction-response', // Added
   ERROR: 'error',
   PREFERENCE_UPDATE: 'preference-update', // Added
   // Add other message types as needed

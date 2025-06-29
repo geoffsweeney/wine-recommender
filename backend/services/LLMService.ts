@@ -42,8 +42,12 @@ export class LLMService {
             host: apiUrl,
             model: model,
             apiKey: apiKey,
-            temperature: 0.1, // Default temperature for structured output
-            numPredict: 2048 // Default num_predict
+            temperature: 0.7, // Default temperature for structured output
+            numPredict: 2048, // Default num_predict
+            defaultOptions: {
+                top_p: 0.9,
+                repeat_penalty: 1.1
+            }
         });
         this.logger.info(`LLMService initialized for Ollama at ${this.apiUrl} with model: ${this.model}, maxRetries: ${this.maxRetries}, retryDelayMs: ${this.retryDelayMs}`);
     }
@@ -100,7 +104,7 @@ export class LLMService {
      * @param correlationId The correlation ID for tracing.
      * @returns A promise that resolves with a Result containing the parsed LLM's response (object) or an AgentError.
      */
-    async sendStructuredPrompt<T>(prompt: string, schema: object | z.ZodObject<any, any, any>, zodSchema: z.ZodObject<any, any, any> | null = null, correlationId: string = 'N/A'): Promise<Result<T, AgentError>> {
+    async sendStructuredPrompt<T>(prompt: string, schema: object | z.ZodObject<any, any, any>, zodSchema: z.ZodObject<any, any, any> | null = null, llmOptions: { temperature?: number; num_predict?: number } = {}, correlationId: string = 'N/A'): Promise<Result<T, AgentError>> {
         let jsonSchema: object;
         let validationSchema: z.ZodObject<any, any, any> | null;
 
@@ -118,13 +122,28 @@ export class LLMService {
         try {
             const parsedResponse = await this.ollamaClient.generateStructured(prompt, jsonSchema, validationSchema, {
                 options: {
-                    temperature: this.ollamaClient.defaultOptions.temperature,
-                    num_predict: this.ollamaClient.defaultOptions.num_predict
+                    temperature: llmOptions.temperature !== undefined ? llmOptions.temperature : this.ollamaClient.defaultOptions.temperature,
+                    num_predict: llmOptions.num_predict !== undefined ? llmOptions.num_predict : this.ollamaClient.defaultOptions.num_predict
                 }
             });
             this.logger.debug(`Received structured Ollama response: ${JSON.stringify(parsedResponse)}`);
             this.logger.info(`LLM Response (structured): Length - ${JSON.stringify(parsedResponse).length} characters.`);
-            return { success: true, data: parsedResponse as T };
+            // Create a new object to ensure type safety and add missing fields
+            const finalResponse: any = {
+                recommendations: parsedResponse.recommendations || [],
+                confidence: parsedResponse.confidence === undefined || parsedResponse.confidence === null ? 0 : parsedResponse.confidence,
+                reasoning: parsedResponse.reasoning || "No reasoning provided.",
+                pairingNotes: parsedResponse.pairingNotes || "",
+                alternatives: parsedResponse.alternatives || [],
+                primaryRecommendation: null // Default to null
+            };
+
+            if (finalResponse.recommendations && finalResponse.recommendations.length > 0) {
+                finalResponse.primaryRecommendation = finalResponse.recommendations[0];
+            }
+
+            // Now, cast to the expected type T
+            return { success: true, data: finalResponse as T };
         } catch (error: unknown) {
             const errorMessage = error instanceof Error ? error.message : String(error);
             this.logger.error(`Error sending structured prompt to LLM: ${errorMessage} (Correlation ID: ${correlationId})`);

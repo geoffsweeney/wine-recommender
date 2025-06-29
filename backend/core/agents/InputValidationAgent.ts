@@ -186,7 +186,7 @@ export class InputValidationAgent extends CommunicatingAgent {
   protected async validateInput(inputMessage: string, correlationId: string = ''): Promise<Result<ValidationResult, AgentError>> {
     try {
       const prompt = this.buildValidationPrompt(inputMessage);
-      const llmResponseResult = await this.llmService.sendStructuredPrompt<ValidationResult>(prompt, InputValidationSchema, null, correlationId);
+      const llmResponseResult = await this.llmService.sendStructuredPrompt<ValidationResult>(prompt, InputValidationSchema, null, {}, correlationId);
 
       if (!llmResponseResult.success) {
         return { success: false, error: llmResponseResult.error };
@@ -225,7 +225,12 @@ export class InputValidationAgent extends CommunicatingAgent {
 
   private buildValidationPrompt(inputMessage: string): string {
     // The schema is now passed directly to sendStructuredPrompt, so we just need the prompt text
-    return `Analyze the following user input for wine pairing:
+    return `Analyze the following user input for wine pairing.
+    
+Examples:
+Input: "I am having a juicy grilled ribeye steak tonight. What wine should I drink?"
+Output: { "isValid": true, "errors": [], "cleanedInput": { "ingredients": ["beef"], "budget": 0 }, "extractedData": { "standardizedIngredients": { "ribeye steak": "beef" }, "dietaryRestrictions": [], "preferences": { "pairing": "beef" } } }
+
 User Input: "${inputMessage}"
 
 Tasks:

@@ -9,7 +9,8 @@ import { logger } from '../../utils/logger'; // Import the logger instance
 import { EnhancedAgentCommunicationBus } from './communication/EnhancedAgentCommunicationBus';
 import { CircuitBreaker } from '../CircuitBreaker';
 import { Agent } from './Agent'; // Import Agent interface
-import { RecommendationResult } from '../../types/agent-outputs'; // Import RecommendationResult
+import { PreferenceExtractionResultPayload, RecommendationResult } from '../../types/agent-outputs'; // Import RecommendationResult and PreferenceExtractionResultPayload
+import { WineNode } from '../../types'; // Import WineNode
 
 // --- Type Definitions for SommelierCoordinator ---
 
@@ -62,8 +63,8 @@ interface OrchestrationInput {
  * Represents the final recommendation output.
  */
 interface FinalRecommendation {
-  primaryRecommendation: any; // TODO: Define Wine type
-  alternatives: any[]; // TODO: Define Wine type
+  primaryRecommendation: string | null; // Changed to string
+  alternatives: string[]; // Changed to string[]
   explanation: string;
   confidence: number;
   conversationId: string;
@@ -255,36 +256,65 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
       this.logger.debug(`[${correlationId}] Sending validation and preference messages.`, logContext);
       state.phase = 'VALIDATION_COMPLETE'; // Update phase after parallel operations are conceptually complete
 
-      const validationPromise = this.sendMessageToAgentWithCircuitBreaker(
+      const validationResult = await this.sendMessageToAgentWithCircuitBreaker(
         'input-validation-agent',
         createAgentMessage(MessageTypes.VALIDATE_INPUT, userInput.input, this.id, conversationId, this.generateCorrelationId(), 'input-validation-agent', userInput.userId)
       );
-      const preferencePromise = this.sendMessageToAgentWithCircuitBreaker(
-        'user-preference-agent',
-        createAgentMessage(MessageTypes.GET_PREFERENCES, { input: userInput.input.message, userId: userInput.userId, conversationHistory: userInput.conversationHistory }, this.id, conversationId, this.generateCorrelationId(), 'user-preference-agent', userInput.userId)
-      );
-
-      this.logger.debug(`[${correlationId}] Awaiting validation and preference results.`, logContext);
-      const [validationResult, preferenceResult] = await Promise.all([
-        validationPromise,
-        preferencePromise
-      ]);
-      this.logger.info(`[${correlationId}] Received validation result: ${validationResult.success ? JSON.stringify(validationResult.data) : validationResult.error.message}`, logContext);
-      this.logger.info(`[${correlationId}] Received preference result: ${preferenceResult.success ? JSON.stringify(preferenceResult.data) : preferenceResult.error.message}`, logContext);
 
       if (!validationResult.success) {
         state.errors.push(validationResult.error);
         this.logger.error(`[${correlationId}] InputValidation failed: ${validationResult.error.message}`, logContext);
         throw validationResult.error;
       }
-      if (!preferenceResult.success) {
+
+      state.validatedIngredients = validationResult.data.payload.cleanedInput.ingredients;
+
+      // Handle preference extraction, which might be asynchronous
+      const preferenceMessageCorrelationId = this.generateCorrelationId();
+      const preferenceRequestMessage = createAgentMessage(
+        MessageTypes.GET_PREFERENCES,
+        { input: userInput.input.message, userId: userInput.userId, conversationHistory: userInput.conversationHistory },
+        this.id,
+        conversationId,
+        preferenceMessageCorrelationId,
+        'user-preference-agent',
+        userInput.userId
+      );
+
+      this.logger.debug(`[${correlationId}] Sending preference request.`, logContext);
+      let preferenceResult = await this.sendMessageToAgentWithCircuitBreaker('user-preference-agent', preferenceRequestMessage);
+      this.logger.info(`[${correlationId}] Received preference result: ${preferenceResult.success ? JSON.stringify(preferenceResult.data) : preferenceResult.error.message}`, logContext);
+
+      // Check if preference extraction is asynchronous
+      if (!preferenceResult.success && preferenceResult.error?.message === 'Analyzing your input for preferences asynchronously.') {
+        this.logger.info(`[${correlationId}] Preference extraction is asynchronous. Waiting for LLMPreferenceExtractorAgent response.`, logContext);
+        // Wait for the actual preference extraction response from LLMPreferenceExtractorAgent
+        const llmPreferenceResult = await this.communicationBus.sendMessageAndWaitForResponse<PreferenceExtractionResultPayload>(
+          'llm-preference-extractor',
+          createAgentMessage(
+            MessageTypes.PREFERENCE_EXTRACTION_REQUEST, // This message type is what LLMPreferenceExtractorAgent expects
+            { input: userInput.input.message, userId: userInput.userId, history: userInput.conversationHistory },
+            this.id,
+            conversationId,
+            preferenceMessageCorrelationId, // Use the same correlation ID
+            'llm-preference-extractor',
+            userInput.userId
+          )
+        );
+
+        if (!llmPreferenceResult.success || !llmPreferenceResult.data) {
+          state.errors.push(llmPreferenceResult.success ? new AgentError('LLMPreferenceExtractorAgent returned no data', 'NO_LLM_PREFERENCE_DATA', this.id, correlationId) : llmPreferenceResult.error);
+          this.logger.error(`[${correlationId}] LLMPreferenceExtractorAgent failed: ${llmPreferenceResult.success ? 'No data' : llmPreferenceResult.error?.message}`, logContext);
+          throw llmPreferenceResult.success ? new AgentError('LLMPreferenceExtractorAgent returned no data', 'NO_LLM_PREFERENCE_DATA', this.id, correlationId) : llmPreferenceResult.error;
+        }
+        state.userPreferences = llmPreferenceResult.data.payload.preferences;
+      } else if (!preferenceResult.success) {
         state.errors.push(preferenceResult.error);
         this.logger.error(`[${correlationId}] PreferenceAgent failed: ${preferenceResult.error.message}`, logContext);
         throw preferenceResult.error;
+      } else {
+        state.userPreferences = preferenceResult.data.payload.preferences;
       }
-
-      state.validatedIngredients = validationResult.data.payload.cleanedInput.ingredients;
-      state.userPreferences = preferenceResult.data.payload.preferences;
       this.logger.info(`[${correlationId}] State updated: validatedIngredients=${JSON.stringify(state.validatedIngredients)}, userPreferences=${JSON.stringify(state.userPreferences)}`, logContext);
       state.decisions.push({
         timestamp: Date.now(),
@@ -373,6 +403,7 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
             input: {
               ingredients: state.ingredients,
               preferences: state.userPreferences,
+              message: userInput.input.message, // Pass the original user message
             },
             conversationHistory: userInput.conversationHistory, // Pass conversation history if available
             userId: userInput.userId,
@@ -391,7 +422,7 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
           const qualityScore = this.evaluateRecommendationQuality(recommendationsResult.data, state);
           state.qualityScore = qualityScore;
 
-          if (qualityScore > 0.8) {
+          if (qualityScore >= 0.8) {
             this.logger.info(`[${correlationId}] High quality recommendations generated.`, logContext);
             break;
           } else if (qualityScore > 0.6) {
@@ -437,7 +468,7 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
           throw fallbackResult.error;
         }
       } else {
-        state.recommendations = recommendationsResult.data.payload;
+        state.recommendations = recommendationsResult.data.payload; // The payload contains the RecommendationResult
       }
       this.logger.debug(`[${correlationId}] Phase 3 complete.`, logContext);
 
@@ -448,11 +479,11 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
 
       // Ensure recommendations exist and have the 'recommendations' array
       const wineRecommendations = state.recommendations?.recommendations || [];
-      const shoppingPromises = wineRecommendations.map((wine: any, index: number) => // wine is now any, as it's a Wine object
+      const shoppingPromises = wineRecommendations.map((wineName: string, index: number) => // wine is now string
         this.sendMessageToAgentWithCircuitBreaker(
           'shopper-agent',
           createAgentMessage(MessageTypes.FIND_WINES, {
-            wine: wine.name, // Pass the wine name as a string
+            wine: wineName, // Pass the wine name as a string
             budget: state.budget,
             priority: index,
             maxResults: index === 0 ? 10 : 5
@@ -605,21 +636,42 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
     // TODO: Implement final ranking, explanation generation, and confidence scoring
     this.logger.info(`[${correlationId}] Finalizing recommendation for conversation: ${state.conversationId}`);
 
-    const primaryRecommendation = state.availableWines && state.availableWines.length > 0 ? state.availableWines[0] : null;
-    const alternatives = state.availableWines ? state.availableWines.slice(1, 4) : [];
+    let primaryRecommendation: string | null = null;
+    let alternatives: string[] = [];
+    let explanation = '';
+    let confidence = 0;
 
-    const explanation = await this.generateExplanation(primaryRecommendation, state.ingredients, state.userPreferences, correlationId, state); // Pass state to generateExplanation
-    const confidence = this.calculateConfidence(state);
+    if (state.availableWines && state.availableWines.length > 0) {
+      // Assuming availableWines are already WineNode objects or can be converted
+      // For now, let's assume they are strings or have a 'name' property
+      primaryRecommendation = state.availableWines[0]?.name || state.availableWines[0]; // Use name if WineNode, else direct string
+      alternatives = state.availableWines.slice(1, 4).map((wine: any) => wine.name || wine); // Map to names
+      // If wines are available, generate explanation based on them
+      explanation = await this.generateExplanation(primaryRecommendation, state.ingredients, state.userPreferences, correlationId, state);
+      confidence = this.calculateConfidence(state); // Calculate confidence based on available wines
+    } else if (state.recommendations && state.recommendations.recommendations && state.recommendations.recommendations.length > 0) {
+      // If no available wines, but LLM provided recommendations, use them (which are strings)
+      primaryRecommendation = state.recommendations.recommendations[0];
+      alternatives = state.recommendations.recommendations.slice(1, 4);
+      explanation = state.recommendations.reasoning || ''; // Use LLM's explanation, default to empty string
+      confidence = state.recommendations.confidence; // Use LLM's confidence
+    } else {
+      // Fallback if no recommendations at all
+      explanation = `No specific wine recommendations could be generated at this time. Please try rephrasing your request.`;
+      confidence = 0;
+    }
 
     // Learning: Update preferences based on recommendation (fire and forget message)
-    this.communicationBus.publishToAgent( // Changed to publishToAgent
-      'user-preference-agent', // Target agent
-      createAgentMessage(MessageTypes.UPDATE_RECOMMENDATION_HISTORY, {
-        userId: state.userId,
-        recommendation: primaryRecommendation,
-        context: state
-      }, this.id, state.conversationId, this.generateCorrelationId(), 'user-preference-agent')
-    );
+    if (primaryRecommendation) { // Only update history if a recommendation was made
+      this.communicationBus.publishToAgent(
+        'user-preference-agent',
+        createAgentMessage(MessageTypes.UPDATE_RECOMMENDATION_HISTORY, {
+          userId: state.userId,
+          recommendation: primaryRecommendation,
+          context: state
+        }, this.id, state.conversationId, this.generateCorrelationId(), 'user-preference-agent')
+      );
+    }
 
     return {
       primaryRecommendation,
@@ -631,11 +683,15 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
     };
   }
 
-  private async generateExplanation(wine: any, ingredients: string[], preferences: any, correlationId: string, state: ConversationState): Promise<string> { // Added state parameter
-    // TODO: Call ExplanationAgent to generate a natural language explanation
-    this.logger.debug(`[${correlationId}] Generating explanation for wine: ${wine?.name}`);
+  private async generateExplanation(wineName: string | null, ingredients: string[], preferences: any, correlationId: string, state: ConversationState): Promise<string> {
+    // Only call ExplanationAgent if there's a primary recommendation to explain
+    if (!wineName) {
+      return `No specific wine was recommended to generate a detailed explanation.`;
+    }
+ 
+    this.logger.debug(`[${correlationId}] Generating explanation for wine: ${wineName}`);
     const explanationMessage = createAgentMessage(MessageTypes.GENERATE_EXPLANATION, {
-      recommendedWines: wine ? [wine] : [], // ExplanationAgent expects an array of recommendedWines
+      recommendedWines: wineName ? [wineName] : [], // Pass wine name as string
       recommendationContext: {
         ingredients: ingredients,
         preferences: preferences
@@ -652,9 +708,15 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
   }
 
   private calculateConfidence(state: ConversationState): number {
-    // TODO: Implement logic to calculate overall confidence based on quality score, errors, etc.
-    this.logger.debug(`Calculating confidence for conversation: ${state.conversationId}`);
-    return state.qualityScore; // Placeholder
+    // If there are available wines, confidence is based on quality score.
+    // Otherwise, if LLM recommendations were used, confidence comes directly from LLM.
+    // If no recommendations at all, confidence is 0.
+    if (state.availableWines && state.availableWines.length > 0) {
+      return state.qualityScore;
+    } else if (state.recommendations && state.recommendations.confidence !== undefined) {
+      return state.recommendations.confidence;
+    }
+    return 0;
   }
   protected generateCorrelationId(): string {
     return `${this.id}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;

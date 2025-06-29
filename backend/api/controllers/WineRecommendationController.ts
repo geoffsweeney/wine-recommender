@@ -30,13 +30,15 @@ export class WineRecommendationController extends BaseController {
   protected async executeImpl(req: ValidatedRequest, res: Response): Promise<void> { // Cast req to ValidatedRequest
     const { method } = req;
     this.logger.info(`Received wine recommendation request [${method}]`, { body: req.body, query: req.query });
+    this.logger.info(`Validated body: ${JSON.stringify(req.validatedBody)}`);
 
     try {
       switch (method) {
         case 'POST':
           const request = req.validatedBody as RecommendationRequest; // Use validatedBody
+          this.logger.info(`Executing recommendation strategy with request: ${JSON.stringify(request)}`);
           const results = await this.recommendationStrategy.execute(request);
-          this.logger.debug('Recommendation results', { results });
+          this.logger.info(`Recommendation strategy returned results: ${JSON.stringify(results)}`);
           this.ok(res, results);
           break;
 
@@ -56,6 +58,7 @@ export class WineRecommendationController extends BaseController {
         body: req.body,
         query: req.query
       });
+      this.logger.error(`Error details: ${err instanceof Error ? err.message : 'Unknown error'}`);
       this.fail(res, err instanceof Error ? err.message : 'Failed to process request'); // Use the actual error message
     }
   }

@@ -110,7 +110,6 @@ export class ShopperAgent extends CommunicatingAgent {
         message.sourceAgent,
         message.userId
       );
-      this.communicationBus.sendResponse(message.sourceAgent, responseMessage);
       return { success: true, data: responseMessage };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -157,7 +156,6 @@ export class ShopperAgent extends CommunicatingAgent {
         message.sourceAgent,
         message.userId
       );
-      this.communicationBus.sendResponse(message.sourceAgent, responseMessage);
       return { success: true, data: responseMessage };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);

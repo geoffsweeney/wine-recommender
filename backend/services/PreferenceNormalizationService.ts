@@ -3,6 +3,7 @@ import { TYPES } from '../di/Types'; // Import TYPES
 import { ILogger, LLMService } from './LLMService'; // Import ILogger and LLMService
 import { PreferenceNode } from '../types';
 import { z } from 'zod'; // Import Zod for schema definition
+import { AgentError } from '../core/agents/AgentError'; // Import AgentError
 
 @injectable()
 export class PreferenceNormalizationService {
@@ -70,7 +71,7 @@ export class PreferenceNormalizationService {
 
   // Define the Zod schema for the LLM's synonym resolution output
   private readonly SynonymResolutionSchema = z.object({
-    canonicalTerm: z.string().describe("The canonical, normalized term for the given input synonym."),
+    canonicalTerm: z.string().optional().describe("The canonical, normalized term for the given input synonym."),
   }).describe("Schema for resolving a synonym to its canonical term using an LLM.");
 
   /**
@@ -81,6 +82,10 @@ export class PreferenceNormalizationService {
    * @returns A Promise that resolves to the canonical term or the original synonym if LLM resolution fails.
    */
   private async resolveSynonymWithLlm(type: string, synonym: string): Promise<string> {
+    if (synonym.trim() === '') {
+      this.logger.warn(`Skipping LLM synonym resolution for empty synonym for type "${type}".`);
+      return ''; // Return empty string directly if synonym is empty
+    }
     this.logger.info(`Attempting to resolve synonym "${synonym}" for type "${type}" with LLM.`);
     const prompt = `Given the preference type "${type}" and the user's input "${synonym}", identify the most appropriate canonical term. The canonical term should be a standardized, widely recognized term within the wine domain for this preference. If the input is already a canonical term or cannot be mapped, return the input as is.
 
@@ -102,19 +107,27 @@ export class PreferenceNormalizationService {
       );
 
       if (result.success) {
-        const canonicalTerm = result.data.canonicalTerm.trim().toLowerCase();
-        this.logger.info(`LLM resolved "${synonym}" to canonical term "${canonicalTerm}" for type "${type}".`);
-        // Cache the LLM-resolved synonym for future use
-        if (!this.synonymRegistry.has(type)) {
-          this.synonymRegistry.set(type, new Map());
+        if (result.data.canonicalTerm !== undefined) {
+          const canonicalTerm = result.data.canonicalTerm.trim().toLowerCase();
+          this.logger.info(`LLM resolved "${synonym}" to canonical term "${canonicalTerm}" for type "${type}".`);
+          // Cache the LLM-resolved synonym for future use
+          if (!this.synonymRegistry.has(type)) {
+            this.synonymRegistry.set(type, new Map());
+          }
+          this.synonymRegistry.get(type)?.set(synonym.toLowerCase(), canonicalTerm);
+          return canonicalTerm;
+        } else {
+          // LLM call was successful, but no canonicalTerm was returned (because it's optional)
+          this.logger.warn(`LLM returned no canonical term for synonym "${synonym}" for type "${type}".`);
+          return synonym; // Return original synonym
         }
-        this.synonymRegistry.get(type)?.set(synonym.toLowerCase(), canonicalTerm);
-        return canonicalTerm;
-      } else {
-        this.logger.warn(`LLM failed to resolve synonym "${synonym}" for type "${type}": ${result.error.message}`);
+      } else { // result.success is false
+        // Explicitly cast result to the error type to access 'error' property
+        const errorResult = result as { success: false; error: AgentError };
+        this.logger.warn(`LLM failed to resolve synonym "${synonym}" for type "${type}": ${errorResult.error.message}`);
         return synonym; // Return original synonym if LLM fails
       }
-    } catch (error) {
+    } catch (error: unknown) { // Catch any unexpected errors during the LLM call
       this.logger.error(`Error during LLM synonym resolution for "${synonym}" (${type}):`, error);
       return synonym; // Return original synonym on error
     }

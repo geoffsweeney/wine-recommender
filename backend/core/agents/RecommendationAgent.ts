@@ -12,6 +12,7 @@ import { AgentError } from './AgentError';
 import { LogContext } from '../../types/LogContext';
 import { z } from 'zod';
 import { WineNode } from '../../types';
+import { RecommendationResult } from '../../types/agent-outputs';
 
 interface Wine extends WineNode {}
 
@@ -19,14 +20,26 @@ interface RecommendationMessagePayload {
   input: {
     ingredients?: string[];
     preferences?: any;
+    message?: string;
+    priceRange?: { min?: number; max?: number };
+    occasion?: string;
+    wineStyle?: string[];
+    bodyPreference?: 'light' | 'medium' | 'full';
+    sweetness?: 'dry' | 'off-dry' | 'medium-dry' | 'medium-sweet' | 'sweet';
   };
   conversationHistory?: { role: string; content: string }[];
   userId?: string;
+  message?: string;
+  requestId?: string;
+  strategy?: 'knowledge_graph_first' | 'llm_first' | 'hybrid';
 }
 
-// Define the configuration interface for RecommendationAgent
 export interface RecommendationAgentConfig {
   defaultRecommendationCount: number;
+  knowledgeGraphEnabled: boolean;
+  hybridMode: boolean;
+  fallbackToLLM: boolean;
+  confidenceThreshold: number;
 }
 
 @injectable()
@@ -37,19 +50,27 @@ export class RecommendationAgent extends CommunicatingAgent {
     @inject(TYPES.DeadLetterProcessor) private readonly deadLetterProcessor: DeadLetterProcessor,
     @inject(TYPES.Logger) protected readonly logger: winston.Logger,
     @inject(EnhancedAgentCommunicationBus) private readonly injectedCommunicationBus: EnhancedAgentCommunicationBus,
-    @inject(TYPES.RecommendationAgentConfig) private readonly agentConfig: RecommendationAgentConfig // Inject agent config
+    @inject(TYPES.RecommendationAgentConfig) private readonly agentConfig: RecommendationAgentConfig
   ) {
     const id = 'recommendation-agent';
     const dependencies: CommunicatingAgentDependencies = {
       communicationBus: injectedCommunicationBus,
       logger: logger,
-      messageQueue: {} as any, // Placeholder for IMessageQueue
-      stateManager: {} as any, // Placeholder for IStateManager
-      config: agentConfig as any // Use the injected config
+      messageQueue: {} as any,
+      stateManager: {} as any,
+      config: agentConfig as any
     };
     super(id, agentConfig, dependencies);
     this.registerHandlers();
-    this.logger.info(`[${this.id}] RecommendationAgent initialized`, { agentId: this.id, operation: 'initialization' });
+    this.logger.info(`[${this.id}] RecommendationAgent initialized`, { 
+      agentId: this.id, 
+      operation: 'initialization',
+      config: {
+        knowledgeGraphEnabled: agentConfig.knowledgeGraphEnabled,
+        hybridMode: agentConfig.hybridMode,
+        fallbackToLLM: agentConfig.fallbackToLLM
+      }
+    });
   }
 
   public getName(): string {
@@ -62,7 +83,9 @@ export class RecommendationAgent extends CommunicatingAgent {
       'ingredient-matching',
       'preference-matching',
       'llm-enhancement',
-      'knowledge-graph-integration'
+      'knowledge-graph-integration',
+      'hybrid-recommendation',
+      'contextual-recommendation'
     ];
   }
 
@@ -70,9 +93,11 @@ export class RecommendationAgent extends CommunicatingAgent {
     const correlationId = message.correlationId;
     switch (message.type) {
       case 'recommendation-request':
+      case MessageTypes.GENERATE_RECOMMENDATIONS:
+      case MessageTypes.REFINE_RECOMMENDATIONS:
         return this.handleRecommendationRequest(message as AgentMessage<RecommendationMessagePayload>);
-      case 'preference-response': // Handle old preference update format
-      case 'preference-update-result': // Handle new preference update format
+      case 'preference-response':
+      case 'preference-update-result':
         return this.handlePreferenceUpdate(message);
       default:
         this.logger.warn(`[${correlationId}] RecommendationAgent received unhandled message type: ${message.type}`, {
@@ -88,7 +113,7 @@ export class RecommendationAgent extends CommunicatingAgent {
             'UNHANDLED_MESSAGE_TYPE',
             this.id,
             correlationId,
-            false, // Not recoverable, as it's an unhandled type
+            false,
             { messageType: message.type }
           )
         };
@@ -97,234 +122,458 @@ export class RecommendationAgent extends CommunicatingAgent {
 
   protected registerHandlers(): void {
     super.registerHandlers();
-    this.communicationBus.registerMessageHandler(
-      this.id,
-      MessageTypes.GENERATE_RECOMMENDATIONS, // Use MessageTypes.GENERATE_RECOMMENDATIONS
-      this.handleRecommendationRequest.bind(this) as (message: AgentMessage<unknown>) => Promise<Result<AgentMessage | null, AgentError>>
-    );
-    this.communicationBus.registerMessageHandler(
-      this.id,
-      MessageTypes.REFINE_RECOMMENDATIONS, // Use MessageTypes.REFINE_RECOMMENDATIONS
-      this.handleRecommendationRequest.bind(this) as (message: AgentMessage<unknown>) => Promise<Result<AgentMessage | null, AgentError>>
-    );
+    
+    // Register all supported message types
+    const messageTypes = [
+      'recommendation-request',
+      MessageTypes.GENERATE_RECOMMENDATIONS,
+      MessageTypes.REFINE_RECOMMENDATIONS
+    ];
 
-    // Handle both old and new preference update formats
-    this.communicationBus.registerMessageHandler(
-      this.id,
-      'preference-response',
-      this.handlePreferenceUpdate.bind(this) as (message: AgentMessage<unknown>) => Promise<Result<AgentMessage | null, AgentError>>
-    );
-    this.communicationBus.registerMessageHandler(
-      this.id,
-      'preference-update-result',
-      this.handlePreferenceUpdate.bind(this) as (message: AgentMessage<unknown>) => Promise<Result<AgentMessage | null, AgentError>>
-    );
+    messageTypes.forEach(messageType => {
+      this.communicationBus.registerMessageHandler(
+        this.id,
+        messageType,
+        this.handleRecommendationRequest.bind(this) as (message: AgentMessage<unknown>) => Promise<Result<AgentMessage | null, AgentError>>
+      );
+    });
+
+    // Handle preference updates
+    ['preference-response', 'preference-update-result'].forEach(messageType => {
+      this.communicationBus.registerMessageHandler(
+        this.id,
+        messageType,
+        this.handlePreferenceUpdate.bind(this) as (message: AgentMessage<unknown>) => Promise<Result<AgentMessage | null, AgentError>>
+      );
+    });
   }
 
   private async handlePreferenceUpdate(message: AgentMessage<unknown>): Promise<Result<AgentMessage | null, AgentError>> {
     const correlationId = message.correlationId;
-    this.logger.debug(`[${correlationId}] Received preference update`, { agentId: this.id, operation: 'handlePreferenceUpdate' });
+    this.logger.debug(`[${correlationId}] Received preference update`, { 
+      agentId: this.id, 
+      operation: 'handlePreferenceUpdate' 
+    });
     
-    const payload = message.payload as { success: boolean; error?: string; }; // Assuming payload has success and error
+    const payload = message.payload as { success: boolean; error?: string; };
 
     if (payload.success === false) {
-      this.logger.warn(`[${correlationId}] Preference update failed: ${payload.error}`, { agentId: this.id, operation: 'handlePreferenceUpdate' });
-      return { success: false, error: new AgentError(`Preference update failed: ${payload.error}`, 'PREFERENCE_UPDATE_FAILED', this.id, correlationId) };
+      this.logger.warn(`[${correlationId}] Preference update failed: ${payload.error}`, { 
+        agentId: this.id, 
+        operation: 'handlePreferenceUpdate' 
+      });
+      return { 
+        success: false, 
+        error: new AgentError(`Preference update failed: ${payload.error}`, 'PREFERENCE_UPDATE_FAILED', this.id, correlationId) 
+      };
     }
 
-    // Process preferences as before
-    this.logger.info(`[${correlationId}] Processing updated preferences`, { agentId: this.id, operation: 'handlePreferenceUpdate' });
-    return { success: true, data: null }; // Indicate successful handling of the update
+    this.logger.info(`[${correlationId}] Processing updated preferences`, { 
+      agentId: this.id, 
+      operation: 'handlePreferenceUpdate' 
+    });
+    return { success: true, data: null };
   }
 
   private async handleRecommendationRequest(message: AgentMessage<unknown>): Promise<Result<AgentMessage | null, AgentError>> {
     const correlationId = message.correlationId;
-    this.logger.info(`[${correlationId}] RecommendationAgent.handleRecommendationRequest entered`, { agentId: this.id, operation: 'handleRecommendationRequest' });
+    this.logger.info(`[${correlationId}] Processing recommendation request`, { 
+      agentId: this.id, 
+      operation: 'handleRecommendationRequest' 
+    });
 
     try {
       const payload = message.payload as RecommendationMessagePayload;
-      this.logger.debug(`[${correlationId}] RecommendationAgent received payload: ${JSON.stringify(payload)}`, { agentId: this.id, operation: 'handleRecommendationRequest' });
+      
       if (!payload?.input) {
         const error = new AgentError('Invalid message: missing payload.input', 'MISSING_PAYLOAD_INPUT', this.id, correlationId);
-        await this.deadLetterProcessor.process(message.payload, error, { source: this.id, stage: 'recommendation-validation', correlationId });
+        await this.deadLetterProcessor.process(message.payload, error, { 
+          source: this.id, 
+          stage: 'recommendation-validation', 
+          correlationId 
+        });
         return { success: false, error };
       }
 
-      let recommendedWines: Wine[] = [];
-      let recommendationType: 'ingredients' | 'preferences' = 'preferences';
-      
-      if (payload.input.ingredients && payload.input.ingredients.length > 0) {
-        this.logger.info(`[${correlationId}] Handling ingredient-based request`, { agentId: this.id, operation: 'handleRecommendationRequest' });
-        this.logger.debug(`[${correlationId}] Searching wines by ingredients: ${JSON.stringify(payload.input.ingredients)}`, { agentId: this.id, operation: 'findWinesByIngredients' });
-        recommendedWines = await this.knowledgeGraphService.findWinesByIngredients(payload.input.ingredients);
-        this.logger.debug(`[${correlationId}] Wines found by ingredients: ${JSON.stringify(recommendedWines)}`, { agentId: this.id, operation: 'findWinesByIngredients' });
-        recommendationType = 'ingredients';
-      } else if (payload.input.preferences) {
-        this.logger.info(`[${correlationId}] Handling preference-based request`, { agentId: this.id, operation: 'handleRecommendationRequest' });
-        this.logger.debug(`[${correlationId}] Searching wines by preferences: ${JSON.stringify(payload.input.preferences)}`, { agentId: this.id, operation: 'findWinesByPreferences' });
-        recommendedWines = await this.knowledgeGraphService.findWinesByPreferences(payload.input.preferences);
-        this.logger.debug(`[${correlationId}] Wines found by preferences: ${JSON.stringify(recommendedWines)}`, { agentId: this.id, operation: 'findWinesByPreferences' });
+      // Determine recommendation strategy
+      const strategy = this.determineRecommendationStrategy(payload);
+      this.logger.debug(`[${correlationId}] Using recommendation strategy: ${strategy}`, { 
+        agentId: this.id, 
+        operation: 'handleRecommendationRequest',
+        strategy 
+      });
+
+      let recommendationResult: RecommendationResult | null = null;
+
+      switch (strategy) {
+        case 'llm_first':
+          recommendationResult = await this.getLLMRecommendation(payload, correlationId, message.conversationId); // Pass original correlationId as parentCorrelationId
+          break;
+        case 'knowledge_graph_first':
+          recommendationResult = await this.getKnowledgeGraphRecommendation(payload, correlationId);
+          if (!recommendationResult && this.agentConfig.fallbackToLLM) {
+            this.logger.info(`[${correlationId}] Knowledge graph failed, falling back to LLM`, {
+              agentId: this.id,
+              operation: 'handleRecommendationRequest'
+            });
+            recommendationResult = await this.getLLMRecommendation(payload, correlationId, message.conversationId); // Pass original correlationId as parentCorrelationId
+          }
+          break;
+        case 'hybrid':
+          recommendationResult = await this.getHybridRecommendation(payload, correlationId, message.conversationId);
+          break;
       }
 
-      if (!recommendedWines || recommendedWines.length === 0) {
-        this.logger.info(`[${correlationId}] No wines found in KnowledgeGraphService. Generating fallback recommendation.`, { agentId: this.id, operation: 'handleRecommendationRequest' });
-        const fallbackRecommendations = await this.generateFallbackRecommendation(payload, correlationId);
-        if (fallbackRecommendations) {
-          const responseMessage = createAgentMessage(
-            'recommendation-response',
-            fallbackRecommendations,
-            this.id,
-            message.conversationId,
-            correlationId,
-            message.sourceAgent
-          );
-          this.communicationBus.sendResponse(message.sourceAgent, responseMessage);
-          this.logger.info(`[${correlationId}] Fallback recommendation processed successfully`, { agentId: this.id, operation: 'handleRecommendationRequest' });
-          return { success: true, data: responseMessage };
-        } else {
-          await this.handleNoWinesFound(message, recommendationType, correlationId);
-          return { success: true, data: null }; // No wines found, and fallback also failed
-        }
+      if (!recommendationResult) {
+        return await this.handleNoRecommendations(message, correlationId);
       }
 
-      const enhancedRecommendations = await this.enhanceRecommendations(
-        recommendedWines,
-        payload,
-        recommendationType,
-        correlationId
-      );
-
+      // Send successful response
       const responseMessage = createAgentMessage(
         'recommendation-response',
-        enhancedRecommendations,
+        recommendationResult,
         this.id,
-        message.conversationId, // Corrected: conversationId
-        correlationId, // Corrected: correlationId
-        message.sourceAgent // Corrected: targetAgent
+        message.conversationId,
+        correlationId,
+        message.sourceAgent
       );
-      this.communicationBus.sendResponse(message.sourceAgent, responseMessage);
-      this.logger.info(`[${correlationId}] Recommendation request processed successfully`, { agentId: this.id, operation: 'handleRecommendationRequest' });
+
+      
+      this.logger.info(`[${message.correlationId}] Recommendation request processed successfully`, { // Use message.correlationId here
+        agentId: this.id,
+        operation: 'handleRecommendationRequest',
+        recommendationCount: recommendationResult.recommendations?.length || 0,
+        confidence: recommendationResult.confidence,
+        strategy
+      });
+
       return { success: true, data: responseMessage };
+
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      const agentError = error instanceof AgentError ? error : new AgentError(errorMessage, 'RECOMMENDATION_PROCESSING_ERROR', this.id, correlationId, true, { originalError: errorMessage });
-      await this.deadLetterProcessor.process(message.payload, agentError, { source: this.id, stage: 'RecommendationProcessing', correlationId });
-      this.logger.error(`[${correlationId}] Error processing recommendation request: ${errorMessage}`, { agentId: this.id, operation: 'handleRecommendationRequest', originalError: errorMessage });
-      return { success: false, error: agentError };
+      return await this.handleRequestError(message, error, correlationId);
     }
   }
 
-  private async enhanceRecommendations(recommendedWines: Wine[], payload: RecommendationMessagePayload, recommendationType: string, correlationId: string) {
-    const wineList = recommendedWines.map(wine => `- ${wine.name} (Type: ${wine.type}, Region: ${wine.region}, Price: $${wine.price || 'N/A'})`).join('\n');
-    const llmPrompt = `Based on the user's input (${recommendationType}) and the following EXACT list of wines available in our database:\n${wineList}\n\nYour task is to provide an enhanced list of recommendations and a brief explanation. CRITICAL: You MUST ONLY recommend wines that are PRESENT in the provided "available_wines" list. Do NOT invent new wines. The output must be a JSON object with 'recommendedWines' (an array of wine objects, each with 'id', 'name', 'region', 'price', 'type' fields) and 'llmEnhancement' (a string explanation).`;
-
-    const enhancedRecommendationsSchema = z.object({
-      recommendedWines: z.array(z.object({
-        id: z.string(),
-        name: z.string(),
-        region: z.string(),
-        price: z.number().optional(),
-        type: z.string(),
-      })),
-      llmEnhancement: z.string(),
-    });
-    
-    try {
-      const llmResponseResult = await this.llmService.sendStructuredPrompt<{ recommendedWines: Wine[], llmEnhancement: string }>(llmPrompt, enhancedRecommendationsSchema, enhancedRecommendationsSchema, correlationId);
-      if (!llmResponseResult.success) {
-        this.logger.warn(`[${correlationId}] LLM enhancement failed: ${llmResponseResult.error.message}`, { agentId: this.id, operation: 'enhanceRecommendations' });
-        return { recommendedWines }; // Return original recommendations if LLM fails
-      }
-
-      const enhancedRecommendations = llmResponseResult.data;
-
-      if (enhancedRecommendations &&
-          Array.isArray(enhancedRecommendations.recommendedWines) &&
-          typeof enhancedRecommendations.llmEnhancement === 'string') {
-        return enhancedRecommendations;
-      }
-      this.logger.warn(`[${correlationId}] LLM returned invalid format for enhanced recommendations`, { agentId: this.id, operation: 'enhanceRecommendations', llmResponse: enhancedRecommendations });
-      return { recommendedWines }; // Return original if LLM response format is invalid
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      this.logger.error(`[${correlationId}] Error enhancing recommendations: ${errorMessage}`, { agentId: this.id, operation: 'enhanceRecommendations', originalError: errorMessage });
-      return { recommendedWines };
+  private determineRecommendationStrategy(payload: RecommendationMessagePayload): 'knowledge_graph_first' | 'llm_first' | 'hybrid' {
+    // Use explicit strategy if provided
+    if (payload.strategy) {
+      return payload.strategy;
     }
+
+    // Use configuration defaults
+    if (this.agentConfig.hybridMode) {
+      return 'hybrid';
+    }
+
+    // If knowledge graph is disabled, use LLM
+    if (!this.agentConfig.knowledgeGraphEnabled) {
+      return 'llm_first';
+    }
+
+    // For structured data (ingredients, specific preferences), prefer knowledge graph first
+    if (payload.input.ingredients?.length || 
+        (payload.input.preferences && Object.keys(payload.input.preferences).length > 0)) {
+      return 'knowledge_graph_first';
+    }
+
+    // For natural language queries, prefer LLM first
+    if (payload.input.message) {
+      return 'llm_first';
+    }
+
+    // Default to knowledge graph first
+    return 'knowledge_graph_first';
   }
 
-  private async generateFallbackRecommendation(payload: RecommendationMessagePayload, correlationId: string): Promise<{ recommendedWines: Wine[], llmEnhancement: string } | null> {
-    const llmPrompt = `Based on the user's input (ingredients: ${JSON.stringify(payload.input.ingredients)}, preferences: ${JSON.stringify(payload.input.preferences)}), provide a general wine recommendation and a brief explanation. Do NOT assume any specific wines are available in a database. Focus on general knowledge. The output must be a JSON object with 'recommendedWines' (an array of wine objects) and 'llmEnhancement' (a string explanation).`;
-
-    const fallbackRecommendationSchema = z.object({
-      recommendedWines: z.array(z.object({
-        id: z.string(),
-        name: z.string(),
-        region: z.string(),
-        price: z.number().optional(),
-        type: z.string(),
-      })),
-      llmEnhancement: z.string(),
+  private async getLLMRecommendation(payload: RecommendationMessagePayload, parentCorrelationId: string, conversationId: string): Promise<RecommendationResult | null> {
+    this.logger.info(`[${parentCorrelationId}] Requesting LLM recommendation`, {
+      agentId: this.id, 
+      operation: 'getLLMRecommendation' 
     });
 
+    const llmRequestPayload = {
+      message: payload.input.message || payload.message,
+      ingredients: payload.input.ingredients,
+      preferences: payload.input.preferences,
+      priceRange: payload.input.priceRange,
+      occasion: payload.input.occasion,
+      wineStyle: payload.input.wineStyle,
+      bodyPreference: payload.input.bodyPreference,
+      sweetness: payload.input.sweetness,
+      conversationHistory: payload.conversationHistory || [],
+      recommendationSource: 'llm' as const
+    };
+
+    const llmRequestMessage = createAgentMessage(
+      'llm-recommendation-request',
+      llmRequestPayload,
+      this.id, // sourceAgent
+      conversationId, // conversationId
+      this.generateCorrelationId(), // NEW correlationId for this specific request
+      'llm-recommendation-agent', // targetAgent
+      undefined, // userId (optional, not used here)
+      'NORMAL', // priority (default)
+      { parentCorrelationId } // metadata
+    );
+
     try {
-      const llmResponseResult = await this.llmService.sendStructuredPrompt<{ recommendedWines: Wine[], llmEnhancement: string }>(llmPrompt, fallbackRecommendationSchema, fallbackRecommendationSchema, correlationId);
-      if (!llmResponseResult.success) {
-        this.logger.warn(`[${correlationId}] LLM fallback recommendation failed: ${llmResponseResult.error.message}`, { agentId: this.id, operation: 'generateFallbackRecommendation' });
+      const llmResponseResult = await this.communicationBus.sendMessageAndWaitForResponse<{
+        recommendation: RecommendationResult;
+        confidenceScore: number;
+      }>(
+        'llm-recommendation-agent',
+        llmRequestMessage
+      );
+
+      if (!llmResponseResult.success || !llmResponseResult.data?.payload) {
+        this.logger.warn(`[${parentCorrelationId}] LLM recommendation failed`, { // Use parentCorrelationId here
+          agentId: this.id,
+          operation: 'getLLMRecommendation',
+          error: llmResponseResult.success ? undefined : llmResponseResult.error?.message
+        });
         return null;
       }
 
-      const fallbackRecommendations = llmResponseResult.data;
-
-      if (fallbackRecommendations &&
-          Array.isArray(fallbackRecommendations.recommendedWines) &&
-          typeof fallbackRecommendations.llmEnhancement === 'string') {
-        return fallbackRecommendations;
+      const llmPayload = llmResponseResult.data.payload;
+      
+      // Transform LLM response to match RecommendationResult format
+      if (llmPayload.recommendation) {
+        return {
+          recommendations: llmPayload.recommendation.recommendations || [],
+          reasoning: llmPayload.recommendation.reasoning || '',
+          confidence: llmPayload.recommendation.confidence || llmPayload.confidenceScore || 0.5,
+          pairingNotes: llmPayload.recommendation.pairingNotes,
+          alternatives: llmPayload.recommendation.alternatives
+        };
       }
-      this.logger.warn(`[${correlationId}] LLM returned invalid format for fallback recommendations`, { agentId: this.id, operation: 'generateFallbackRecommendation', llmResponse: fallbackRecommendations });
+
       return null;
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      this.logger.error(`[${correlationId}] Error generating fallback recommendations: ${errorMessage}`, { agentId: this.id, operation: 'generateFallbackRecommendation', originalError: errorMessage });
+      this.logger.error(`[${parentCorrelationId}] Error getting LLM recommendation: ${errorMessage}`, { // Use parentCorrelationId here
+        agentId: this.id,
+        operation: 'getLLMRecommendation',
+        originalError: errorMessage
+      });
       return null;
     }
   }
 
-  private async handleNoWinesFound(message: AgentMessage<unknown>, recommendationType: string, correlationId: string) {
+  private async getKnowledgeGraphRecommendation(payload: RecommendationMessagePayload, correlationId: string): Promise<RecommendationResult | null> {
+    this.logger.info(`[${correlationId}] Requesting knowledge graph recommendation`, { 
+      agentId: this.id, 
+      operation: 'getKnowledgeGraphRecommendation' 
+    });
+
+    try {
+      let wines: Wine[] = [];
+
+      if (payload.input.ingredients && payload.input.ingredients.length > 0) {
+        wines = await this.knowledgeGraphService.findWinesByIngredients(payload.input.ingredients);
+        this.logger.debug(`[${correlationId}] Found ${wines.length} wines by ingredients`, { 
+          agentId: this.id, 
+          operation: 'getKnowledgeGraphRecommendation',
+          ingredients: payload.input.ingredients 
+        });
+      } else if (payload.input.preferences) {
+        wines = await this.knowledgeGraphService.findWinesByPreferences(payload.input.preferences);
+        this.logger.debug(`[${correlationId}] Found ${wines.length} wines by preferences`, { 
+          agentId: this.id, 
+          operation: 'getKnowledgeGraphRecommendation' 
+        });
+      }
+
+      if (!wines || wines.length === 0) {
+        this.logger.info(`[${correlationId}] No wines found in knowledge graph`, { 
+          agentId: this.id, 
+          operation: 'getKnowledgeGraphRecommendation' 
+        });
+        return null;
+      }
+
+      // Limit results to configured count
+      const limitedWines = wines.slice(0, this.agentConfig.defaultRecommendationCount);
+      const wineNames = limitedWines.map(wine => wine.name);
+
+      // Enhance with LLM if available
+      const enhancement = await this.enhanceKnowledgeGraphResults(wineNames, payload, correlationId);
+
+      return {
+        recommendations: wineNames,
+        reasoning: enhancement.explanation,
+        confidence: enhancement.confidence,
+        source: 'knowledge_graph'
+      };
+
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.error(`[${correlationId}] Error getting knowledge graph recommendation: ${errorMessage}`, { 
+        agentId: this.id, 
+        operation: 'getKnowledgeGraphRecommendation',
+        originalError: errorMessage 
+      });
+      return null;
+    }
+  }
+
+  private async getHybridRecommendation(payload: RecommendationMessagePayload, correlationId: string, conversationId: string): Promise<RecommendationResult | null> {
+    this.logger.info(`[${correlationId}] Using hybrid recommendation approach`, { 
+      agentId: this.id, 
+      operation: 'getHybridRecommendation' 
+    });
+
+    // Get both recommendations in parallel
+    const [llmResult, kgResult] = await Promise.allSettled([
+      this.getLLMRecommendation(payload, correlationId, conversationId), // Pass original correlationId as parentCorrelationId
+      this.getKnowledgeGraphRecommendation(payload, correlationId)
+    ]);
+
+    const llmRecommendation = llmResult.status === 'fulfilled' ? llmResult.value : null;
+    const kgRecommendation = kgResult.status === 'fulfilled' ? kgResult.value : null;
+
+    // If both failed, return null
+    if (!llmRecommendation && !kgRecommendation) {
+      this.logger.warn(`[${correlationId}] Both LLM and knowledge graph recommendations failed`, { 
+        agentId: this.id, 
+        operation: 'getHybridRecommendation' 
+      });
+      return null;
+    }
+
+    // Use the one with higher confidence, or LLM if confidence is similar
+    if (llmRecommendation && kgRecommendation) {
+      const confidenceDiff = Math.abs((llmRecommendation.confidence || 0) - (kgRecommendation.confidence || 0));
+      
+      if (confidenceDiff < 0.1) {
+        // Similar confidence, prefer LLM for better explanations
+        this.logger.debug(`[${correlationId}] Similar confidence, preferring LLM recommendation`, { 
+          agentId: this.id, 
+          operation: 'getHybridRecommendation',
+          llmConfidence: llmRecommendation.confidence,
+          kgConfidence: kgRecommendation.confidence 
+        });
+        return llmRecommendation;
+      } else if ((llmRecommendation.confidence || 0) > (kgRecommendation.confidence || 0)) {
+        return llmRecommendation;
+      } else {
+        return kgRecommendation;
+      }
+    }
+
+    // Return whichever one succeeded
+    return llmRecommendation || kgRecommendation;
+  }
+
+  private async enhanceKnowledgeGraphResults(wineNames: string[], payload: RecommendationMessagePayload, correlationId: string): Promise<{ explanation: string; confidence: number }> {
+    const wineList = wineNames.map(name => `- ${name}`).join('\n');
+    const contextInfo = this.buildContextForEnhancement(payload);
+    
+    const enhancementPrompt = `You are enhancing wine recommendations from our database. 
+
+Context: ${contextInfo}
+
+Available wines from our database:
+${wineList}
+
+Provide a brief, engaging explanation (2-3 sentences) for why these wines are recommended for this request. Focus on the characteristics that make them suitable.
+
+Respond with JSON: {"explanation": "your explanation here", "confidence": 0.8}`;
+
+    const enhancementSchema = z.object({
+      explanation: z.string(),
+      confidence: z.number().min(0).max(1)
+    });
+
+    try {
+      const enhancementResult = await this.llmService.sendStructuredPrompt<{ explanation: string; confidence: number }>(
+        enhancementPrompt, 
+        enhancementSchema, 
+        null, 
+        {}, // Pass empty llmOptions as per previous instruction
+        correlationId
+      );
+
+      if (enhancementResult.success && enhancementResult.data) {
+        return enhancementResult.data;
+      }
+    } catch (error) {
+      this.logger.debug(`[${correlationId}] Failed to enhance knowledge graph results with LLM`, { 
+        agentId: this.id, 
+        operation: 'enhanceKnowledgeGraphResults' 
+      });
+    }
+
+    // Fallback enhancement
+    return {
+      explanation: `These wines were selected from our database based on your ${payload.input.ingredients ? 'ingredient preferences' : 'stated preferences'}.`,
+      confidence: 0.6
+    };
+  }
+
+  private buildContextForEnhancement(payload: RecommendationMessagePayload): string {
+    const parts: string[] = [];
+    
+    if (payload.input.message) {
+      parts.push(`User request: "${payload.input.message}"`);
+    }
+    
+    if (payload.input.ingredients?.length) {
+      parts.push(`Ingredients: ${payload.input.ingredients.join(', ')}`);
+    }
+    
+    if (payload.input.preferences && Object.keys(payload.input.preferences).length > 0) {
+      parts.push(`Preferences: ${JSON.stringify(payload.input.preferences)}`);
+    }
+    
+    return parts.join('. ') || 'General wine recommendation request';
+  }
+
+  private async handleNoRecommendations(message: AgentMessage<unknown>, correlationId: string): Promise<Result<AgentMessage | null, AgentError>> {
     const responseMessage = createAgentMessage(
       'recommendation-response',
       {
-        recommendedWines: [],
-        error: `No wines found matching ${recommendationType} criteria and no fallback could be generated.`
+        recommendations: [],
+        reasoning: 'Unfortunately, no suitable wine recommendations could be generated for your request. Please try refining your preferences or providing more details.',
+        confidence: 0.0,
+        error: 'No recommendations could be generated'
       },
       this.id,
       message.conversationId,
       correlationId,
       message.sourceAgent
     );
-    this.communicationBus.sendResponse(message.sourceAgent, responseMessage);
-    this.logger.info(`[${correlationId}] No wines found for request and no fallback`, { agentId: this.id, operation: 'handleNoWinesFound' });
+
+    this.logger.warn(`[${message.correlationId}] No recommendations could be generated`, { // Use message.correlationId here
+      agentId: this.id,
+      operation: 'handleNoRecommendations'
+    });
+
+    return { success: true, data: responseMessage };
   }
 
-  private async handleError(message: AgentMessage<unknown>, error: AgentError, correlationId: string) {
-    await this.deadLetterProcessor.process(
-      message.payload,
-      error,
-      { source: this.id, stage: 'RecommendationProcessing', correlationId }
+  private async handleRequestError(message: AgentMessage<unknown>, error: unknown, correlationId: string): Promise<Result<AgentMessage | null, AgentError>> {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const agentError = error instanceof AgentError ? error : new AgentError(
+      errorMessage, 
+      'RECOMMENDATION_PROCESSING_ERROR', 
+      this.id, 
+      correlationId, 
+      true, 
+      { originalError: errorMessage }
     );
 
-    const errorMessage = createAgentMessage(
-      'error-response',
-      {
-        error: error.message,
-        code: error.code,
-        userId: message.userId ?? 'unknown_user' // Provide a fallback for userId
-      },
-      this.id,
-      message.conversationId, // Corrected: conversationId
-      correlationId, // Corrected: correlationId
-      message.sourceAgent // Corrected: targetAgent
-    );
-    this.communicationBus.sendResponse(message.sourceAgent, errorMessage);
-    this.logger.error(`[${correlationId}] Error in RecommendationAgent: ${error.message}`, { agentId: this.id, operation: 'handleError', originalError: error.message });
+    await this.deadLetterProcessor.process(message.payload, agentError, { 
+      source: this.id, 
+      stage: 'RecommendationProcessing', 
+      correlationId 
+    });
+
+    this.logger.error(`[${message.correlationId}] Error processing recommendation request: ${errorMessage}`, { // Use message.correlationId here
+      agentId: this.id,
+      operation: 'handleRecommendationRequest',
+      originalError: errorMessage
+    });
+
+    return { success: false, error: agentError };
   }
 }

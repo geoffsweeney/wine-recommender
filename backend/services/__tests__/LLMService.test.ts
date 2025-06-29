@@ -1,12 +1,35 @@
 import 'reflect-metadata';
+import { z } from 'zod'; // Import zod for schema definition
 import { LLMService } from '../LLMService';
 import { mock, instance, when, verify, anything } from 'ts-mockito';
 import { ILogger } from '../LLMService';
 import { OllamaStructuredClient } from '../../utils/ollama_structured_output';
 import { GenerateResponse } from 'ollama';
 import { AgentError } from '../../core/agents/AgentError'; // Re-import AgentError explicitly
+
+// Mocking the 'zod' module
+jest.mock('zod', () => {
+  // Mock ZodObject constructor as a jest.fn()
+  let MockZodObject;
+
+  MockZodObject = jest.fn((schemaDefinition?: any) => ({
+    shape: schemaDefinition?.shape || {},
+    parse: jest.fn(),
+  }));
+
+  // Mock the 'z' object and its methods, using MockZodObject as the constructor
+  const z = {
+    object: jest.fn((schemaDefinition) => MockZodObject(schemaDefinition)),
+    string: jest.fn(() => MockZodObject()),
+    number: jest.fn(() => MockZodObject()),
+  };
+
+  return {
+    z,
+    ZodObject: MockZodObject, // Export the mock constructor
+  };
+});
  
-// Mock the entire OllamaStructuredClient module
 jest.mock('../../utils/ollama_structured_output', () => {
   const mockOllamaInstance = {
     generate: jest.fn(),
@@ -14,7 +37,7 @@ jest.mock('../../utils/ollama_structured_output', () => {
     list: jest.fn(),
     pull: jest.fn(),
   };
-
+ 
   const MockOllamaStructuredClient = jest.fn().mockImplementation(() => {
     return {
       ollama: mockOllamaInstance,
@@ -30,7 +53,7 @@ jest.mock('../../utils/ollama_structured_output', () => {
   });
   return { OllamaStructuredClient: MockOllamaStructuredClient };
 });
-
+ 
 describe('LLMService', () => {
   let service: LLMService;
   let mockLogger: ILogger;
@@ -58,7 +81,7 @@ describe('LLMService', () => {
     // @ts-ignore - Overwrite the private property with the mock instance
     service['ollamaClient'] = mockOllamaStructuredClientInstance;
   });
-
+ 
   describe('sendPrompt (unstructured)', () => {
     it('should successfully send unstructured prompt and return response', async () => {
       mockOllamaStructuredClientInstance.ollama.generate.mockResolvedValueOnce({
@@ -75,7 +98,7 @@ describe('LLMService', () => {
         context: [],
         prompt_eval_duration: 100
       } as GenerateResponse);
-
+ 
       const result = await service.sendPrompt('test-prompt');
       expect(result.success).toBe(true);
       if (result.success) {
@@ -87,10 +110,10 @@ describe('LLMService', () => {
         model: 'test-model'
       }));
     });
-
+ 
     it('should handle errors during unstructured prompt generation', async () => {
       mockOllamaStructuredClientInstance.ollama.generate.mockRejectedValueOnce(new Error('LLM generation error'));
-
+ 
       const result = await service.sendPrompt('test-prompt');
       expect(result.success).toBe(false);
       if (!result.success) {
@@ -99,7 +122,7 @@ describe('LLMService', () => {
       }
       expect(mockOllamaStructuredClientInstance.ollama.generate).toHaveBeenCalledTimes(1);
     });
-
+ 
     it('should handle invalid unstructured response format', async () => {
       mockOllamaStructuredClientInstance.ollama.generate.mockResolvedValueOnce({
         invalid: 'format',
@@ -116,7 +139,7 @@ describe('LLMService', () => {
         context: [],
         prompt_eval_duration: 0
       } as GenerateResponse);
-
+ 
       const result = await service.sendPrompt('test-prompt');
       expect(result.success).toBe(false);
       if (!result.success) {
@@ -126,15 +149,18 @@ describe('LLMService', () => {
       expect(mockOllamaStructuredClientInstance.ollama.generate).toHaveBeenCalledTimes(1);
     });
   });
-
+ 
   describe('sendStructuredPrompt', () => {
-    const mockSchema = { type: 'object', properties: { key: { type: 'string' } } };
-    const mockZodSchema = { parse: jest.fn() };
-
+    // Define the schema structure using Zod for clarity.
+    // This will be processed by our mocked 'zod' library.
+    const mockSchema = z.object({ key: z.string() });
+    // Define the Zod schema for parsing the LLM's output.
+    const mockZodSchema = z.object({ key: z.string() });
+ 
     it('should successfully send structured prompt and return parsed response', async () => {
       const mockParsedData = { key: 'value' };
       mockOllamaStructuredClientInstance.generateStructured.mockResolvedValueOnce(mockParsedData);
-
+ 
       const result = await service.sendStructuredPrompt('test-structured-prompt', mockSchema, mockZodSchema);
       expect(result.success).toBe(true);
       if (result.success) {
@@ -148,10 +174,10 @@ describe('LLMService', () => {
         expect.any(Object) // options object
       );
     });
-
+ 
     it('should handle errors during structured prompt generation', async () => {
       mockOllamaStructuredClientInstance.generateStructured.mockRejectedValueOnce(new Error('Structured generation error'));
-
+ 
       const result = await service.sendStructuredPrompt('test-structured-prompt', mockSchema, mockZodSchema);
       expect(result.success).toBe(false);
       if (!result.success) {
@@ -161,7 +187,7 @@ describe('LLMService', () => {
       expect(mockOllamaStructuredClientInstance.generateStructured).toHaveBeenCalledTimes(1);
     });
   });
-
+ 
   describe('constructor', () => {
     it('should initialize with provided parameters and OllamaStructuredClient', () => {
       // This test now primarily verifies the constructor's ability to instantiate the service

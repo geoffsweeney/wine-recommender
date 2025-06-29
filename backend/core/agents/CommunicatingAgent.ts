@@ -75,7 +75,6 @@ export abstract class CommunicatingAgent extends BaseAgent<any, any> { // TConfi
           traceId,
           message.sourceAgent
         );
-        this.communicationBus.sendResponse(message.sourceAgent, errorMessage);
         return { success: false, error: result.error };
       }
     } catch (error: unknown) { // Explicitly type as unknown

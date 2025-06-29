@@ -1,10 +1,51 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="jest tests" tests="1" failures="1" errors="0" time="1.491">
-  <testsuite name="SommelierCoordinator Integration" errors="0" failures="1" skipped="0" timestamp="2025-06-28T01:28:27" time="1.337" tests="1">
-    <testcase classname="SommelierCoordinator Integration orchestrateRecommendation should successfully orchestrate recommendation flow with valid preferences and ingredients" name="SommelierCoordinator Integration orchestrateRecommendation should successfully orchestrate recommendation flow with valid preferences and ingredients" time="0.019">
-      <failure>TypeError: Cannot read properties of null (reading &apos;name&apos;)
-    at Object.&lt;anonymous&gt; (/home/geoff/src/roo/wine-recommender/backend/core/agents/__tests__/SommelierCoordinator.integration.test.ts:252:43)
-    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
+<testsuites name="jest tests" tests="6" failures="2" errors="0" time="1.461">
+  <testsuite name="LLMService" errors="0" failures="2" skipped="0" timestamp="2025-06-28T09:34:47" time="1.262" tests="6">
+    <testcase classname="LLMService sendPrompt (unstructured) should successfully send unstructured prompt and return response" name="LLMService sendPrompt (unstructured) should successfully send unstructured prompt and return response" time="0.002">
+    </testcase>
+    <testcase classname="LLMService sendPrompt (unstructured) should handle errors during unstructured prompt generation" name="LLMService sendPrompt (unstructured) should handle errors during unstructured prompt generation" time="0.001">
+    </testcase>
+    <testcase classname="LLMService sendPrompt (unstructured) should handle invalid unstructured response format" name="LLMService sendPrompt (unstructured) should handle invalid unstructured response format" time="0.001">
+    </testcase>
+    <testcase classname="LLMService sendStructuredPrompt should successfully send structured prompt and return parsed response" name="LLMService sendStructuredPrompt should successfully send structured prompt and return parsed response" time="0">
+      <failure>TypeError: Right-hand side of &apos;instanceof&apos; is not an object
+    at LLMService.sendStructuredPrompt (/home/geoff/src/roo/wine-recommender/backend/services/LLMService.ts:111:19)
+    at Object.&lt;anonymous&gt; (/home/geoff/src/roo/wine-recommender/backend/services/__tests__/LLMService.test.ts:164:36)
+    at Promise.then.completed (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/utils.js:298:28)
+    at new Promise (&lt;anonymous&gt;)
+    at callAsyncCircusFn (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/utils.js:231:10)
+    at _callCircusTest (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/run.js:316:40)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at _runTest (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/run.js:252:3)
+    at _runTestsForDescribeBlock (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/run.js:126:9)
+    at _runTestsForDescribeBlock (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/run.js:121:9)
+    at _runTestsForDescribeBlock (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/run.js:121:9)
+    at run (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/run.js:71:3)
+    at runAndTransformResultsToJestFormat (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)
+    at jestAdapter (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)
+    at runTestInternal (/home/geoff/src/roo/wine-recommender/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/home/geoff/src/roo/wine-recommender/node_modules/jest-runner/build/runTest.js:444:34)</failure>
+    </testcase>
+    <testcase classname="LLMService sendStructuredPrompt should handle errors during structured prompt generation" name="LLMService sendStructuredPrompt should handle errors during structured prompt generation" time="0.001">
+      <failure>TypeError: Right-hand side of &apos;instanceof&apos; is not an object
+    at LLMService.sendStructuredPrompt (/home/geoff/src/roo/wine-recommender/backend/services/LLMService.ts:111:19)
+    at Object.&lt;anonymous&gt; (/home/geoff/src/roo/wine-recommender/backend/services/__tests__/LLMService.test.ts:181:36)
+    at Promise.then.completed (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/utils.js:298:28)
+    at new Promise (&lt;anonymous&gt;)
+    at callAsyncCircusFn (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/utils.js:231:10)
+    at _callCircusTest (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/run.js:316:40)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at _runTest (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/run.js:252:3)
+    at _runTestsForDescribeBlock (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/run.js:126:9)
+    at _runTestsForDescribeBlock (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/run.js:121:9)
+    at _runTestsForDescribeBlock (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/run.js:121:9)
+    at run (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/run.js:71:3)
+    at runAndTransformResultsToJestFormat (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)
+    at jestAdapter (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)
+    at runTestInternal (/home/geoff/src/roo/wine-recommender/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/home/geoff/src/roo/wine-recommender/node_modules/jest-runner/build/runTest.js:444:34)</failure>
+    </testcase>
+    <testcase classname="LLMService constructor should initialize with provided parameters and OllamaStructuredClient" name="LLMService constructor should initialize with provided parameters and OllamaStructuredClient" time="0.001">
     </testcase>
   </testsuite>
 </testsuites>

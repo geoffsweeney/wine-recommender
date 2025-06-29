@@ -16,6 +16,7 @@ interface LLMPreferenceExtractorMessagePayload {
   input: string;
   conversationHistory?: { role: string; content: string }[];
   userId: string;
+  originalSourceAgent?: string; // Added to pass the original source agent
 }
 
 // Define the configuration interface for LLMPreferenceExtractorAgent
@@ -112,9 +113,12 @@ export class LLMPreferenceExtractorAgent extends CommunicatingAgent {
          'Output: { "isValid": true, "preferences": { "style": "bold", "color": "red", "priceRange": [0,30] }, "ingredients": [] }',
          '\nExample 2:',
          'Input: "Looking for a wine to pair with chicken and mushrooms"',
-         'Output: { "isValid": true, "ingredients": ["chicken", "mushrooms"], "preferences": {} }'
+         'Output: { "isValid": true, "ingredients": ["chicken", "mushrooms"], "preferences": {} }',
+         '\nExample 3:',
+         'Input: "I am having a juicy grilled ribeye steak tonight. What wine should I drink?"',
+         'Output: { "isValid": true, "ingredients": ["beef"], "preferences": { "pairing": "beef" } }'
        ].join('\n');
- 
+
        const llmPrompt = `Analyze this wine request and extract structured preferences:\n${examples}\n\nCurrent request: "${input}"\n\n${
          conversationHistory ? 'Conversation context:\n' + conversationHistory.map(turn => `${turn.role}: ${turn.content}`).join('\n') : ''
        }\n\nOutput JSON matching the examples exactly:`;
@@ -123,7 +127,7 @@ export class LLMPreferenceExtractorAgent extends CommunicatingAgent {
        
        for (let attempt = 0; attempt < retries; attempt++) {
          try {
-           const llmResponseResult = await this.llmService.sendStructuredPrompt<any>(llmPrompt, PreferenceExtractionSchema, null, correlationId);
+           const llmResponseResult = await this.llmService.sendStructuredPrompt<any>(llmPrompt, PreferenceExtractionSchema, null, {}, correlationId);
            if (!llmResponseResult.success) {
              throw llmResponseResult.error;
            }
@@ -131,7 +135,7 @@ export class LLMPreferenceExtractorAgent extends CommunicatingAgent {
            
            const responseMessage = createAgentMessage(
              'preference-extraction-response',
-             extractedPreferences,
+             { ...extractedPreferences, originalSourceAgent: payload.originalSourceAgent }, // Include originalSourceAgent in the response payload
              this.id,
              message.conversationId, // Corrected: conversationId
              correlationId, // Corrected: correlationId

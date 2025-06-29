@@ -1,4 +1,5 @@
 import winston from 'winston';
+import { LLMRecommendationAgentConfig } from '../core/agents/LLMRecommendationAgent'; // Import LLMRecommendationAgentConfig
 
 export const TYPES = {
     // Core infrastructure

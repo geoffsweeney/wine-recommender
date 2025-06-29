@@ -247,7 +247,7 @@ export function setupContainer() {
   // Register SommelierCoordinatorConfig
   const sommelierCoordinatorConfig = {
     maxRecommendationAttempts: parseInt(process.env.SOMMELIER_MAX_RECOMMENDATION_ATTEMPTS || '3'),
-    agentTimeoutMs: parseInt(process.env.SOMMELIER_AGENT_TIMEOUT_MS || '5000'),
+    agentTimeoutMs: parseInt(process.env.SOMMELIER_AGENT_TIMEOUT_MS || '30000'),
     circuitBreakerFailureThreshold: parseInt(process.env.SOMMELIER_CIRCUIT_FAILURE_THRESHOLD || '5'),
     circuitBreakerSuccessThreshold: parseInt(process.env.SOMMELIER_CIRCUIT_SUCCESS_THRESHOLD || '3'),
   };

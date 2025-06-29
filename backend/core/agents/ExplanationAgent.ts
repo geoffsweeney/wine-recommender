@@ -155,7 +155,6 @@ export class ExplanationAgent extends CommunicatingAgent {
         correlationId, // Corrected: correlationId
         message.sourceAgent // Corrected: targetAgent
       );
-      this.communicationBus.sendResponse(message.sourceAgent, responseMessage);
       this.logger.info(
         '[ExplanationAgent] Explanation request processed successfully',
         {
