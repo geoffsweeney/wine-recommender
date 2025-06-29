@@ -6,37 +6,37 @@ This application is a sophisticated, AI-powered wine recommendation system desig
 
 The primary goal of this application is to guide users to suitable wine choices based on their specific needs, preferences, and even food pairings. It aims to provide a highly contextual and personalized recommendation experience.
 
-## How it Works: The Agent-Based Architecture
+## How it Works: The Agent-Based Architecture and Application Flow
 
-The system is built on a modular, agent-based architecture, where different AI agents collaborate to fulfill a user's request. The core of this collaboration is orchestrated by the `SommelierCoordinator` agent.
+The system is built on a modular, agent-based architecture, where different AI agents collaborate to fulfill a user's request. The core of this collaboration is orchestrated by the `SommelierCoordinator` agent, with all inter-agent communication managed by the `EnhancedAgentCommunicationBus`.
 
-### Key Components:
+### End-to-End Application Flow:
 
-*   **`SommelierCoordinator` (Orchestration Agent):** This is the central brain of the system. When a user requests a wine recommendation, the `SommelierCoordinator` takes charge. It orchestrates the entire recommendation workflow, managing the flow of information and tasks between various specialized agents. Its responsibilities include:
-    *   **Information Gathering:** Initiates parallel processes to validate user input and extract detailed preferences.
-    *   **Decision Making:** Based on the gathered information, it makes intelligent decisions, such as handling ambiguous or invalid input, and adjusting expectations (e.g., budget) if necessary.
-    *   **Recommendation Generation & Refinement:** Delegates the task of generating wine recommendations to specialized agents and manages a feedback loop to refine these recommendations until a satisfactory quality is achieved.
-    *   **Availability Checking:** Coordinates with agents to find available wines that match the recommendations, even expanding the search if initial results are limited.
-    *   **Final Assembly & Presentation:** Compiles the final recommendation, including a primary suggestion, alternatives, and a clear explanation, along with a confidence score.
+1.  **User Request Initiation:** A user sends a request (e.g., via a `curl` POST to `/api/recommendations`) with their input (e.g., "I am having a juicy steak tonight. What wine should I drink?").
+2.  **API Gateway & Controller:** The request is received by the Express.js API, which routes it to the `WineRecommendationController`. This controller acts as the entry point to the agent system.
+3.  **Orchestration by `SommelierCoordinator`:** The `WineRecommendationController` sends an `ORCHESTRATE_RECOMMENDATION_REQUEST` message to the `SommelierCoordinator` via the `EnhancedAgentCommunicationBus`. This message includes the user's input, a unique `conversationId` (to track the entire interaction), and a `correlationId` (to link this specific request to its response).
+4.  **Information Gathering (Phase 1):** The `SommelierCoordinator` initiates parallel requests to:
+    *   **`InputValidationAgent`:** To clean and validate the user's input.
+    *   **`UserPreferenceAgent`:** To extract user preferences from the natural language input. This might involve an asynchronous call to the `LLMPreferenceExtractorAgent` if fast extraction is not sufficient.
+    All these inter-agent communications happen via `sendMessageAndWaitForResponse` calls on the `EnhancedAgentCommunicationBus`, ensuring that the `SommelierCoordinator` waits for a response from each agent, maintaining context using the `correlationId`.
+5.  **Decision Making (Phase 2):** Based on the gathered information (validated input, extracted preferences), the `SommelierCoordinator` makes decisions. This includes checking for invalid ingredients (and potentially consulting a `FallbackAgent`) or assessing budget realism.
+6.  **Recommendation Generation (Phase 3):** The `SommelierCoordinator` sends a `GENERATE_RECOMMENDATIONS` message to the `RecommendationAgent`. The `RecommendationAgent` then leverages the `LLMRecommendationAgent` (or a knowledge graph) to generate wine recommendations. The `SommelierCoordinator` might attempt multiple recommendation strategies or refinement steps if the initial recommendations are of low quality.
+7.  **Shopping & Availability (Phase 4):** Once recommendations are generated, the `SommelierCoordinator` sends `FIND_WINES` messages to the `ShopperAgent` for each recommended wine to check its availability. If no wines are found, it might send an `EXPANDED_SEARCH` message to the `ShopperAgent`.
+8.  **Final Assembly & Presentation (Phase 5):** The `SommelierCoordinator` assembles the final recommendation, including the primary wine, alternatives, and an explanation. It sends a `GENERATE_EXPLANATION` message to the `ExplanationAgent` to get a natural language explanation for the recommendation.
+9.  **History Update (Fire and Forget):** The `SommelierCoordinator` publishes an `UPDATE_RECOMMENDATION_HISTORY` message to the `UserPreferenceAgent` using `publishToAgent`. This is a "fire and forget" message, meaning the `SommelierCoordinator` does not wait for a response, as it's primarily for logging or background processing.
+10. **Response to Client:** Finally, the `SommelierCoordinator` sends the `FINAL_RECOMMENDATION` back to the `WineRecommendationController` via the `EnhancedAgentCommunicationBus`, which then sends the recommendation as an HTTP response back to the user.
 
-*   **`LLM Preference Extractor Agent`:** This agent is responsible for understanding the user's intent and preferences from their natural language input. It leverages Large Language Models (LLMs) to:
-    *   Parse user queries like "I prefer bold red wines under $30" or "Looking for a wine to pair with chicken and mushrooms."
-    *   Extract structured preferences (e.g., wine style, color, price range) and relevant ingredients.
-    *   It can also utilize a `KnowledgeGraphService` and `PreferenceNormalizationService` for more accurate and consistent preference understanding.
+### Key Components and Communication Patterns:
 
-*   **`LLM Recommendation Agent`:** This agent is the core recommendation engine. It uses LLMs to generate wine recommendations based on the extracted user preferences, ingredients, and the ongoing conversation history. It constructs detailed prompts for the LLM to ensure relevant and contextual wine suggestions.
+*   **`SommelierCoordinator` (Orchestration Agent):** The central brain, orchestrating the entire workflow. It uses `sendMessageAndWaitForResponse` for critical steps where a response is expected, and `publishToAgent` for "fire and forget" messages.
+*   **`EnhancedAgentCommunicationBus`:** The central nervous system for all inter-agent communication. It handles message routing, manages `correlationId`s for request-response matching, and ensures callbacks are correctly managed. It automatically sends responses when handlers return a `Result` with data.
+*   **Specialized Agents:** (`InputValidationAgent`, `UserPreferenceAgent`, `LLMPreferenceExtractorAgent`, `RecommendationAgent`, `LLMRecommendationAgent`, `ShopperAgent`, `ExplanationAgent`, `FallbackAgent`) Each agent has a specific role and communicates with the `SommelierCoordinator` and other agents via the `EnhancedAgentCommunicationBus`.
+*   **`correlationId`:** A unique identifier crucial for linking requests to their corresponding responses across asynchronous agent interactions. It ensures that the correct callback is triggered when a response is received.
+*   **`conversationId`:** Maintains the overall context of a user's interaction across multiple turns and agent calls.
 
-*   **`Shopper Agent`:** Once recommendations are generated, this agent is tasked with finding actual available wines that match the suggestions. It can perform searches and potentially expand its criteria if no suitable wines are found initially.
+### Robustness Mechanisms:
 
-*   **`Explanation Agent`:** To enhance user understanding and trust, this agent generates natural language explanations for why a particular wine was recommended, linking it back to the user's preferences and input.
-
-*   **`Input Validation Agent`:** Ensures the user's initial input is well-formed and understandable before further processing.
-
-*   **`Fallback Agent`:** Provides alternative suggestions or handles situations where other agents encounter difficulties or cannot fulfill a request with high confidence.
-
-### Communication and Robustness:
-
-The agents communicate with each other via an `EnhancedAgentCommunicationBus`, which facilitates message passing and response handling. The system is designed with robustness in mind, incorporating several mechanisms to ensure reliability:
+The system is designed with robustness in mind, incorporating several mechanisms to ensure reliability:
 
 *   **Circuit Breakers:** Protect against cascading failures by temporarily preventing calls to agents that are experiencing issues.
 *   **Dead-Letter Queues:** Capture and store messages that could not be processed successfully, allowing for later analysis and reprocessing.

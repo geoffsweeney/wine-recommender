@@ -186,3 +186,35 @@ graph TD
 2. Load testing with 1000 concurrent requests
 3. Message delivery rate monitoring
 4. Tracing visualization working
+
+## Learnings from Debugging: Common Pitfalls and Best Practices in Agent Communication
+
+During recent debugging sessions, several critical insights emerged regarding the proper implementation of agent communication, particularly concerning `correlationId` management and the use of `EnhancedAgentCommunicationBus`. Adhering to these best practices is crucial for stable and predictable inter-agent communication.
+
+### 1. Correct `correlationId` and `conversationId` Propagation
+
+- **Pitfall:** Incorrectly passing `correlationId` or `conversationId` (e.g., using an agent's own ID as `correlationId` for outgoing messages, or not propagating the original `correlationId` from an incoming request to its response).
+- **Impact:** Leads to "No callback found" warnings, broken request-response cycles, and overall communication failures, making debugging extremely difficult.
+- **Best Practice:**
+    - Always use `createAgentMessage()` to construct messages, ensuring `correlationId` and `conversationId` are correctly set.
+    - For messages that are part of a request-response cycle (e.g., `sendMessageAndWaitForResponse`), the `correlationId` of the *outgoing* message should be unique to that specific request. The `sourceAgent` of the response message should match the `targetAgent` of the request message, and the `targetAgent` of the response message should match the `sourceAgent` of the request message.
+    - When an agent receives a message and needs to respond, the `correlationId` of the *response* message should be the same as the `correlationId` of the *incoming request* message. This links the response back to the original request's callback.
+    - The `conversationId` should be consistently propagated throughout a user's interaction to maintain conversational context across multiple agent interactions.
+
+### 2. Avoiding Redundant `sendResponse` Calls in Handlers
+
+- **Pitfall:** Explicitly calling `this.communicationBus.sendResponse()` within an agent's message handler method (e.g., `handleRecommendationRequest`, `handleExplanationRequestInternal`).
+- **Impact:** The `EnhancedAgentCommunicationBus.routeMessage()` method is designed to automatically call `this.sendResponse()` when a handler returns a `Result` object with `data`. An explicit `sendResponse()` call within the handler will cause the callback associated with the `correlationId` to be executed and removed prematurely. When `routeMessage()` then attempts its own `sendResponse()`, it finds "No callback found," leading to warnings.
+- **Best Practice:**
+    - **Never call `this.communicationBus.sendResponse()` directly within an agent's handler method if that handler is registered with `EnhancedAgentCommunicationBus.registerMessageHandler()` and is expected to return a `Result` with data.**
+    - Instead, simply `return { success: true, data: responseMessage };` (or `return { success: false, error: agentError };`). The `EnhancedAgentCommunicationBus` will correctly handle sending the response based on the returned `Result`.
+
+### 3. Handling "Fire and Forget" Messages (`publishToAgent`)
+
+- **Pitfall:** Handlers for messages sent via `this.communicationBus.publishToAgent()` (which is a "fire and forget" mechanism, not expecting a direct response) returning a `Result` with `data`.
+- **Impact:** `publishToAgent()` calls `routeMessage()`, which will execute the handler. If the handler returns a `Result` with `data`, `routeMessage()` will attempt to call `sendResponse()`. Since no callback was set up for a `publishToAgent` message, this results in a "No callback found" warning.
+- **Best Practice:**
+    - For handlers processing messages sent via `publishToAgent()` (e.g., `MessageTypes.PREFERENCE_UPDATE`, `MessageTypes.UPDATE_RECOMMENDATION_HISTORY`), ensure they return `Result<null, AgentError>` or `Result<undefined, AgentError>` for successful operations. This signals that the operation completed successfully but no explicit response message is expected back through the callback mechanism.
+    - If an error occurs in such a handler, return `Result<false, AgentError>`. The error will be logged, but no "No callback found" warning will occur due to an attempted `sendResponse` to a non-existent callback.
+
+By diligently following these guidelines, we can significantly improve the robustness, predictability, and debuggability of our agent communication system.

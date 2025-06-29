@@ -1,3 +1,5 @@
+import { FinalRecommendationPayload } from '../../types/agent-outputs';
+import { WineRecommendationOutput } from './LLMRecommendationAgent';
 import { singleton, inject } from 'tsyringe'; // Import singleton and inject decorator
 import { BaseAgent } from './BaseAgent';
 import { AgentMessage, MessageTypes, createAgentMessage } from './communication/AgentMessage';
@@ -63,8 +65,8 @@ interface OrchestrationInput {
  * Represents the final recommendation output.
  */
 interface FinalRecommendation {
-  primaryRecommendation: string | null; // Changed to string
-  alternatives: string[]; // Changed to string[]
+  primaryRecommendation: WineRecommendationOutput | null;
+  alternatives: WineRecommendationOutput[];
   explanation: string;
   confidence: number;
   conversationId: string;
@@ -479,11 +481,11 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
 
       // Ensure recommendations exist and have the 'recommendations' array
       const wineRecommendations = state.recommendations?.recommendations || [];
-      const shoppingPromises = wineRecommendations.map((wineName: string, index: number) => // wine is now string
+      const shoppingPromises = wineRecommendations.map((wine: WineRecommendationOutput, index: number) =>
         this.sendMessageToAgentWithCircuitBreaker(
           'shopper-agent',
           createAgentMessage(MessageTypes.FIND_WINES, {
-            wine: wineName, // Pass the wine name as a string
+            wine: wine.name, // Pass the wine name as a string
             budget: state.budget,
             priority: index,
             maxResults: index === 0 ? 10 : 5
@@ -632,22 +634,22 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
     return available; // Placeholder
   }
 
-  private async finalizeRecommendation(state: ConversationState, correlationId: string): Promise<FinalRecommendation> {
+  private async finalizeRecommendation(state: ConversationState, correlationId: string): Promise<FinalRecommendationPayload> {
     // TODO: Implement final ranking, explanation generation, and confidence scoring
     this.logger.info(`[${correlationId}] Finalizing recommendation for conversation: ${state.conversationId}`);
 
-    let primaryRecommendation: string | null = null;
-    let alternatives: string[] = [];
+    let primaryRecommendation: WineRecommendationOutput | null = null;
+    let alternatives: WineRecommendationOutput[] = [];
     let explanation = '';
     let confidence = 0;
 
     if (state.availableWines && state.availableWines.length > 0) {
       // Assuming availableWines are already WineNode objects or can be converted
       // For now, let's assume they are strings or have a 'name' property
-      primaryRecommendation = state.availableWines[0]?.name || state.availableWines[0]; // Use name if WineNode, else direct string
-      alternatives = state.availableWines.slice(1, 4).map((wine: any) => wine.name || wine); // Map to names
+      primaryRecommendation = state.availableWines[0] ? { name: state.availableWines[0].name, grapeVarieties: state.availableWines[0].grapeVarieties || [] } : null;
+      alternatives = state.availableWines.slice(1, 4).map((wine: any) => ({ name: wine.name, grapeVarieties: wine.grapeVarieties || [] }));
       // If wines are available, generate explanation based on them
-      explanation = await this.generateExplanation(primaryRecommendation, state.ingredients, state.userPreferences, correlationId, state);
+      explanation = await this.generateExplanation(primaryRecommendation?.name || null, state.ingredients, state.userPreferences, correlationId, state);
       confidence = this.calculateConfidence(state); // Calculate confidence based on available wines
     } else if (state.recommendations && state.recommendations.recommendations && state.recommendations.recommendations.length > 0) {
       // If no available wines, but LLM provided recommendations, use them (which are strings)
@@ -667,7 +669,7 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
         'user-preference-agent',
         createAgentMessage(MessageTypes.UPDATE_RECOMMENDATION_HISTORY, {
           userId: state.userId,
-          recommendation: primaryRecommendation,
+          recommendation: primaryRecommendation?.name || null,
           context: state
         }, this.id, state.conversationId, this.generateCorrelationId(), 'user-preference-agent')
       );

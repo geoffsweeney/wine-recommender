@@ -1,3 +1,5 @@
+import { GrapeVariety } from './services/models/Wine';
+
 export interface WineNode {
   id: string;
   name: string;
@@ -6,6 +8,7 @@ export interface WineNode {
   vintage?: number;
   price?: number; // Added price property
   rating?: number;
+  grapeVarieties?: GrapeVariety[];
 }
 
 export interface PreferenceNode {

@@ -23,21 +23,44 @@ describe('End-to-End Live Recommendation API', () => {
       expect(response.body).toHaveProperty('alternatives');
       expect(response.body).toHaveProperty('explanation');
       expect(response.body).toHaveProperty('confidence');
+      expect(typeof response.body.primaryRecommendation).toBe('object');
       expect(response.body.primaryRecommendation).toHaveProperty('name');
-      expect(response.body.primaryRecommendation).toHaveProperty('type');
+      expect(typeof response.body.primaryRecommendation.name).toBe('string');
+      expect(response.body.primaryRecommendation).toHaveProperty('grapeVarieties');
+      expect(Array.isArray(response.body.primaryRecommendation.grapeVarieties)).toBe(true);
+      expect(response.body.primaryRecommendation.grapeVarieties.every((gv: any) =>
+        typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined)
+      )).toBe(true);
+
+      expect(Array.isArray(response.body.alternatives)).toBe(true);
+      expect(response.body.alternatives.every((alt: any) =>
+        typeof alt === 'object' &&
+        alt.hasOwnProperty('name') &&
+        typeof alt.name === 'string' &&
+        alt.hasOwnProperty('grapeVarieties') &&
+        Array.isArray(alt.grapeVarieties) &&
+        alt.grapeVarieties.every((gv: any) => typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined))
+      )).toBe(true);
+      expect(response.body).toHaveProperty('conversationId');
+      expect(typeof response.body.conversationId).toBe('string');
+      expect(response.body).toHaveProperty('canRefine');
+      expect(typeof response.body.canRefine).toBe('boolean');
       expect(response.body.confidence).toBeGreaterThan(0.0);
       
       // Check for known good red wine types for steak
-      const wineType = response.body.primaryRecommendation.type?.toLowerCase() ?? '';
-      const wineName = response.body.primaryRecommendation.name?.toLowerCase() ?? '';
+      const primaryRecommendationName = response.body.primaryRecommendation?.name?.toLowerCase() ?? '';
+      const primaryRecommendationGrapeVarieties = response.body.primaryRecommendation?.grapeVarieties?.map((gv: any) => gv.name.toLowerCase()) ?? [];
       const explanation = response.body.explanation?.toLowerCase() || '';
       
       expect(
-        wineType.includes('red') || 
-        wineName.includes('cabernet') || 
-        wineName.includes('malbec') || 
-        wineName.includes('syrah') ||
-        wineName.includes('Shiraz') ||
+        primaryRecommendationName.includes('cabernet') ||
+        primaryRecommendationName.includes('malbec') ||
+        primaryRecommendationName.includes('syrah') ||
+        primaryRecommendationName.includes('shiraz') ||
+        primaryRecommendationGrapeVarieties.includes('cabernet sauvignon') ||
+        primaryRecommendationGrapeVarieties.includes('malbec') ||
+        primaryRecommendationGrapeVarieties.includes('syrah') ||
+        primaryRecommendationGrapeVarieties.includes('shiraz') ||
         explanation.includes('red wine') ||
         explanation.includes('cabernet') ||
         explanation.includes('malbec')
@@ -55,17 +78,41 @@ describe('End-to-End Live Recommendation API', () => {
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('primaryRecommendation');
       expect(response.body).toHaveProperty('explanation');
+      expect(typeof response.body.primaryRecommendation).toBe('object');
+      expect(response.body.primaryRecommendation).toHaveProperty('name');
+      expect(typeof response.body.primaryRecommendation.name).toBe('string');
+      expect(response.body.primaryRecommendation).toHaveProperty('grapeVarieties');
+      expect(Array.isArray(response.body.primaryRecommendation.grapeVarieties)).toBe(true);
+      expect(response.body.primaryRecommendation.grapeVarieties.every((gv: any) => 
+        typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined)
+      )).toBe(true);
+
+      expect(Array.isArray(response.body.alternatives)).toBe(true);
+      expect(response.body.alternatives.every((alt: any) => 
+        typeof alt === 'object' && 
+        alt.hasOwnProperty('name') && 
+        typeof alt.name === 'string' &&
+        alt.hasOwnProperty('grapeVarieties') &&
+        Array.isArray(alt.grapeVarieties) &&
+        alt.grapeVarieties.every((gv: any) => typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined))
+      )).toBe(true);
+      expect(response.body).toHaveProperty('conversationId');
+      expect(typeof response.body.conversationId).toBe('string');
+      expect(response.body).toHaveProperty('canRefine');
+      expect(typeof response.body.canRefine).toBe('boolean');
       expect(response.body.confidence).toBeGreaterThan(0.0);
       
-      const wineType = response.body.primaryRecommendation.type?.toLowerCase() || '';
-      const wineName = response.body.primaryRecommendation.name?.toLowerCase() || '';
+      const primaryRecommendationName = response.body.primaryRecommendation?.name?.toLowerCase() ?? '';
+      const primaryRecommendationGrapeVarieties = response.body.primaryRecommendation?.grapeVarieties?.map((gv: any) => gv.name.toLowerCase()) ?? [];
       const explanation = response.body.explanation?.toLowerCase() || '';
       
       expect(
-        wineType.includes('white') || 
-        wineName.includes('pinot grigio') || 
-        wineName.includes('sauvignon blanc') || 
-        wineName.includes('albariño') ||
+        primaryRecommendationName.includes('pinot grigio') ||
+        primaryRecommendationName.includes('sauvignon blanc') ||
+        primaryRecommendationName.includes('albariño') ||
+        primaryRecommendationGrapeVarieties.includes('pinot grigio') ||
+        primaryRecommendationGrapeVarieties.includes('sauvignon blanc') ||
+        primaryRecommendationGrapeVarieties.includes('albariño') ||
         explanation.includes('white wine') ||
         explanation.includes('crisp') ||
         explanation.includes('citrus')
@@ -83,16 +130,43 @@ describe('End-to-End Live Recommendation API', () => {
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('primaryRecommendation');
       expect(response.body).toHaveProperty('explanation');
+      expect(typeof response.body.primaryRecommendation).toBe('object');
+      expect(response.body.primaryRecommendation).toHaveProperty('name');
+      expect(typeof response.body.primaryRecommendation.name).toBe('string');
+      expect(response.body.primaryRecommendation).toHaveProperty('grapeVarieties');
+      expect(Array.isArray(response.body.primaryRecommendation.grapeVarieties)).toBe(true);
+      expect(response.body.primaryRecommendation.grapeVarieties.every((gv: any) => 
+        typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined)
+      )).toBe(true);
+
+      expect(Array.isArray(response.body.alternatives)).toBe(true);
+      expect(response.body.alternatives.every((alt: any) => 
+        typeof alt === 'object' && 
+        alt.hasOwnProperty('name') && 
+        typeof alt.name === 'string' &&
+        alt.hasOwnProperty('grapeVarieties') &&
+        Array.isArray(alt.grapeVarieties) &&
+        alt.grapeVarieties.every((gv: any) => typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined))
+      )).toBe(true);
+      expect(response.body).toHaveProperty('conversationId');
+      expect(typeof response.body.conversationId).toBe('string');
+      expect(response.body).toHaveProperty('canRefine');
+      expect(typeof response.body.canRefine).toBe('boolean');
       expect(response.body.confidence).toBeGreaterThan(0.0);
       
-      const wineName = response.body.primaryRecommendation.name?.toLowerCase() || '';
+      const primaryRecommendationName = response.body.primaryRecommendation?.name?.toLowerCase() ?? '';
+      const primaryRecommendationGrapeVarieties = response.body.primaryRecommendation?.grapeVarieties?.map((gv: any) => gv.name.toLowerCase()) ?? [];
       const explanation = response.body.explanation?.toLowerCase() || '';
       
       expect(
-        wineName.includes('pinot noir') || 
-        wineName.includes('chianti') || 
-        wineName.includes('beaujolais') ||
-        wineName.includes('chardonnay') ||
+        primaryRecommendationName.includes('pinot noir') ||
+        primaryRecommendationName.includes('chianti') ||
+        primaryRecommendationName.includes('beaujolais') ||
+        primaryRecommendationName.includes('chardonnay') ||
+        primaryRecommendationGrapeVarieties.includes('pinot noir') ||
+        primaryRecommendationGrapeVarieties.includes('sangiovese') ||
+        primaryRecommendationGrapeVarieties.includes('gamay') ||
+        primaryRecommendationGrapeVarieties.includes('chardonnay') ||
         explanation.includes('pinot noir') ||
         explanation.includes('light red') ||
         explanation.includes('medium-bodied')
@@ -110,16 +184,44 @@ describe('End-to-End Live Recommendation API', () => {
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('primaryRecommendation');
       expect(response.body).toHaveProperty('explanation');
+      expect(typeof response.body.primaryRecommendation).toBe('object');
+      expect(response.body.primaryRecommendation).toHaveProperty('name');
+      expect(typeof response.body.primaryRecommendation.name).toBe('string');
+      expect(response.body.primaryRecommendation).toHaveProperty('grapeVarieties');
+      expect(Array.isArray(response.body.primaryRecommendation.grapeVarieties)).toBe(true);
+      expect(response.body.primaryRecommendation.grapeVarieties.every((gv: any) => 
+        typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined)
+      )).toBe(true);
+
+      expect(Array.isArray(response.body.alternatives)).toBe(true);
+      expect(response.body.alternatives.every((alt: any) => 
+        typeof alt === 'object' && 
+        alt.hasOwnProperty('name') && 
+        typeof alt.name === 'string' &&
+        alt.hasOwnProperty('grapeVarieties') &&
+        Array.isArray(alt.grapeVarieties) &&
+        alt.grapeVarieties.every((gv: any) => typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined))
+      )).toBe(true);
+      expect(response.body).toHaveProperty('conversationId');
+      expect(typeof response.body.conversationId).toBe('string');
+      expect(response.body).toHaveProperty('canRefine');
+      expect(typeof response.body.canRefine).toBe('boolean');
       expect(response.body.confidence).toBeGreaterThan(0.0);
       
-      const wineName = response.body.primaryRecommendation.name?.toLowerCase() || '';
+      const primaryRecommendationName = response.body.primaryRecommendation?.name?.toLowerCase() ?? '';
+      const primaryRecommendationGrapeVarieties = response.body.primaryRecommendation?.grapeVarieties?.map((gv: any) => gv.name.toLowerCase()) ?? [];
       const explanation = response.body.explanation?.toLowerCase() || '';
       
       expect(
-        wineName.includes('champagne') || 
-        wineName.includes('prosecco') || 
-        wineName.includes('chablis') ||
-        wineName.includes('muscadet') ||
+        primaryRecommendationName.includes('champagne') ||
+        primaryRecommendationName.includes('prosecco') ||
+        primaryRecommendationName.includes('chablis') ||
+        primaryRecommendationName.includes('muscadet') ||
+        primaryRecommendationGrapeVarieties.includes('chardonnay') ||
+        primaryRecommendationGrapeVarieties.includes('pinot noir') ||
+        primaryRecommendationGrapeVarieties.includes('pinot meunier') ||
+        primaryRecommendationGrapeVarieties.includes('glera') ||
+        primaryRecommendationGrapeVarieties.includes('melon de bourgogne') ||
         explanation.includes('sparkling') ||
         explanation.includes('bubbles') ||
         explanation.includes('crisp') ||
@@ -139,15 +241,40 @@ describe('End-to-End Live Recommendation API', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('primaryRecommendation');
+      expect(typeof response.body.primaryRecommendation).toBe('object');
+      expect(response.body.primaryRecommendation).toHaveProperty('name');
+      expect(typeof response.body.primaryRecommendation.name).toBe('string');
+      expect(response.body.primaryRecommendation).toHaveProperty('grapeVarieties');
+      expect(Array.isArray(response.body.primaryRecommendation.grapeVarieties)).toBe(true);
+      expect(response.body.primaryRecommendation.grapeVarieties.every((gv: any) => 
+        typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined)
+      )).toBe(true);
+
+      expect(Array.isArray(response.body.alternatives)).toBe(true);
+      expect(response.body.alternatives.every((alt: any) => 
+        typeof alt === 'object' && 
+        alt.hasOwnProperty('name') && 
+        typeof alt.name === 'string' &&
+        alt.hasOwnProperty('grapeVarieties') &&
+        Array.isArray(alt.grapeVarieties) &&
+        alt.grapeVarieties.every((gv: any) => typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined))
+      )).toBe(true);
+      expect(response.body).toHaveProperty('conversationId');
+      expect(typeof response.body.conversationId).toBe('string');
+      expect(response.body).toHaveProperty('canRefine');
+      expect(typeof response.body.canRefine).toBe('boolean');
       expect(response.body.confidence).toBeGreaterThan(0.0);
       
-      const wineName = response.body.primaryRecommendation.name?.toLowerCase() || '';
+      const primaryRecommendationName = response.body.primaryRecommendation?.name?.toLowerCase() ?? '';
+      const primaryRecommendationGrapeVarieties = response.body.primaryRecommendation?.grapeVarieties?.map((gv: any) => gv.name.toLowerCase()) ?? [];
       const explanation = response.body.explanation?.toLowerCase() || '';
       
       expect(
-        wineName.includes('chianti') || 
-        wineName.includes('sangiovese') || 
-        wineName.includes('barbera') ||
+        primaryRecommendationName.includes('chianti') ||
+        primaryRecommendationName.includes('sangiovese') ||
+        primaryRecommendationName.includes('barbera') ||
+        primaryRecommendationGrapeVarieties.includes('sangiovese') ||
+        primaryRecommendationGrapeVarieties.includes('barbera') ||
         explanation.includes('italian') ||
         explanation.includes('acidity') ||
         explanation.includes('tomato')
@@ -164,16 +291,43 @@ describe('End-to-End Live Recommendation API', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('primaryRecommendation');
+      expect(typeof response.body.primaryRecommendation).toBe('object');
+      expect(response.body.primaryRecommendation).toHaveProperty('name');
+      expect(typeof response.body.primaryRecommendation.name).toBe('string');
+      expect(response.body.primaryRecommendation).toHaveProperty('grapeVarieties');
+      expect(Array.isArray(response.body.primaryRecommendation.grapeVarieties)).toBe(true);
+      expect(response.body.primaryRecommendation.grapeVarieties.every((gv: any) => 
+        typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined)
+      )).toBe(true);
+
+      expect(Array.isArray(response.body.alternatives)).toBe(true);
+      expect(response.body.alternatives.every((alt: any) => 
+        typeof alt === 'object' && 
+        alt.hasOwnProperty('name') && 
+        typeof alt.name === 'string' &&
+        alt.hasOwnProperty('grapeVarieties') &&
+        Array.isArray(alt.grapeVarieties) &&
+        alt.grapeVarieties.every((gv: any) => typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined))
+      )).toBe(true);
+      expect(response.body).toHaveProperty('conversationId');
+      expect(typeof response.body.conversationId).toBe('string');
+      expect(response.body).toHaveProperty('canRefine');
+      expect(typeof response.body.canRefine).toBe('boolean');
       expect(response.body.confidence).toBeGreaterThan(0.0);
       
-      const wineName = response.body.primaryRecommendation.name?.toLowerCase() || '';
+      const primaryRecommendationName = response.body.primaryRecommendation?.name?.toLowerCase() ?? '';
+      const primaryRecommendationGrapeVarieties = response.body.primaryRecommendation?.grapeVarieties?.map((gv: any) => gv.name.toLowerCase()) ?? [];
       const explanation = response.body.explanation?.toLowerCase() || '';
       
       expect(
-        wineName.includes('pinot grigio') || 
-        wineName.includes('vermentino') || 
-        wineName.includes('soave') ||
-        wineName.includes('albariño') ||
+        primaryRecommendationName.includes('pinot grigio') ||
+        primaryRecommendationName.includes('vermentino') ||
+        primaryRecommendationName.includes('soave') ||
+        primaryRecommendationName.includes('albariño') ||
+        primaryRecommendationGrapeVarieties.includes('pinot grigio') ||
+        primaryRecommendationGrapeVarieties.includes('vermentino') ||
+        primaryRecommendationGrapeVarieties.includes('garganega') ||
+        primaryRecommendationGrapeVarieties.includes('albariño') ||
         explanation.includes('white') ||
         explanation.includes('seafood') ||
         explanation.includes('italian')
@@ -192,16 +346,43 @@ describe('End-to-End Live Recommendation API', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('primaryRecommendation');
+      expect(typeof response.body.primaryRecommendation).toBe('object');
+      expect(response.body.primaryRecommendation).toHaveProperty('name');
+      expect(typeof response.body.primaryRecommendation.name).toBe('string');
+      expect(response.body.primaryRecommendation).toHaveProperty('grapeVarieties');
+      expect(Array.isArray(response.body.primaryRecommendation.grapeVarieties)).toBe(true);
+      expect(response.body.primaryRecommendation.grapeVarieties.every((gv: any) => 
+        typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined)
+      )).toBe(true);
+
+      expect(Array.isArray(response.body.alternatives)).toBe(true);
+      expect(response.body.alternatives.every((alt: any) => 
+        typeof alt === 'object' && 
+        alt.hasOwnProperty('name') && 
+        typeof alt.name === 'string' &&
+        alt.hasOwnProperty('grapeVarieties') &&
+        Array.isArray(alt.grapeVarieties) &&
+        alt.grapeVarieties.every((gv: any) => typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined))
+      )).toBe(true);
+      expect(response.body).toHaveProperty('conversationId');
+      expect(typeof response.body.conversationId).toBe('string');
+      expect(response.body).toHaveProperty('canRefine');
+      expect(typeof response.body.canRefine).toBe('boolean');
       expect(response.body.confidence).toBeGreaterThan(0.0);
       
-      const wineName = response.body.primaryRecommendation.name?.toLowerCase() || '';
+      const primaryRecommendationName = response.body.primaryRecommendation?.name?.toLowerCase() ?? '';
+      const primaryRecommendationGrapeVarieties = response.body.primaryRecommendation?.grapeVarieties?.map((gv: any) => gv.name.toLowerCase()) ?? [];
       const explanation = response.body.explanation?.toLowerCase() || '';
       
       expect(
-        wineName.includes('port') || 
-        wineName.includes('cabernet') || 
-        wineName.includes('bordeaux') ||
-        wineName.includes('sherry') ||
+        primaryRecommendationName.includes('port') ||
+        primaryRecommendationName.includes('cabernet') ||
+        primaryRecommendationName.includes('bordeaux') ||
+        primaryRecommendationName.includes('sherry') ||
+        primaryRecommendationGrapeVarieties.includes('touriga nacional') ||
+        primaryRecommendationGrapeVarieties.includes('cabernet sauvignon') ||
+        primaryRecommendationGrapeVarieties.includes('merlot') ||
+        primaryRecommendationGrapeVarieties.includes('tinta roriz') ||
         explanation.includes('bold') ||
         explanation.includes('aged') ||
         explanation.includes('robust')
@@ -218,16 +399,41 @@ describe('End-to-End Live Recommendation API', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('primaryRecommendation');
+      expect(typeof response.body.primaryRecommendation).toBe('object');
+      expect(response.body.primaryRecommendation).toHaveProperty('name');
+      expect(typeof response.body.primaryRecommendation.name).toBe('string');
+      expect(response.body.primaryRecommendation).toHaveProperty('grapeVarieties');
+      expect(Array.isArray(response.body.primaryRecommendation.grapeVarieties)).toBe(true);
+      expect(response.body.primaryRecommendation.grapeVarieties.every((gv: any) => 
+        typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined)
+      )).toBe(true);
+
+      expect(Array.isArray(response.body.alternatives)).toBe(true);
+      expect(response.body.alternatives.every((alt: any) => 
+        typeof alt === 'object' && 
+        alt.hasOwnProperty('name') && 
+        typeof alt.name === 'string' &&
+        alt.hasOwnProperty('grapeVarieties') &&
+        Array.isArray(alt.grapeVarieties) &&
+        alt.grapeVarieties.every((gv: any) => typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined))
+      )).toBe(true);
+      expect(response.body).toHaveProperty('conversationId');
+      expect(typeof response.body.conversationId).toBe('string');
+      expect(response.body).toHaveProperty('canRefine');
+      expect(typeof response.body.canRefine).toBe('boolean');
       expect(response.body.confidence).toBeGreaterThan(0.0);
       
-      const wineName = response.body.primaryRecommendation.name?.toLowerCase() || '';
+      const primaryRecommendationName = response.body.primaryRecommendation?.name?.toLowerCase() ?? '';
+      const primaryRecommendationGrapeVarieties = response.body.primaryRecommendation?.grapeVarieties?.map((gv: any) => gv.name.toLowerCase()) ?? [];
       const explanation = response.body.explanation?.toLowerCase() || '';
       
       expect(
-        wineName.includes('sauvignon blanc') || 
-        wineName.includes('sancerre') || 
-        wineName.includes('pouilly') ||
-        wineName.includes('albariño') ||
+        primaryRecommendationName.includes('sauvignon blanc') ||
+        primaryRecommendationName.includes('sancerre') ||
+        primaryRecommendationName.includes('pouilly') ||
+        primaryRecommendationName.includes('albariño') ||
+        primaryRecommendationGrapeVarieties.includes('sauvignon blanc') ||
+        primaryRecommendationGrapeVarieties.includes('albariño') ||
         explanation.includes('crisp') ||
         explanation.includes('acidity') ||
         explanation.includes('citrus')
@@ -246,16 +452,42 @@ describe('End-to-End Live Recommendation API', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('primaryRecommendation');
+      expect(typeof response.body.primaryRecommendation).toBe('object');
+      expect(response.body.primaryRecommendation).toHaveProperty('name');
+      expect(typeof response.body.primaryRecommendation.name).toBe('string');
+      expect(response.body.primaryRecommendation).toHaveProperty('grapeVarieties');
+      expect(Array.isArray(response.body.primaryRecommendation.grapeVarieties)).toBe(true);
+      expect(response.body.primaryRecommendation.grapeVarieties.every((gv: any) => 
+        typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined)
+      )).toBe(true);
+
+      expect(Array.isArray(response.body.alternatives)).toBe(true);
+      expect(response.body.alternatives.every((alt: any) => 
+        typeof alt === 'object' && 
+        alt.hasOwnProperty('name') && 
+        typeof alt.name === 'string' &&
+        alt.hasOwnProperty('grapeVarieties') &&
+        Array.isArray(alt.grapeVarieties) &&
+        alt.grapeVarieties.every((gv: any) => typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined))
+      )).toBe(true);
+      expect(response.body).toHaveProperty('conversationId');
+      expect(typeof response.body.conversationId).toBe('string');
+      expect(response.body).toHaveProperty('canRefine');
+      expect(typeof response.body.canRefine).toBe('boolean');
       expect(response.body.confidence).toBeGreaterThan(0.0);
       
-      const wineName = response.body.primaryRecommendation.name?.toLowerCase() || '';
+      const primaryRecommendationName = response.body.primaryRecommendation?.name?.toLowerCase() ?? '';
+      const primaryRecommendationGrapeVarieties = response.body.primaryRecommendation?.grapeVarieties?.map((gv: any) => gv.name.toLowerCase()) ?? [];
       const explanation = response.body.explanation?.toLowerCase() || '';
       
       expect(
-        wineName.includes('moscato') || 
-        wineName.includes('riesling') || 
-        wineName.includes('gewürztraminer') ||
-        wineName.includes('ice wine') ||
+        primaryRecommendationName.includes('moscato') ||
+        primaryRecommendationName.includes('riesling') ||
+        primaryRecommendationName.includes('gewürztraminer') ||
+        primaryRecommendationName.includes('ice wine') ||
+        primaryRecommendationGrapeVarieties.includes('moscato bianco') ||
+        primaryRecommendationGrapeVarieties.includes('riesling') ||
+        primaryRecommendationGrapeVarieties.includes('gewürztraminer') ||
         explanation.includes('sweet') ||
         explanation.includes('dessert') ||
         explanation.includes('fruit')
@@ -272,16 +504,43 @@ describe('End-to-End Live Recommendation API', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('primaryRecommendation');
+      expect(typeof response.body.primaryRecommendation).toBe('object');
+      expect(response.body.primaryRecommendation).toHaveProperty('name');
+      expect(typeof response.body.primaryRecommendation.name).toBe('string');
+      expect(response.body.primaryRecommendation).toHaveProperty('grapeVarieties');
+      expect(Array.isArray(response.body.primaryRecommendation.grapeVarieties)).toBe(true);
+      expect(response.body.primaryRecommendation.grapeVarieties.every((gv: any) => 
+        typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined)
+      )).toBe(true);
+
+      expect(Array.isArray(response.body.alternatives)).toBe(true);
+      expect(response.body.alternatives.every((alt: any) => 
+        typeof alt === 'object' && 
+        alt.hasOwnProperty('name') && 
+        typeof alt.name === 'string' &&
+        alt.hasOwnProperty('grapeVarieties') &&
+        Array.isArray(alt.grapeVarieties) &&
+        alt.grapeVarieties.every((gv: any) => typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined))
+      )).toBe(true);
+      expect(response.body).toHaveProperty('conversationId');
+      expect(typeof response.body.conversationId).toBe('string');
+      expect(response.body).toHaveProperty('canRefine');
+      expect(typeof response.body.canRefine).toBe('boolean');
       expect(response.body.confidence).toBeGreaterThan(0.0);
       
-      const wineName = response.body.primaryRecommendation.name?.toLowerCase() || '';
+      const primaryRecommendationName = response.body.primaryRecommendation?.name?.toLowerCase() ?? '';
+      const primaryRecommendationGrapeVarieties = response.body.primaryRecommendation?.grapeVarieties?.map((gv: any) => gv.name.toLowerCase()) ?? [];
       const explanation = response.body.explanation?.toLowerCase() || '';
       
       expect(
-        wineName.includes('port') || 
-        wineName.includes('madeira') || 
-        wineName.includes('sherry') ||
-        wineName.includes('banyuls') ||
+        primaryRecommendationName.includes('port') ||
+        primaryRecommendationName.includes('madeira') ||
+        primaryRecommendationName.includes('sherry') ||
+        primaryRecommendationName.includes('banyuls') ||
+        primaryRecommendationGrapeVarieties.includes('touriga nacional') ||
+        primaryRecommendationGrapeVarieties.includes('tinta negra mole') ||
+        primaryRecommendationGrapeVarieties.includes('palomino') ||
+        primaryRecommendationGrapeVarieties.includes('grenache') ||
         explanation.includes('fortified') ||
         explanation.includes('chocolate') ||
         explanation.includes('rich')
@@ -300,16 +559,42 @@ describe('End-to-End Live Recommendation API', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('primaryRecommendation');
+      expect(typeof response.body.primaryRecommendation).toBe('object');
+      expect(response.body.primaryRecommendation).toHaveProperty('name');
+      expect(typeof response.body.primaryRecommendation.name).toBe('string');
+      expect(response.body.primaryRecommendation).toHaveProperty('grapeVarieties');
+      expect(Array.isArray(response.body.primaryRecommendation.grapeVarieties)).toBe(true);
+      expect(response.body.primaryRecommendation.grapeVarieties.every((gv: any) => 
+        typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined)
+      )).toBe(true);
+
+      expect(Array.isArray(response.body.alternatives)).toBe(true);
+      expect(response.body.alternatives.every((alt: any) => 
+        typeof alt === 'object' && 
+        alt.hasOwnProperty('name') && 
+        typeof alt.name === 'string' &&
+        alt.hasOwnProperty('grapeVarieties') &&
+        Array.isArray(alt.grapeVarieties) &&
+        alt.grapeVarieties.every((gv: any) => typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined))
+      )).toBe(true);
+      expect(response.body).toHaveProperty('conversationId');
+      expect(typeof response.body.conversationId).toBe('string');
+      expect(response.body).toHaveProperty('canRefine');
+      expect(typeof response.body.canRefine).toBe('boolean');
       expect(response.body.confidence).toBeGreaterThan(0.0);
       
-      const wineName = response.body.primaryRecommendation.name?.toLowerCase() || '';
+      const primaryRecommendationName = response.body.primaryRecommendation?.name?.toLowerCase() ?? '';
+      const primaryRecommendationGrapeVarieties = response.body.primaryRecommendation?.grapeVarieties?.map((gv: any) => gv.name.toLowerCase()) ?? [];
       const explanation = response.body.explanation?.toLowerCase() || '';
       
       expect(
-        wineName.includes('riesling') || 
-        wineName.includes('gewürztraminer') || 
-        wineName.includes('viognier') ||
-        wineName.includes('rosé') ||
+        primaryRecommendationName.includes('riesling') ||
+        primaryRecommendationName.includes('gewürztraminer') ||
+        primaryRecommendationName.includes('viognier') ||
+        primaryRecommendationName.includes('rosé') ||
+        primaryRecommendationGrapeVarieties.includes('riesling') ||
+        primaryRecommendationGrapeVarieties.includes('gewürztraminer') ||
+        primaryRecommendationGrapeVarieties.includes('viognier') ||
         explanation.includes('off-dry') ||
         explanation.includes('spicy') ||
         explanation.includes('aromatic') ||
@@ -327,16 +612,44 @@ describe('End-to-End Live Recommendation API', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('primaryRecommendation');
+      expect(typeof response.body.primaryRecommendation).toBe('object');
+      expect(response.body.primaryRecommendation).toHaveProperty('name');
+      expect(typeof response.body.primaryRecommendation.name).toBe('string');
+      expect(response.body.primaryRecommendation).toHaveProperty('grapeVarieties');
+      expect(Array.isArray(response.body.primaryRecommendation.grapeVarieties)).toBe(true);
+      expect(response.body.primaryRecommendation.grapeVarieties.every((gv: any) => 
+        typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined)
+      )).toBe(true);
+
+      expect(Array.isArray(response.body.alternatives)).toBe(true);
+      expect(response.body.alternatives.every((alt: any) => 
+        typeof alt === 'object' && 
+        alt.hasOwnProperty('name') && 
+        typeof alt.name === 'string' &&
+        alt.hasOwnProperty('grapeVarieties') &&
+        Array.isArray(alt.grapeVarieties) &&
+        alt.grapeVarieties.every((gv: any) => typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined))
+      )).toBe(true);
+      expect(response.body).toHaveProperty('conversationId');
+      expect(typeof response.body.conversationId).toBe('string');
+      expect(response.body).toHaveProperty('canRefine');
+      expect(typeof response.body.canRefine).toBe('boolean');
       expect(response.body.confidence).toBeGreaterThan(0.0);
       
-      const wineName = response.body.primaryRecommendation.name?.toLowerCase() || '';
+      const primaryRecommendationName = response.body.primaryRecommendation?.name?.toLowerCase() ?? '';
+      const primaryRecommendationGrapeVarieties = response.body.primaryRecommendation?.grapeVarieties?.map((gv: any) => gv.name.toLowerCase()) ?? [];
       const explanation = response.body.explanation?.toLowerCase() || '';
       
       expect(
-        wineName.includes('tempranillo') || 
-        wineName.includes('rioja') || 
-        wineName.includes('albariño') ||
-        wineName.includes('verdejo') ||
+        primaryRecommendationName.includes('tempranillo') ||
+        primaryRecommendationName.includes('rioja') ||
+        primaryRecommendationName.includes('albariño') ||
+        primaryRecommendationName.includes('verdejo') ||
+        primaryRecommendationGrapeVarieties.includes('tempranillo') ||
+        primaryRecommendationGrapeVarieties.includes('garnacha') ||
+        primaryRecommendationGrapeVarieties.includes('graciano') ||
+        primaryRecommendationGrapeVarieties.includes('albariño') ||
+        primaryRecommendationGrapeVarieties.includes('verdejo') ||
         explanation.includes('spanish') ||
         explanation.includes('saffron') ||
         explanation.includes('seafood')
@@ -413,9 +726,37 @@ describe('End-to-End Live Recommendation API', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('primaryRecommendation');
+      expect(response.body).toHaveProperty('alternatives');
       expect(response.body).toHaveProperty('explanation');
+      expect(response.body).toHaveProperty('confidence');
+      expect(typeof response.body.primaryRecommendation).toBe('object');
+      expect(response.body.primaryRecommendation).toHaveProperty('name');
+      expect(typeof response.body.primaryRecommendation.name).toBe('string');
+      expect(response.body.primaryRecommendation).toHaveProperty('grapeVarieties');
+      expect(Array.isArray(response.body.primaryRecommendation.grapeVarieties)).toBe(true);
+      expect(response.body.primaryRecommendation.grapeVarieties.every((gv: any) => 
+        typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined)
+      )).toBe(true);
+
+      expect(Array.isArray(response.body.alternatives)).toBe(true);
+      expect(response.body.alternatives.every((alt: any) => 
+        typeof alt === 'object' && 
+        alt.hasOwnProperty('name') && 
+        typeof alt.name === 'string' &&
+        alt.hasOwnProperty('grapeVarieties') &&
+        Array.isArray(alt.grapeVarieties) &&
+        alt.grapeVarieties.every((gv: any) => typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined))
+      )).toBe(true);
+      expect(response.body).toHaveProperty('conversationId');
+      expect(typeof response.body.conversationId).toBe('string');
+      expect(response.body).toHaveProperty('canRefine');
+      expect(typeof response.body.canRefine).toBe('boolean');
       expect(response.body.confidence).toBeGreaterThan(0.0);
       // Should still provide some recommendation even for vague requests
+      const primaryRecommendationName = response.body.primaryRecommendation?.name?.toLowerCase() ?? '';
+      const primaryRecommendationGrapeVarieties = response.body.primaryRecommendation?.grapeVarieties?.map((gv: any) => gv.name.toLowerCase()) ?? [];
+      // No specific assertions for vague requests, just ensure it's not empty
+      expect(primaryRecommendationName.length).toBeGreaterThan(0);
     });
 
     it('should handle conflicting preferences intelligently', async () => {
@@ -428,8 +769,35 @@ describe('End-to-End Live Recommendation API', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('primaryRecommendation');
+      expect(response.body).toHaveProperty('alternatives');
       expect(response.body).toHaveProperty('explanation');
+      expect(response.body).toHaveProperty('confidence');
+      expect(typeof response.body.primaryRecommendation).toBe('object');
+      expect(response.body.primaryRecommendation).toHaveProperty('name');
+      expect(typeof response.body.primaryRecommendation.name).toBe('string');
+      expect(response.body.primaryRecommendation).toHaveProperty('grapeVarieties');
+      expect(Array.isArray(response.body.primaryRecommendation.grapeVarieties)).toBe(true);
+      expect(response.body.primaryRecommendation.grapeVarieties.every((gv: any) => 
+        typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined)
+      )).toBe(true);
+
+      expect(Array.isArray(response.body.alternatives)).toBe(true);
+      expect(response.body.alternatives.every((alt: any) => 
+        typeof alt === 'object' && 
+        alt.hasOwnProperty('name') && 
+        typeof alt.name === 'string' &&
+        alt.hasOwnProperty('grapeVarieties') &&
+        Array.isArray(alt.grapeVarieties) &&
+        alt.grapeVarieties.every((gv: any) => typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined))
+      )).toBe(true);
+      expect(response.body).toHaveProperty('conversationId');
+      expect(typeof response.body.conversationId).toBe('string');
+      expect(response.body).toHaveProperty('canRefine');
+      expect(typeof response.body.canRefine).toBe('boolean');
+      expect(response.body.confidence).toBeGreaterThan(0.0);
       // Should provide explanation addressing the conflicting preferences
+      const primaryRecommendationName = response.body.primaryRecommendation?.name?.toLowerCase() ?? '';
+      const primaryRecommendationGrapeVarieties = response.body.primaryRecommendation?.grapeVarieties?.map((gv: any) => gv.name.toLowerCase()) ?? [];
       expect(response.body.explanation.length).toBeGreaterThan(50);
     });
 
@@ -443,9 +811,35 @@ describe('End-to-End Live Recommendation API', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('primaryRecommendation');
+      expect(response.body).toHaveProperty('alternatives');
       expect(response.body).toHaveProperty('explanation');
+      expect(response.body).toHaveProperty('confidence');
+      expect(typeof response.body.primaryRecommendation).toBe('object');
+      expect(response.body.primaryRecommendation).toHaveProperty('name');
+      expect(typeof response.body.primaryRecommendation.name).toBe('string');
+      expect(response.body.primaryRecommendation).toHaveProperty('grapeVarieties');
+      expect(Array.isArray(response.body.primaryRecommendation.grapeVarieties)).toBe(true);
+      expect(response.body.primaryRecommendation.grapeVarieties.every((gv: any) => 
+        typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined)
+      )).toBe(true);
+
+      expect(Array.isArray(response.body.alternatives)).toBe(true);
+      expect(response.body.alternatives.every((alt: any) => 
+        typeof alt === 'object' && 
+        alt.hasOwnProperty('name') && 
+        typeof alt.name === 'string' &&
+        alt.hasOwnProperty('grapeVarieties') &&
+        Array.isArray(alt.grapeVarieties) &&
+        alt.grapeVarieties.every((gv: any) => typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined))
+      )).toBe(true);
+      expect(response.body).toHaveProperty('conversationId');
+      expect(typeof response.body.conversationId).toBe('string');
+      expect(response.body).toHaveProperty('canRefine');
+      expect(typeof response.body.canRefine).toBe('boolean');
       expect(response.body.confidence).toBeGreaterThan(0.0);
       // Should attempt to make a recommendation even for unusual combinations
+      const primaryRecommendationName = response.body.primaryRecommendation?.name?.toLowerCase() ?? '';
+      const primaryRecommendationGrapeVarieties = response.body.primaryRecommendation?.grapeVarieties?.map((gv: any) => gv.name.toLowerCase()) ?? [];
     });
 
     it('should handle budget constraints appropriately', async () => {
@@ -458,11 +852,38 @@ describe('End-to-End Live Recommendation API', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('primaryRecommendation');
+      expect(response.body).toHaveProperty('alternatives');
       expect(response.body).toHaveProperty('explanation');
+      expect(response.body).toHaveProperty('confidence');
+      expect(typeof response.body.primaryRecommendation).toBe('object');
+      expect(response.body.primaryRecommendation).toHaveProperty('name');
+      expect(typeof response.body.primaryRecommendation.name).toBe('string');
+      expect(response.body.primaryRecommendation).toHaveProperty('grapeVarieties');
+      expect(Array.isArray(response.body.primaryRecommendation.grapeVarieties)).toBe(true);
+      expect(response.body.primaryRecommendation.grapeVarieties.every((gv: any) => 
+        typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined)
+      )).toBe(true);
+
+      expect(Array.isArray(response.body.alternatives)).toBe(true);
+      expect(response.body.alternatives.every((alt: any) => 
+        typeof alt === 'object' && 
+        alt.hasOwnProperty('name') && 
+        typeof alt.name === 'string' &&
+        alt.hasOwnProperty('grapeVarieties') &&
+        Array.isArray(alt.grapeVarieties) &&
+        alt.grapeVarieties.every((gv: any) => typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined))
+      )).toBe(true);
+      expect(response.body).toHaveProperty('conversationId');
+      expect(typeof response.body.conversationId).toBe('string');
+      expect(response.body).toHaveProperty('canRefine');
+      expect(typeof response.body.canRefine).toBe('boolean');
+      expect(response.body.confidence).toBeGreaterThan(0.0);
+      const primaryRecommendationName = response.body.primaryRecommendation?.name?.toLowerCase() ?? '';
+      const primaryRecommendationGrapeVarieties = response.body.primaryRecommendation?.grapeVarieties?.map((gv: any) => gv.name.toLowerCase()) ?? [];
       const explanation = response.body.explanation.toLowerCase();
       expect(
-        explanation.includes('budget') || 
-        explanation.includes('affordable') || 
+        explanation.includes('budget') ||
+        explanation.includes('affordable') ||
         explanation.includes('value') ||
         explanation.includes('$')
       ).toBeTruthy();
@@ -478,11 +899,38 @@ describe('End-to-End Live Recommendation API', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('primaryRecommendation');
+      expect(response.body).toHaveProperty('alternatives');
       expect(response.body).toHaveProperty('explanation');
+      expect(response.body).toHaveProperty('confidence');
+      expect(typeof response.body.primaryRecommendation).toBe('object');
+      expect(response.body.primaryRecommendation).toHaveProperty('name');
+      expect(typeof response.body.primaryRecommendation.name).toBe('string');
+      expect(response.body.primaryRecommendation).toHaveProperty('grapeVarieties');
+      expect(Array.isArray(response.body.primaryRecommendation.grapeVarieties)).toBe(true);
+      expect(response.body.primaryRecommendation.grapeVarieties.every((gv: any) => 
+        typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined)
+      )).toBe(true);
+
+      expect(Array.isArray(response.body.alternatives)).toBe(true);
+      expect(response.body.alternatives.every((alt: any) => 
+        typeof alt === 'object' && 
+        alt.hasOwnProperty('name') && 
+        typeof alt.name === 'string' &&
+        alt.hasOwnProperty('grapeVarieties') &&
+        Array.isArray(alt.grapeVarieties) &&
+        alt.grapeVarieties.every((gv: any) => typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined))
+      )).toBe(true);
+      expect(response.body).toHaveProperty('conversationId');
+      expect(typeof response.body.conversationId).toBe('string');
+      expect(response.body).toHaveProperty('canRefine');
+      expect(typeof response.body.canRefine).toBe('boolean');
+      expect(response.body.confidence).toBeGreaterThan(0.0);
+      const primaryRecommendationName = response.body.primaryRecommendation?.name?.toLowerCase() ?? '';
+      const primaryRecommendationGrapeVarieties = response.body.primaryRecommendation?.grapeVarieties?.map((gv: any) => gv.name.toLowerCase()) ?? [];
       const explanation = response.body.explanation.toLowerCase();
       expect(
-        explanation.includes('vegan') || 
-        explanation.includes('organic') || 
+        explanation.includes('vegan') ||
+        explanation.includes('organic') ||
         explanation.includes('sulfite') ||
         explanation.includes('mushroom') ||
         explanation.includes('earthy')
@@ -499,9 +947,36 @@ describe('End-to-End Live Recommendation API', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('primaryRecommendation');
+      expect(response.body).toHaveProperty('alternatives');
       expect(response.body).toHaveProperty('explanation');
+      expect(response.body).toHaveProperty('confidence');
+      expect(typeof response.body.primaryRecommendation).toBe('object');
+      expect(response.body.primaryRecommendation).toHaveProperty('name');
+      expect(typeof response.body.primaryRecommendation.name).toBe('string');
+      expect(response.body.primaryRecommendation).toHaveProperty('grapeVarieties');
+      expect(Array.isArray(response.body.primaryRecommendation.grapeVarieties)).toBe(true);
+      expect(response.body.primaryRecommendation.grapeVarieties.every((gv: any) => 
+        typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined)
+      )).toBe(true);
+
+      expect(Array.isArray(response.body.alternatives)).toBe(true);
+      expect(response.body.alternatives.every((alt: any) => 
+        typeof alt === 'object' && 
+        alt.hasOwnProperty('name') && 
+        typeof alt.name === 'string' &&
+        alt.hasOwnProperty('grapeVarieties') &&
+        Array.isArray(alt.grapeVarieties) &&
+        alt.grapeVarieties.every((gv: any) => typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined))
+      )).toBe(true);
+      expect(response.body).toHaveProperty('conversationId');
+      expect(typeof response.body.conversationId).toBe('string');
+      expect(response.body).toHaveProperty('canRefine');
+      expect(typeof response.body.canRefine).toBe('boolean');
+      expect(response.body.confidence).toBeGreaterThan(0.0);
       // Should provide an explanation about why this might be challenging
       // and offer the closest reasonable alternative
+      const primaryRecommendationName = response.body.primaryRecommendation?.name?.toLowerCase() ?? '';
+      const primaryRecommendationGrapeVarieties = response.body.primaryRecommendation?.grapeVarieties?.map((gv: any) => gv.name.toLowerCase()) ?? [];
       expect(response.body.explanation.length).toBeGreaterThan(30);
     });
 
@@ -515,11 +990,38 @@ describe('End-to-End Live Recommendation API', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('primaryRecommendation');
+      expect(response.body).toHaveProperty('alternatives');
       expect(response.body).toHaveProperty('explanation');
+      expect(response.body).toHaveProperty('confidence');
+      expect(typeof response.body.primaryRecommendation).toBe('object');
+      expect(response.body.primaryRecommendation).toHaveProperty('name');
+      expect(typeof response.body.primaryRecommendation.name).toBe('string');
+      expect(response.body.primaryRecommendation).toHaveProperty('grapeVarieties');
+      expect(Array.isArray(response.body.primaryRecommendation.grapeVarieties)).toBe(true);
+      expect(response.body.primaryRecommendation.grapeVarieties.every((gv: any) => 
+        typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined)
+      )).toBe(true);
+
+      expect(Array.isArray(response.body.alternatives)).toBe(true);
+      expect(response.body.alternatives.every((alt: any) => 
+        typeof alt === 'object' && 
+        alt.hasOwnProperty('name') && 
+        typeof alt.name === 'string' &&
+        alt.hasOwnProperty('grapeVarieties') &&
+        Array.isArray(alt.grapeVarieties) &&
+        alt.grapeVarieties.every((gv: any) => typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined))
+      )).toBe(true);
+      expect(response.body).toHaveProperty('conversationId');
+      expect(typeof response.body.conversationId).toBe('string');
+      expect(response.body).toHaveProperty('canRefine');
+      expect(typeof response.body.canRefine).toBe('boolean');
+      expect(response.body.confidence).toBeGreaterThan(0.0);
+      const primaryRecommendationName = response.body.primaryRecommendation?.name?.toLowerCase() ?? '';
+      const primaryRecommendationGrapeVarieties = response.body.primaryRecommendation?.grapeVarieties?.map((gv: any) => gv.name.toLowerCase()) ?? [];
       const explanation = response.body.explanation.toLowerCase();
       expect(
-        explanation.includes('special') || 
-        explanation.includes('elegant') || 
+        explanation.includes('special') ||
+        explanation.includes('elegant') ||
         explanation.includes('anniversary') ||
         explanation.includes('celebration') ||
         explanation.includes('romantic') ||
@@ -537,11 +1039,38 @@ describe('End-to-End Live Recommendation API', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('primaryRecommendation');
+      expect(response.body).toHaveProperty('alternatives');
       expect(response.body).toHaveProperty('explanation');
+      expect(response.body).toHaveProperty('confidence');
+      expect(typeof response.body.primaryRecommendation).toBe('object');
+      expect(response.body.primaryRecommendation).toHaveProperty('name');
+      expect(typeof response.body.primaryRecommendation.name).toBe('string');
+      expect(response.body.primaryRecommendation).toHaveProperty('grapeVarieties');
+      expect(Array.isArray(response.body.primaryRecommendation.grapeVarieties)).toBe(true);
+      expect(response.body.primaryRecommendation.grapeVarieties.every((gv: any) => 
+        typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined)
+      )).toBe(true);
+
+      expect(Array.isArray(response.body.alternatives)).toBe(true);
+      expect(response.body.alternatives.every((alt: any) => 
+        typeof alt === 'object' && 
+        alt.hasOwnProperty('name') && 
+        typeof alt.name === 'string' &&
+        alt.hasOwnProperty('grapeVarieties') &&
+        Array.isArray(alt.grapeVarieties) &&
+        alt.grapeVarieties.every((gv: any) => typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined))
+      )).toBe(true);
+      expect(response.body).toHaveProperty('conversationId');
+      expect(typeof response.body.conversationId).toBe('string');
+      expect(response.body).toHaveProperty('canRefine');
+      expect(typeof response.body.canRefine).toBe('boolean');
+      const primaryRecommendationName = response.body.primaryRecommendation?.name?.toLowerCase() ?? '';
+      const primaryRecommendationGrapeVarieties = response.body.primaryRecommendation?.grapeVarieties?.map((gv: any) => gv.name.toLowerCase()) ?? [];
+      expect(response.body.confidence).toBeGreaterThan(0.0);
       const explanation = response.body.explanation.toLowerCase();
       expect(
-        explanation.includes('moroccan') || 
-        explanation.includes('tagine') || 
+        explanation.includes('moroccan') ||
+        explanation.includes('tagine') ||
         explanation.includes('lamb') ||
         explanation.includes('apricot') ||
         explanation.includes('spice') ||
@@ -561,14 +1090,44 @@ describe('End-to-End Live Recommendation API', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('primaryRecommendation');
-      const wineName = response.body.primaryRecommendation.name?.toLowerCase() || '';
+      expect(response.body).toHaveProperty('alternatives');
+      expect(response.body).toHaveProperty('explanation');
+      expect(response.body).toHaveProperty('confidence');
+      expect(typeof response.body.primaryRecommendation).toBe('object');
+      expect(response.body.primaryRecommendation).toHaveProperty('name');
+      expect(typeof response.body.primaryRecommendation.name).toBe('string');
+      expect(response.body.primaryRecommendation).toHaveProperty('grapeVarieties');
+      expect(Array.isArray(response.body.primaryRecommendation.grapeVarieties)).toBe(true);
+      expect(response.body.primaryRecommendation.grapeVarieties.every((gv: any) => 
+        typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined)
+      )).toBe(true);
+
+      expect(Array.isArray(response.body.alternatives)).toBe(true);
+      expect(response.body.alternatives.every((alt: any) => 
+        typeof alt === 'object' && 
+        alt.hasOwnProperty('name') && 
+        typeof alt.name === 'string' &&
+        alt.hasOwnProperty('grapeVarieties') &&
+        Array.isArray(alt.grapeVarieties) &&
+        alt.grapeVarieties.every((gv: any) => typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined))
+      )).toBe(true);
+      expect(response.body).toHaveProperty('conversationId');
+      expect(typeof response.body.conversationId).toBe('string');
+      expect(response.body).toHaveProperty('canRefine');
+      expect(typeof response.body.canRefine).toBe('boolean');
+      expect(response.body.confidence).toBeGreaterThan(0.0);
+      const primaryRecommendationName = response.body.primaryRecommendation?.name?.toLowerCase() || '';
+      const primaryRecommendationGrapeVarieties = response.body.primaryRecommendation?.grapeVarieties?.map((gv: any) => gv.name.toLowerCase()) ?? [];
       const explanation = response.body.explanation?.toLowerCase() || '';
       
       expect(
-        wineName.includes('zinfandel') || 
-        wineName.includes('syrah') || 
-        wineName.includes('shiraz') ||
-        wineName.includes('malbec') ||
+        primaryRecommendationName.includes('zinfandel') ||
+        primaryRecommendationName.includes('syrah') ||
+        primaryRecommendationName.includes('shiraz') ||
+        primaryRecommendationName.includes('malbec') ||
+        primaryRecommendationGrapeVarieties.includes('zinfandel') ||
+        primaryRecommendationGrapeVarieties.includes('syrah') ||
+        primaryRecommendationGrapeVarieties.includes('malbec') ||
         explanation.includes('bold') ||
         explanation.includes('smoky') ||
         explanation.includes('barbecue')
@@ -585,14 +1144,45 @@ describe('End-to-End Live Recommendation API', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('primaryRecommendation');
-      const wineName = response.body.primaryRecommendation.name?.toLowerCase() || '';
+      expect(response.body).toHaveProperty('alternatives');
+      expect(response.body).toHaveProperty('explanation');
+      expect(response.body).toHaveProperty('confidence');
+      expect(typeof response.body.primaryRecommendation).toBe('object');
+      expect(response.body.primaryRecommendation).toHaveProperty('name');
+      expect(typeof response.body.primaryRecommendation.name).toBe('string');
+      expect(response.body.primaryRecommendation).toHaveProperty('grapeVarieties');
+      expect(Array.isArray(response.body.primaryRecommendation.grapeVarieties)).toBe(true);
+      expect(response.body.primaryRecommendation.grapeVarieties.every((gv: any) => 
+        typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined)
+      )).toBe(true);
+
+      expect(Array.isArray(response.body.alternatives)).toBe(true);
+      expect(response.body.alternatives.every((alt: any) => 
+        typeof alt === 'object' && 
+        alt.hasOwnProperty('name') && 
+        typeof alt.name === 'string' &&
+        alt.hasOwnProperty('grapeVarieties') &&
+        Array.isArray(alt.grapeVarieties) &&
+        alt.grapeVarieties.every((gv: any) => typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined))
+      )).toBe(true);
+      expect(response.body).toHaveProperty('conversationId');
+      expect(typeof response.body.conversationId).toBe('string');
+      expect(response.body).toHaveProperty('canRefine');
+      expect(typeof response.body.canRefine).toBe('boolean');
+      expect(response.body.confidence).toBeGreaterThan(0.0);
+      const primaryRecommendationName = response.body.primaryRecommendation?.name?.toLowerCase() || '';
+      const primaryRecommendationGrapeVarieties = response.body.primaryRecommendation?.grapeVarieties?.map((gv: any) => gv.name.toLowerCase()) ?? [];
       const explanation = response.body.explanation?.toLowerCase() || '';
       
       expect(
-        wineName.includes('rosé') || 
-        wineName.includes('rosato') || 
-        wineName.includes('provence') ||
-        wineName.includes('sauvignon blanc') ||
+        primaryRecommendationName.includes('rosé') ||
+        primaryRecommendationName.includes('rosato') ||
+        primaryRecommendationName.includes('provence') ||
+        primaryRecommendationName.includes('sauvignon blanc') ||
+        primaryRecommendationGrapeVarieties.includes('grenache') ||
+        primaryRecommendationGrapeVarieties.includes('cinsault') ||
+        primaryRecommendationGrapeVarieties.includes('mourvèdre') ||
+        primaryRecommendationGrapeVarieties.includes('sauvignon blanc') ||
         explanation.includes('light') ||
         explanation.includes('fresh') ||
         explanation.includes('summer')
@@ -611,15 +1201,44 @@ describe('End-to-End Live Recommendation API', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('primaryRecommendation');
-      const wineName = response.body.primaryRecommendation.name?.toLowerCase() || '';
+      expect(response.body).toHaveProperty('alternatives');
+      expect(response.body).toHaveProperty('explanation');
+      expect(response.body).toHaveProperty('confidence');
+      expect(typeof response.body.primaryRecommendation).toBe('object');
+      expect(response.body.primaryRecommendation).toHaveProperty('name');
+      expect(typeof response.body.primaryRecommendation.name).toBe('string');
+      expect(response.body.primaryRecommendation).toHaveProperty('grapeVarieties');
+      expect(Array.isArray(response.body.primaryRecommendation.grapeVarieties)).toBe(true);
+      expect(response.body.primaryRecommendation.grapeVarieties.every((gv: any) => 
+        typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined)
+      )).toBe(true);
+
+      expect(Array.isArray(response.body.alternatives)).toBe(true);
+      expect(response.body.alternatives.every((alt: any) => 
+        typeof alt === 'object' && 
+        alt.hasOwnProperty('name') && 
+        typeof alt.name === 'string' &&
+        alt.hasOwnProperty('grapeVarieties') &&
+        Array.isArray(alt.grapeVarieties) &&
+        alt.grapeVarieties.every((gv: any) => typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined))
+      )).toBe(true);
+      expect(response.body).toHaveProperty('conversationId');
+      expect(typeof response.body.conversationId).toBe('string');
+      expect(response.body).toHaveProperty('canRefine');
+      expect(typeof response.body.canRefine).toBe('boolean');
+      expect(response.body.confidence).toBeGreaterThan(0.0);
+      const primaryRecommendationName = response.body.primaryRecommendation?.name?.toLowerCase() || '';
+      const primaryRecommendationGrapeVarieties = response.body.primaryRecommendation?.grapeVarieties?.map((gv: any) => gv.name.toLowerCase()) ?? [];
       const explanation = response.body.explanation?.toLowerCase() || '';
       
       expect(
-        wineName.includes('shiraz') || 
-        wineName.includes('barossa') || 
-        wineName.includes('mclaren vale') ||
-        wineName.includes('hunter valley') ||
-        wineName.includes('cabernet') ||
+        primaryRecommendationName.includes('shiraz') ||
+        primaryRecommendationName.includes('barossa') ||
+        primaryRecommendationName.includes('mclaren vale') ||
+        primaryRecommendationName.includes('hunter valley') ||
+        primaryRecommendationName.includes('cabernet') ||
+        primaryRecommendationGrapeVarieties.includes('shiraz') ||
+        primaryRecommendationGrapeVarieties.includes('cabernet sauvignon') ||
         explanation.includes('australian') ||
         explanation.includes('shiraz') ||
         explanation.includes('bold') ||
@@ -637,15 +1256,45 @@ describe('End-to-End Live Recommendation API', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('primaryRecommendation');
-      const wineName = response.body.primaryRecommendation.name?.toLowerCase() || '';
+      expect(response.body).toHaveProperty('alternatives');
+      expect(response.body).toHaveProperty('explanation');
+      expect(response.body).toHaveProperty('confidence');
+      expect(typeof response.body.primaryRecommendation).toBe('object');
+      expect(response.body.primaryRecommendation).toHaveProperty('name');
+      expect(typeof response.body.primaryRecommendation.name).toBe('string');
+      expect(response.body.primaryRecommendation).toHaveProperty('grapeVarieties');
+      expect(Array.isArray(response.body.primaryRecommendation.grapeVarieties)).toBe(true);
+      expect(response.body.primaryRecommendation.grapeVarieties.every((gv: any) => 
+        typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined)
+      )).toBe(true);
+
+      expect(Array.isArray(response.body.alternatives)).toBe(true);
+      expect(response.body.alternatives.every((alt: any) => 
+        typeof alt === 'object' && 
+        alt.hasOwnProperty('name') && 
+        typeof alt.name === 'string' &&
+        alt.hasOwnProperty('grapeVarieties') &&
+        Array.isArray(alt.grapeVarieties) &&
+        alt.grapeVarieties.every((gv: any) => typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined))
+      )).toBe(true);
+      expect(response.body).toHaveProperty('conversationId');
+      expect(typeof response.body.conversationId).toBe('string');
+      expect(response.body).toHaveProperty('canRefine');
+      expect(typeof response.body.canRefine).toBe('boolean');
+      expect(response.body.confidence).toBeGreaterThan(0.0);
+      const primaryRecommendationName = response.body.primaryRecommendation?.name?.toLowerCase() || '';
+      const primaryRecommendationGrapeVarieties = response.body.primaryRecommendation?.grapeVarieties?.map((gv: any) => gv.name.toLowerCase()) ?? [];
       const explanation = response.body.explanation?.toLowerCase() || '';
       
       expect(
-        wineName.includes('riesling') || 
-        wineName.includes('eden valley') || 
-        wineName.includes('clare valley') ||
-        wineName.includes('sauvignon blanc') ||
-        wineName.includes('gewürztraminer') ||
+        primaryRecommendationName.includes('riesling') ||
+        primaryRecommendationName.includes('eden valley') ||
+        primaryRecommendationName.includes('clare valley') ||
+        primaryRecommendationName.includes('sauvignon blanc') ||
+        primaryRecommendationName.includes('gewürztraminer') ||
+        primaryRecommendationGrapeVarieties.includes('riesling') ||
+        primaryRecommendationGrapeVarieties.includes('sauvignon blanc') ||
+        primaryRecommendationGrapeVarieties.includes('gewürztraminer') ||
         explanation.includes('australian') ||
         explanation.includes('riesling') ||
         explanation.includes('spicy') ||
@@ -663,15 +1312,44 @@ describe('End-to-End Live Recommendation API', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('primaryRecommendation');
-      const wineName = response.body.primaryRecommendation.name?.toLowerCase() || '';
+      expect(response.body).toHaveProperty('alternatives');
+      expect(response.body).toHaveProperty('explanation');
+      expect(response.body).toHaveProperty('confidence');
+      expect(typeof response.body.primaryRecommendation).toBe('object');
+      expect(response.body.primaryRecommendation).toHaveProperty('name');
+      expect(typeof response.body.primaryRecommendation.name).toBe('string');
+      expect(response.body.primaryRecommendation).toHaveProperty('grapeVarieties');
+      expect(Array.isArray(response.body.primaryRecommendation.grapeVarieties)).toBe(true);
+      expect(response.body.primaryRecommendation.grapeVarieties.every((gv: any) => 
+        typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined)
+      )).toBe(true);
+
+      expect(Array.isArray(response.body.alternatives)).toBe(true);
+      expect(response.body.alternatives.every((alt: any) => 
+        typeof alt === 'object' && 
+        alt.hasOwnProperty('name') && 
+        typeof alt.name === 'string' &&
+        alt.hasOwnProperty('grapeVarieties') &&
+        Array.isArray(alt.grapeVarieties) &&
+        alt.grapeVarieties.every((gv: any) => typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined))
+      )).toBe(true);
+      expect(response.body).toHaveProperty('conversationId');
+      expect(typeof response.body.conversationId).toBe('string');
+      expect(response.body).toHaveProperty('canRefine');
+      expect(typeof response.body.canRefine).toBe('boolean');
+      expect(response.body.confidence).toBeGreaterThan(0.0);
+      const primaryRecommendationName = response.body.primaryRecommendation?.name?.toLowerCase() || '';
+      const primaryRecommendationGrapeVarieties = response.body.primaryRecommendation?.grapeVarieties?.map((gv: any) => gv.name.toLowerCase()) ?? [];
       const explanation = response.body.explanation?.toLowerCase() || '';
       
       expect(
-        wineName.includes('chardonnay') || 
-        wineName.includes('margaret river') || 
-        wineName.includes('adelaide hills') ||
-        wineName.includes('yarra valley') ||
-        wineName.includes('sauvignon blanc') ||
+        primaryRecommendationName.includes('chardonnay') ||
+        primaryRecommendationName.includes('margaret river') ||
+        primaryRecommendationName.includes('adelaide hills') ||
+        primaryRecommendationName.includes('yarra valley') ||
+        primaryRecommendationName.includes('sauvignon blanc') ||
+        primaryRecommendationGrapeVarieties.includes('chardonnay') ||
+        primaryRecommendationGrapeVarieties.includes('sauvignon blanc') ||
         explanation.includes('australian') ||
         explanation.includes('chardonnay') ||
         explanation.includes('crisp') ||
@@ -689,15 +1367,43 @@ describe('End-to-End Live Recommendation API', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('primaryRecommendation');
-      const wineName = response.body.primaryRecommendation.name?.toLowerCase() || '';
+      expect(response.body).toHaveProperty('alternatives');
+      expect(response.body).toHaveProperty('explanation');
+      expect(response.body).toHaveProperty('confidence');
+      expect(typeof response.body.primaryRecommendation).toBe('object');
+      expect(response.body.primaryRecommendation).toHaveProperty('name');
+      expect(typeof response.body.primaryRecommendation.name).toBe('string');
+      expect(response.body.primaryRecommendation).toHaveProperty('grapeVarieties');
+      expect(Array.isArray(response.body.primaryRecommendation.grapeVarieties)).toBe(true);
+      expect(response.body.primaryRecommendation.grapeVarieties.every((gv: any) => 
+        typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined)
+      )).toBe(true);
+
+      expect(Array.isArray(response.body.alternatives)).toBe(true);
+      expect(response.body.alternatives.every((alt: any) => 
+        typeof alt === 'object' && 
+        alt.hasOwnProperty('name') && 
+        typeof alt.name === 'string' &&
+        alt.hasOwnProperty('grapeVarieties') &&
+        Array.isArray(alt.grapeVarieties) &&
+        alt.grapeVarieties.every((gv: any) => typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined))
+      )).toBe(true);
+      expect(response.body).toHaveProperty('conversationId');
+      expect(typeof response.body.conversationId).toBe('string');
+      expect(response.body).toHaveProperty('canRefine');
+      expect(typeof response.body.canRefine).toBe('boolean');
+      expect(response.body.confidence).toBeGreaterThan(0.0);
+      const primaryRecommendationName = response.body.primaryRecommendation?.name?.toLowerCase() || '';
+      const primaryRecommendationGrapeVarieties = response.body.primaryRecommendation?.grapeVarieties?.map((gv: any) => gv.name.toLowerCase()) ?? [];
       const explanation = response.body.explanation?.toLowerCase() || '';
       
       expect(
-        wineName.includes('pinot noir') || 
-        wineName.includes('yarra valley') || 
-        wineName.includes('mornington peninsula') ||
-        wineName.includes('adelaide hills') ||
-        wineName.includes('tasman') ||
+        primaryRecommendationName.includes('pinot noir') ||
+        primaryRecommendationName.includes('yarra valley') ||
+        primaryRecommendationName.includes('mornington peninsula') ||
+        primaryRecommendationName.includes('adelaide hills') ||
+        primaryRecommendationName.includes('tasman') ||
+        primaryRecommendationGrapeVarieties.includes('pinot noir') ||
         explanation.includes('australian') ||
         explanation.includes('pinot noir') ||
         explanation.includes('elegant') ||
@@ -715,16 +1421,46 @@ describe('End-to-End Live Recommendation API', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('primaryRecommendation');
-      const wineName = response.body.primaryRecommendation.name?.toLowerCase() || '';
+      expect(response.body).toHaveProperty('alternatives');
+      expect(response.body).toHaveProperty('explanation');
+      expect(response.body).toHaveProperty('confidence');
+      expect(typeof response.body.primaryRecommendation).toBe('object');
+      expect(response.body.primaryRecommendation).toHaveProperty('name');
+      expect(typeof response.body.primaryRecommendation.name).toBe('string');
+      expect(response.body.primaryRecommendation).toHaveProperty('grapeVarieties');
+      expect(Array.isArray(response.body.primaryRecommendation.grapeVarieties)).toBe(true);
+      expect(response.body.primaryRecommendation.grapeVarieties.every((gv: any) => 
+        typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined)
+      )).toBe(true);
+
+      expect(Array.isArray(response.body.alternatives)).toBe(true);
+      expect(response.body.alternatives.every((alt: any) => 
+        typeof alt === 'object' && 
+        alt.hasOwnProperty('name') && 
+        typeof alt.name === 'string' &&
+        alt.hasOwnProperty('grapeVarieties') &&
+        Array.isArray(alt.grapeVarieties) &&
+        alt.grapeVarieties.every((gv: any) => typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined))
+      )).toBe(true);
+      expect(response.body).toHaveProperty('conversationId');
+      expect(typeof response.body.conversationId).toBe('string');
+      expect(response.body).toHaveProperty('canRefine');
+      expect(typeof response.body.canRefine).toBe('boolean');
+      expect(response.body.confidence).toBeGreaterThan(0.0);
+      const primaryRecommendationName = response.body.primaryRecommendation?.name?.toLowerCase() || '';
+      const primaryRecommendationGrapeVarieties = response.body.primaryRecommendation?.grapeVarieties?.map((gv: any) => gv.name.toLowerCase()) ?? [];
       const explanation = response.body.explanation?.toLowerCase() || '';
       
       expect(
-        wineName.includes('grenache') || 
-        wineName.includes('gsm') || 
-        wineName.includes('rhône') ||
-        wineName.includes('barossa') ||
-        wineName.includes('shiraz') ||
-        wineName.includes('mclaren vale') ||
+        primaryRecommendationName.includes('grenache') ||
+        primaryRecommendationName.includes('gsm') ||
+        primaryRecommendationName.includes('rhône') ||
+        primaryRecommendationName.includes('barossa') ||
+        primaryRecommendationName.includes('shiraz') ||
+        primaryRecommendationName.includes('mclaren vale') ||
+        primaryRecommendationGrapeVarieties.includes('grenache') ||
+        primaryRecommendationGrapeVarieties.includes('shiraz') ||
+        primaryRecommendationGrapeVarieties.includes('mourvèdre') ||
         explanation.includes('australian') ||
         explanation.includes('grenache') ||
         explanation.includes('lamb') ||
@@ -742,15 +1478,46 @@ describe('End-to-End Live Recommendation API', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('primaryRecommendation');
-      const wineName = response.body.primaryRecommendation.name?.toLowerCase() || '';
+      expect(response.body).toHaveProperty('alternatives');
+      expect(response.body).toHaveProperty('explanation');
+      expect(response.body).toHaveProperty('confidence');
+      expect(typeof response.body.primaryRecommendation).toBe('object');
+      expect(response.body.primaryRecommendation).toHaveProperty('name');
+      expect(typeof response.body.primaryRecommendation.name).toBe('string');
+      expect(response.body.primaryRecommendation).toHaveProperty('grapeVarieties');
+      expect(Array.isArray(response.body.primaryRecommendation.grapeVarieties)).toBe(true);
+      expect(response.body.primaryRecommendation.grapeVarieties.every((gv: any) => 
+        typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined)
+      )).toBe(true);
+
+      expect(Array.isArray(response.body.alternatives)).toBe(true);
+      expect(response.body.alternatives.every((alt: any) => 
+        typeof alt === 'object' && 
+        alt.hasOwnProperty('name') && 
+        typeof alt.name === 'string' &&
+        alt.hasOwnProperty('grapeVarieties') &&
+        Array.isArray(alt.grapeVarieties) &&
+        alt.grapeVarieties.every((gv: any) => typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined))
+      )).toBe(true);
+      expect(response.body).toHaveProperty('conversationId');
+      expect(typeof response.body.conversationId).toBe('string');
+      expect(response.body).toHaveProperty('canRefine');
+      expect(typeof response.body.canRefine).toBe('boolean');
+      expect(response.body.confidence).toBeGreaterThan(0.0);
+      const primaryRecommendationName = response.body.primaryRecommendation?.name?.toLowerCase() || '';
+      const primaryRecommendationGrapeVarieties = response.body.primaryRecommendation?.grapeVarieties?.map((gv: any) => gv.name.toLowerCase()) ?? [];
       const explanation = response.body.explanation?.toLowerCase() || '';
       
       expect(
-        wineName.includes('semillon') || 
-        wineName.includes('hunter valley') || 
-        wineName.includes('sauvignon blanc') ||
-        wineName.includes('riesling') ||
-        wineName.includes('verdelho') ||
+        primaryRecommendationName.includes('semillon') ||
+        primaryRecommendationName.includes('hunter valley') ||
+        primaryRecommendationName.includes('sauvignon blanc') ||
+        primaryRecommendationName.includes('riesling') ||
+        primaryRecommendationName.includes('verdelho') ||
+        primaryRecommendationGrapeVarieties.includes('semillon') ||
+        primaryRecommendationGrapeVarieties.includes('sauvignon blanc') ||
+        primaryRecommendationGrapeVarieties.includes('riesling') ||
+        primaryRecommendationGrapeVarieties.includes('verdelho') ||
         explanation.includes('australian') ||
         explanation.includes('semillon') ||
         explanation.includes('oyster') ||
@@ -769,15 +1536,44 @@ describe('End-to-End Live Recommendation API', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('primaryRecommendation');
-      const wineName = response.body.primaryRecommendation.name?.toLowerCase() || '';
+      expect(response.body).toHaveProperty('alternatives');
+      expect(response.body).toHaveProperty('explanation');
+      expect(response.body).toHaveProperty('confidence');
+      expect(typeof response.body.primaryRecommendation).toBe('object');
+      expect(response.body.primaryRecommendation).toHaveProperty('name');
+      expect(typeof response.body.primaryRecommendation.name).toBe('string');
+      expect(response.body.primaryRecommendation).toHaveProperty('grapeVarieties');
+      expect(Array.isArray(response.body.primaryRecommendation.grapeVarieties)).toBe(true);
+      expect(response.body.primaryRecommendation.grapeVarieties.every((gv: any) => 
+        typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined)
+      )).toBe(true);
+
+      expect(Array.isArray(response.body.alternatives)).toBe(true);
+      expect(response.body.alternatives.every((alt: any) => 
+        typeof alt === 'object' && 
+        alt.hasOwnProperty('name') && 
+        typeof alt.name === 'string' &&
+        alt.hasOwnProperty('grapeVarieties') &&
+        Array.isArray(alt.grapeVarieties) &&
+        alt.grapeVarieties.every((gv: any) => typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined))
+      )).toBe(true);
+      expect(response.body).toHaveProperty('conversationId');
+      expect(typeof response.body.conversationId).toBe('string');
+      expect(response.body).toHaveProperty('canRefine');
+      expect(typeof response.body.canRefine).toBe('boolean');
+      expect(response.body.confidence).toBeGreaterThan(0.0);
+      const primaryRecommendationName = response.body.primaryRecommendation?.name?.toLowerCase() || '';
+      const primaryRecommendationGrapeVarieties = response.body.primaryRecommendation?.grapeVarieties?.map((gv: any) => gv.name.toLowerCase()) ?? [];
       const explanation = response.body.explanation?.toLowerCase() || '';
       
       expect(
-        wineName.includes('cabernet sauvignon') || 
-        wineName.includes('coonawarra') || 
-        wineName.includes('margaret river') ||
-        wineName.includes('cabernet') ||
-        wineName.includes('shiraz') ||
+        primaryRecommendationName.includes('cabernet sauvignon') ||
+        primaryRecommendationName.includes('coonawarra') ||
+        primaryRecommendationName.includes('margaret river') ||
+        primaryRecommendationName.includes('cabernet') ||
+        primaryRecommendationName.includes('shiraz') ||
+        primaryRecommendationGrapeVarieties.includes('cabernet sauvignon') ||
+        primaryRecommendationGrapeVarieties.includes('shiraz') ||
         explanation.includes('australian') ||
         explanation.includes('cabernet') ||
         explanation.includes('bold') ||
@@ -796,17 +1592,47 @@ describe('End-to-End Live Recommendation API', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('primaryRecommendation');
-      const wineName = response.body.primaryRecommendation.name?.toLowerCase() || '';
+      expect(response.body).toHaveProperty('alternatives');
+      expect(response.body).toHaveProperty('explanation');
+      expect(response.body).toHaveProperty('confidence');
+      expect(typeof response.body.primaryRecommendation).toBe('object');
+      expect(response.body.primaryRecommendation).toHaveProperty('name');
+      expect(typeof response.body.primaryRecommendation.name).toBe('string');
+      expect(response.body.primaryRecommendation).toHaveProperty('grapeVarieties');
+      expect(Array.isArray(response.body.primaryRecommendation.grapeVarieties)).toBe(true);
+      expect(response.body.primaryRecommendation.grapeVarieties.every((gv: any) => 
+        typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined)
+      )).toBe(true);
+
+      expect(Array.isArray(response.body.alternatives)).toBe(true);
+      expect(response.body.alternatives.every((alt: any) => 
+        typeof alt === 'object' && 
+        alt.hasOwnProperty('name') && 
+        typeof alt.name === 'string' &&
+        alt.hasOwnProperty('grapeVarieties') &&
+        Array.isArray(alt.grapeVarieties) &&
+        alt.grapeVarieties.every((gv: any) => typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined))
+      )).toBe(true);
+      expect(response.body).toHaveProperty('conversationId');
+      expect(typeof response.body.conversationId).toBe('string');
+      expect(response.body).toHaveProperty('canRefine');
+      expect(typeof response.body.canRefine).toBe('boolean');
+      expect(response.body.confidence).toBeGreaterThan(0.0);
+      const primaryRecommendationName = response.body.primaryRecommendation?.name?.toLowerCase() || '';
+      const primaryRecommendationGrapeVarieties = response.body.primaryRecommendation?.grapeVarieties?.map((gv: any) => gv.name.toLowerCase()) ?? [];
       const explanation = response.body.explanation?.toLowerCase() || '';
       
       expect(
-        wineName.includes('sparkling') || 
-        wineName.includes('prosecco') || 
-        wineName.includes('champagne') ||
-        wineName.includes('méthode') ||
-        wineName.includes('traditional') ||
-        wineName.includes('tasmanian') ||
-        wineName.includes('yarra valley') ||
+        primaryRecommendationName.includes('sparkling') ||
+        primaryRecommendationName.includes('prosecco') ||
+        primaryRecommendationName.includes('champagne') ||
+        primaryRecommendationName.includes('méthode') ||
+        primaryRecommendationName.includes('traditional') ||
+        primaryRecommendationName.includes('tasmanian') ||
+        primaryRecommendationName.includes('yarra valley') ||
+        primaryRecommendationGrapeVarieties.includes('chardonnay') ||
+        primaryRecommendationGrapeVarieties.includes('pinot noir') ||
+        primaryRecommendationGrapeVarieties.includes('pinot meunier') ||
         explanation.includes('australian') ||
         explanation.includes('sparkling') ||
         explanation.includes('celebration') ||
@@ -825,17 +1651,48 @@ describe('End-to-End Live Recommendation API', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('primaryRecommendation');
-      const wineName = response.body.primaryRecommendation.name?.toLowerCase() || '';
+      expect(response.body).toHaveProperty('alternatives');
+      expect(response.body).toHaveProperty('explanation');
+      expect(response.body).toHaveProperty('confidence');
+      expect(typeof response.body.primaryRecommendation).toBe('object');
+      expect(response.body.primaryRecommendation).toHaveProperty('name');
+      expect(typeof response.body.primaryRecommendation.name).toBe('string');
+      expect(response.body.primaryRecommendation).toHaveProperty('grapeVarieties');
+      expect(Array.isArray(response.body.primaryRecommendation.grapeVarieties)).toBe(true);
+      expect(response.body.primaryRecommendation.grapeVarieties.every((gv: any) => 
+        typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined)
+      )).toBe(true);
+
+      expect(Array.isArray(response.body.alternatives)).toBe(true);
+      expect(response.body.alternatives.every((alt: any) => 
+        typeof alt === 'object' && 
+        alt.hasOwnProperty('name') && 
+        typeof alt.name === 'string' &&
+        alt.hasOwnProperty('grapeVarieties') &&
+        Array.isArray(alt.grapeVarieties) &&
+        alt.grapeVarieties.every((gv: any) => typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined))
+      )).toBe(true);
+      expect(response.body).toHaveProperty('conversationId');
+      expect(typeof response.body.conversationId).toBe('string');
+      expect(response.body).toHaveProperty('canRefine');
+      expect(typeof response.body.canRefine).toBe('boolean');
+      expect(response.body.confidence).toBeGreaterThan(0.0);
+      const primaryRecommendationName = response.body.primaryRecommendation?.name?.toLowerCase() || '';
+      const primaryRecommendationGrapeVarieties = response.body.primaryRecommendation?.grapeVarieties?.map((gv: any) => gv.name.toLowerCase()) ?? [];
       const explanation = response.body.explanation?.toLowerCase() || '';
       
       expect(
-        wineName.includes('sauvignon blanc') || 
-        wineName.includes('chardonnay') || 
-        wineName.includes('riesling') ||
-        wineName.includes('pinot grigio') ||
-        wineName.includes('adelaide hills') ||
-        wineName.includes('yarra valley') ||
-        wineName.includes('tasmanian') ||
+        primaryRecommendationName.includes('sauvignon blanc') ||
+        primaryRecommendationName.includes('chardonnay') ||
+        primaryRecommendationName.includes('riesling') ||
+        primaryRecommendationName.includes('pinot grigio') ||
+        primaryRecommendationName.includes('adelaide hills') ||
+        primaryRecommendationName.includes('yarra valley') ||
+        primaryRecommendationName.includes('tasmanian') ||
+        primaryRecommendationGrapeVarieties.includes('sauvignon blanc') ||
+        primaryRecommendationGrapeVarieties.includes('chardonnay') ||
+        primaryRecommendationGrapeVarieties.includes('riesling') ||
+        primaryRecommendationGrapeVarieties.includes('pinot grigio') ||
         explanation.includes('australian') ||
         explanation.includes('cool climate') ||
         explanation.includes('delicate') ||
@@ -854,17 +1711,43 @@ describe('End-to-End Live Recommendation API', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('primaryRecommendation');
-      const wineName = response.body.primaryRecommendation.name?.toLowerCase() || '';
+      expect(response.body).toHaveProperty('alternatives');
+      expect(response.body).toHaveProperty('explanation');
+      expect(response.body).toHaveProperty('confidence');
+      expect(typeof response.body.primaryRecommendation).toBe('object');
+      expect(response.body.primaryRecommendation).toHaveProperty('name');
+      expect(typeof response.body.primaryRecommendation.name).toBe('string');
+      expect(response.body.primaryRecommendation).toHaveProperty('grapeVarieties');
+      expect(Array.isArray(response.body.primaryRecommendation.grapeVarieties)).toBe(true);
+      expect(response.body.primaryRecommendation.grapeVarieties.every((gv: any) => 
+        typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined)
+      )).toBe(true);
+
+      expect(Array.isArray(response.body.alternatives)).toBe(true);
+      expect(response.body.alternatives.every((alt: any) => 
+        typeof alt === 'object' && 
+        alt.hasOwnProperty('name') && 
+        typeof alt.name === 'string' &&
+        alt.hasOwnProperty('grapeVarieties') &&
+        Array.isArray(alt.grapeVarieties) &&
+        alt.grapeVarieties.every((gv: any) => typeof gv.name === 'string' && (typeof gv.percentage === 'number' || gv.percentage === undefined))
+      )).toBe(true);
+      expect(response.body).toHaveProperty('conversationId');
+      expect(typeof response.body.conversationId).toBe('string');
+      expect(response.body).toHaveProperty('canRefine');
+      expect(typeof response.body.canRefine).toBe('boolean');
+      expect(response.body.confidence).toBeGreaterThan(0.0);
+      const primaryRecommendation = response.body.primaryRecommendation?.toLowerCase() || '';
       const explanation = response.body.explanation?.toLowerCase() || '';
       
       expect(
-        wineName.includes('port') || 
-        wineName.includes('fortified') || 
-        wineName.includes('muscat') ||
-        wineName.includes('tokay') ||
-        wineName.includes('rutherglen') ||
-        wineName.includes('stickies') ||
-        wineName.includes('dessert') ||
+        primaryRecommendation.includes('port') ||
+        primaryRecommendation.includes('fortified') ||
+        primaryRecommendation.includes('muscat') ||
+        primaryRecommendation.includes('tokay') ||
+        primaryRecommendation.includes('rutherglen') ||
+        primaryRecommendation.includes('stickies') ||
+        primaryRecommendation.includes('dessert') ||
         explanation.includes('australian') ||
         explanation.includes('fortified') ||
         explanation.includes('sweet') ||

@@ -1,3 +1,4 @@
+import { WineRecommendationOutput } from './LLMRecommendationAgent';
 import { inject, injectable } from 'tsyringe';
 import { CommunicatingAgent, CommunicatingAgentDependencies } from './CommunicatingAgent';
 import { EnhancedAgentCommunicationBus } from './communication/EnhancedAgentCommunicationBus';
@@ -399,7 +400,7 @@ export class RecommendationAgent extends CommunicatingAgent {
       const enhancement = await this.enhanceKnowledgeGraphResults(wineNames, payload, correlationId);
 
       return {
-        recommendations: wineNames,
+        recommendations: wineNames.map(name => ({ name, grapeVarieties: [] })),
         reasoning: enhancement.explanation,
         confidence: enhancement.confidence,
         source: 'knowledge_graph'

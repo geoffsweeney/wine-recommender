@@ -11,6 +11,7 @@ import { AgentError } from './AgentError';
 import { LogContext } from '../../types/LogContext';
 import { RecommendationResult } from '../../types/agent-outputs';
 import { z } from 'zod'; // Import z for schema definition
+import { GrapeVariety } from '../../services/models/Wine'; // Import GrapeVariety
 
 interface LLMRecommendationRequestPayload {
   preferences?: Record<string, any>;
@@ -25,10 +26,15 @@ interface LLMRecommendationRequestPayload {
   sweetness?: 'dry' | 'off-dry' | 'medium-dry' | 'medium-sweet' | 'sweet';
 }
 
+export interface WineRecommendationOutput {
+  name: string;
+  grapeVarieties?: GrapeVariety[];
+}
+
 interface LLMRecommendationResponsePayload {
-  wines: string[];
+  wines: WineRecommendationOutput[];
   confidenceScore?: number;
-  alternatives?: string[];
+  alternatives?: WineRecommendationOutput[];
 }
 
 export interface LLMRecommendationAgentConfig {
@@ -187,6 +193,12 @@ export class LLMRecommendationAgent extends CommunicatingAgent {
         return { success: false, error };
       }
 
+      // Ensure grape percentages are present, estimating if necessary
+      parsedRecommendation.recommendations = this.ensureGrapePercentages(parsedRecommendation.recommendations as WineRecommendationOutput[] || []);
+      if (parsedRecommendation.alternatives) {
+        parsedRecommendation.alternatives = this.ensureGrapePercentages(parsedRecommendation.alternatives as WineRecommendationOutput[]);
+      }
+
       this.logger.debug(`[${correlationId}] Successfully parsed and validated LLM response`, {
         agentId: this.id,
         recommendationCount: parsedRecommendation.recommendations?.length || 0,
@@ -268,21 +280,35 @@ Key principles for recommendations:
 Example 1 - Food Pairing:
 User: "I'm making grilled salmon with lemon and herbs for dinner tonight"
 Response: {
-  "recommendations": ["Sancerre Loire Valley", "Chablis Premier Cru", "Oregon Pinot Noir"],
+  "recommendations": [
+    { "name": "Sancerre Loire Valley", "grapeVarieties": [{ "name": "Sauvignon Blanc", "percentage": 100 }] },
+    { "name": "Chablis Premier Cru", "grapeVarieties": [{ "name": "Chardonnay", "percentage": 100 }] },
+    { "name": "Oregon Pinot Noir", "grapeVarieties": [{ "name": "Pinot Noir", "percentage": 100 }] }
+  ],
   "confidence": 0.9,
   "reasoning": "Sancerre's mineral acidity complements salmon's richness, while Chablis adds citrus harmony. Oregon Pinot Noir offers a light red option that pairs beautifully with grilled salmon.",
   "pairingNotes": "The mineral notes in these wines enhance the fish while complementing the lemon and herbs.",
-  "alternatives": ["Albariño", "Grüner Veltliner"]
+  "alternatives": [
+    { "name": "Albariño", "grapeVarieties": [{ "name": "Albariño", "percentage": 100 }] },
+    { "name": "Grüner Veltliner", "grapeVarieties": [{ "name": "Grüner Veltliner", "percentage": 100 }] }
+  ]
 }
 
 Example 2 - Preference-based:
 User: "I love bold, full-bodied red wines under $25"
 Response: {
-  "recommendations": ["Côtes du Rhône Villages", "Spanish Garnacha", "Portuguese Douro Red"],
+  "recommendations": [
+    { "name": "Côtes du Rhône Villages", "grapeVarieties": [{ "name": "Grenache", "percentage": 70 }, { "name": "Syrah", "percentage": 30 }] },
+    { "name": "Spanish Garnacha", "grapeVarieties": [{ "name": "Garnacha", "percentage": 100 }] },
+    { "name": "Portuguese Douro Red", "grapeVarieties": [{ "name": "Touriga Nacional", "percentage": 50 }, { "name": "Touriga Franca", "percentage": 50 }] }
+  ],
   "confidence": 0.85,
   "reasoning": "These regions offer excellent value for bold, full-bodied reds with rich fruit and robust tannins within your budget.",
   "pairingNotes": "Perfect with grilled meats, hearty stews, or aged cheeses.",
-  "alternatives": ["Montepulciano d'Abruzzo", "Côtes du Roussillon"]
+  "alternatives": [
+    { "name": "Montepulciano d'Abruzzo", "grapeVarieties": [{ "name": "Montepulciano", "percentage": 100 }] },
+    { "name": "Côtes du Roussillon", "grapeVarieties": [{ "name": "Grenache", "percentage": 60 }, { "name": "Syrah", "percentage": 40 }] }
+  ]
 }`;
   }
 
@@ -343,6 +369,7 @@ Response: {
     return `## Instructions:
 Provide exactly ${maxRecs} specific wine recommendations in the JSON format below. 
 - Use specific wine names and producers when possible (e.g., "Kendall-Jackson Vintner's Reserve Chardonnay" rather than just "Chardonnay")
+- For each wine, include an array of \`grapeVarieties\` with \`name\` and \`percentage\`. If the percentage is not explicitly known, estimate it (e.g., 100% for single varietals, or an even split for blends if no other information is available).
 - Confidence should be between 0.1 and 1.0 based on how well the recommendations match the request
 - Reasoning should be 1-2 sentences explaining why these wines fit the request
 - Include pairing notes if food/ingredients are mentioned
@@ -370,8 +397,8 @@ Provide exactly ${maxRecs} specific wine recommendations in the JSON format belo
 
     // Check for generic recommendations that suggest poor LLM performance
     const genericTerms = ['red wine', 'white wine', 'wine', 'bottle'];
-    const hasGenericRecs = result.recommendations.some((rec: string) => 
-      genericTerms.some(term => rec.toLowerCase().trim() === term)
+    const hasGenericRecs = result.recommendations.some((rec: WineRecommendationOutput) =>
+      genericTerms.some(term => rec.name.toLowerCase().trim() === term)
     );
 
     if (hasGenericRecs) {
@@ -383,15 +410,43 @@ Provide exactly ${maxRecs} specific wine recommendations in the JSON format belo
 
     return { isValid: true };
   }
+
+  private ensureGrapePercentages(recommendations: WineRecommendationOutput[]): WineRecommendationOutput[] {
+    return recommendations.map(rec => {
+      if (rec.grapeVarieties && rec.grapeVarieties.length > 0) {
+        const hasPercentages = rec.grapeVarieties.every(gv => typeof gv.percentage === 'number');
+        if (!hasPercentages) {
+          const estimatedPercentage = 100 / rec.grapeVarieties.length;
+          rec.grapeVarieties = rec.grapeVarieties.map(gv => ({
+            ...gv,
+            percentage: gv.percentage || estimatedPercentage
+          }));
+        }
+      }
+      return rec;
+    });
+  }
 }
 
 // Enhanced schema with more specific requirements
 export const EnhancedRecommendationSchema = z.object({
-  recommendations: z.array(z.string().min(5, "Specific wine name required")).min(1, "At least one recommendation required").max(5, "Maximum 5 recommendations allowed"),
+  recommendations: z.array(z.object({
+    name: z.string().min(5, "Specific wine name required"),
+    grapeVarieties: z.array(z.object({
+      name: z.string(),
+      percentage: z.number().optional()
+    })).optional()
+  })).min(1, "At least one recommendation required").max(5, "Maximum 5 recommendations allowed"),
   confidence: z.number().min(0.1, "Confidence must be at least 0.1").max(1.0, "Confidence cannot exceed 1.0"),
   reasoning: z.string().min(20, "Reasoning must be at least 20 characters"),
   pairingNotes: z.string().optional(),
-  alternatives: z.array(z.string()).max(3, "Maximum 3 alternatives allowed").optional()
+  alternatives: z.array(z.object({
+    name: z.string(),
+    grapeVarieties: z.array(z.object({
+      name: z.string(),
+      percentage: z.number().optional()
+    })).optional()
+  })).max(3, "Maximum 3 alternatives allowed").optional()
 });
 
 // Keep the original schema for backward compatibility

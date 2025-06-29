@@ -71,3 +71,15 @@
 - Profile agent performance
 - Optimize expensive operations
 - Scale horizontally if needed
+
+### Agent Communication Pitfalls
+**Symptoms**:
+- "No callback found" warnings in logs
+- Broken request-response cycles between agents
+- Unexpected behavior in agent interactions
+
+**Solutions**:
+- Ensure correct `correlationId` and `conversationId` propagation.
+- Avoid redundant `this.communicationBus.sendResponse()` calls within agent handlers; let the `EnhancedAgentCommunicationBus` handle responses based on returned `Result` objects.
+- For "fire and forget" messages (sent via `publishToAgent`), ensure handlers return `Result<null, AgentError>` to prevent "No callback found" warnings.
+- Refer to [Agent Communication Refactoring Plan](agent_communication_refactor.md) for detailed best practices.

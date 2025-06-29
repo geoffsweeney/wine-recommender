@@ -1,4 +1,5 @@
 import { WineNode } from '../types'; // Corrected import path for WineNode
+import { WineRecommendationOutput } from '../core/agents/LLMRecommendationAgent';
 
 // Defines structured output interfaces for agents
 
@@ -59,11 +60,11 @@ export interface ValueAnalysisResult {
  * This aligns with the structured output requested from the LLM.
  */
 export interface RecommendationResult {
-    recommendations: string[]; // Array of wine names (strings)
+    recommendations: WineRecommendationOutput[]; // Array of wine names (strings)
     reasoning?: string; // Explanation/reasoning from LLM
     confidence: number; // Confidence score for the recommendation
     pairingNotes?: string; // Notes on food pairing
-    alternatives?: string[]; // Alternative recommendations
+    alternatives?: WineRecommendationOutput[]; // Alternative recommendations
     source?: 'knowledge_graph' | 'llm' | 'hybrid'; // Source of the recommendation
     error?: string; // Optional error message
 }
@@ -74,4 +75,15 @@ export interface RecommendationResult {
 export interface ExplanationResult {
     explanation: string;
     // Add references to recommendation details if needed
+}
+/**
+ * Represents the final recommendation payload sent to the API.
+ */
+export interface FinalRecommendationPayload {
+    primaryRecommendation: WineRecommendationOutput | null;
+    alternatives: WineRecommendationOutput[];
+    explanation: string;
+    confidence: number;
+    conversationId: string;
+    canRefine: boolean;
 }
