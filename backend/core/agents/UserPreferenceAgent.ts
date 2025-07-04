@@ -253,21 +253,17 @@ export class UserPreferenceAgent extends CommunicatingAgent {
         }
 
         // Process top-level ingredients separately to avoid duplication and ensure it's handled
+        // Add top-level ingredients if present after PreferenceExtractionService processing
         if (llmExtractedData.ingredients && llmExtractedData.ingredients.length > 0) {
-          // Check if 'ingredients' was already added from 'preferences' and if its value is the same
           const newIngredientValue = llmExtractedData.ingredients.join(',');
-          const existingIngredientPref = extractedPreferences.find(p => p.type === 'ingredients' && p.value === newIngredientValue);
-
-          if (!existingIngredientPref) { // Only add if not already present with the same value
-            extractedPreferences.push({
-              type: 'ingredients',
-              value: newIngredientValue,
-              source: 'llm-extraction',
-              confidence: 0.8,
-              timestamp: new Date().toISOString(),
-              active: true
-            });
-          }
+          extractedPreferences.push({
+            type: 'ingredients',
+            value: newIngredientValue,
+            source: 'llm-extraction',
+            confidence: 0.8,
+            timestamp: new Date().toISOString(),
+            active: true
+          });
         }
 
         const normalizedExtractedPreferences = await this.preferenceNormalizationService.normalizePreferences(extractedPreferences);

@@ -27,6 +27,7 @@ interface RecommendationMessagePayload {
     wineStyle?: string[];
     bodyPreference?: 'light' | 'medium' | 'full';
     sweetness?: 'dry' | 'off-dry' | 'medium-dry' | 'medium-sweet' | 'sweet';
+    wineCharacteristics?: { [key: string]: string[] }; // Added wineCharacteristics
   };
   conversationHistory?: { role: string; content: string }[];
   userId?: string;
@@ -196,34 +197,17 @@ export class RecommendationAgent extends CommunicatingAgent {
         return { success: false, error };
       }
 
-      // Determine recommendation strategy
       const strategy = this.determineRecommendationStrategy(payload);
-      this.logger.debug(`[${correlationId}] Using recommendation strategy: ${strategy}`, { 
-        agentId: this.id, 
+      this.logger.debug(`[${correlationId}] Recommendation strategy determined: ${strategy}`, {
+        agentId: this.id,
         operation: 'handleRecommendationRequest',
-        strategy 
+        strategy
       });
 
       let recommendationResult: RecommendationResult | null = null;
 
-      switch (strategy) {
-        case 'llm_first':
-          recommendationResult = await this.getLLMRecommendation(payload, correlationId, message.conversationId); // Pass original correlationId as parentCorrelationId
-          break;
-        case 'knowledge_graph_first':
-          recommendationResult = await this.getKnowledgeGraphRecommendation(payload, correlationId);
-          if (!recommendationResult && this.agentConfig.fallbackToLLM) {
-            this.logger.info(`[${correlationId}] Knowledge graph failed, falling back to LLM`, {
-              agentId: this.id,
-              operation: 'handleRecommendationRequest'
-            });
-            recommendationResult = await this.getLLMRecommendation(payload, correlationId, message.conversationId); // Pass original correlationId as parentCorrelationId
-          }
-          break;
-        case 'hybrid':
-          recommendationResult = await this.getHybridRecommendation(payload, correlationId, message.conversationId);
-          break;
-      }
+      // Always use LLM for core recommendations as per new strategy
+      recommendationResult = await this.getLLMRecommendation(payload, correlationId, message.conversationId);
 
       if (!recommendationResult) {
         return await this.handleNoRecommendations(message, correlationId);
@@ -256,34 +240,12 @@ export class RecommendationAgent extends CommunicatingAgent {
   }
 
   private determineRecommendationStrategy(payload: RecommendationMessagePayload): 'knowledge_graph_first' | 'llm_first' | 'hybrid' {
-    // Use explicit strategy if provided
+    // As per the new strategy, always use LLM for core recommendations.
+    // Explicit strategy from payload still takes precedence.
     if (payload.strategy) {
       return payload.strategy;
     }
-
-    // Use configuration defaults
-    if (this.agentConfig.hybridMode) {
-      return 'hybrid';
-    }
-
-    // If knowledge graph is disabled, use LLM
-    if (!this.agentConfig.knowledgeGraphEnabled) {
-      return 'llm_first';
-    }
-
-    // For structured data (ingredients, specific preferences), prefer knowledge graph first
-    if (payload.input.ingredients?.length || 
-        (payload.input.preferences && Object.keys(payload.input.preferences).length > 0)) {
-      return 'knowledge_graph_first';
-    }
-
-    // For natural language queries, prefer LLM first
-    if (payload.input.message) {
-      return 'llm_first';
-    }
-
-    // Default to knowledge graph first
-    return 'knowledge_graph_first';
+    return 'llm_first';
   }
 
   private async getLLMRecommendation(payload: RecommendationMessagePayload, parentCorrelationId: string, conversationId: string): Promise<RecommendationResult | null> {
@@ -295,7 +257,10 @@ export class RecommendationAgent extends CommunicatingAgent {
     const llmRequestPayload = {
       message: payload.input.message || payload.message,
       ingredients: payload.input.ingredients,
-      preferences: payload.input.preferences,
+      preferences: {
+        ...payload.input.preferences,
+        ...payload.input.wineCharacteristics // Include wineCharacteristics from PreferenceExtractionResultPayload
+      },
       priceRange: payload.input.priceRange,
       occasion: payload.input.occasion,
       wineStyle: payload.input.wineStyle,
@@ -361,60 +326,12 @@ export class RecommendationAgent extends CommunicatingAgent {
   }
 
   private async getKnowledgeGraphRecommendation(payload: RecommendationMessagePayload, correlationId: string): Promise<RecommendationResult | null> {
-    this.logger.info(`[${correlationId}] Requesting knowledge graph recommendation`, { 
+    this.logger.info(`[${correlationId}] Knowledge graph recommendation is currently bypassed for core matching.`, { 
       agentId: this.id, 
       operation: 'getKnowledgeGraphRecommendation' 
     });
-
-    try {
-      let wines: Wine[] = [];
-
-      if (payload.input.ingredients && payload.input.ingredients.length > 0) {
-        wines = await this.knowledgeGraphService.findWinesByIngredients(payload.input.ingredients);
-        this.logger.debug(`[${correlationId}] Found ${wines.length} wines by ingredients`, { 
-          agentId: this.id, 
-          operation: 'getKnowledgeGraphRecommendation',
-          ingredients: payload.input.ingredients 
-        });
-      } else if (payload.input.preferences) {
-        wines = await this.knowledgeGraphService.findWinesByPreferences(payload.input.preferences);
-        this.logger.debug(`[${correlationId}] Found ${wines.length} wines by preferences`, { 
-          agentId: this.id, 
-          operation: 'getKnowledgeGraphRecommendation' 
-        });
-      }
-
-      if (!wines || wines.length === 0) {
-        this.logger.info(`[${correlationId}] No wines found in knowledge graph`, { 
-          agentId: this.id, 
-          operation: 'getKnowledgeGraphRecommendation' 
-        });
-        return null;
-      }
-
-      // Limit results to configured count
-      const limitedWines = wines.slice(0, this.agentConfig.defaultRecommendationCount);
-      const wineNames = limitedWines.map(wine => wine.name);
-
-      // Enhance with LLM if available
-      const enhancement = await this.enhanceKnowledgeGraphResults(wineNames, payload, correlationId);
-
-      return {
-        recommendations: wineNames.map(name => ({ name, grapeVarieties: [] })),
-        reasoning: enhancement.explanation,
-        confidence: enhancement.confidence,
-        source: 'knowledge_graph'
-      };
-
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      this.logger.error(`[${correlationId}] Error getting knowledge graph recommendation: ${errorMessage}`, { 
-        agentId: this.id, 
-        operation: 'getKnowledgeGraphRecommendation',
-        originalError: errorMessage 
-      });
-      return null;
-    }
+    // Return null or an empty recommendation as it's not part of the primary flow
+    return null;
   }
 
   private async getHybridRecommendation(payload: RecommendationMessagePayload, correlationId: string, conversationId: string): Promise<RecommendationResult | null> {
@@ -470,21 +387,21 @@ export class RecommendationAgent extends CommunicatingAgent {
     const contextInfo = this.buildContextForEnhancement(payload);
     
     const enhancementPrompt = `You are enhancing wine recommendations from our database. 
-
+    
 Context: ${contextInfo}
-
+ 
 Available wines from our database:
 ${wineList}
-
+ 
 Provide a brief, engaging explanation (2-3 sentences) for why these wines are recommended for this request. Focus on the characteristics that make them suitable.
-
+ 
 Respond with JSON: {"explanation": "your explanation here", "confidence": 0.8}`;
-
+ 
     const enhancementSchema = z.object({
       explanation: z.string(),
       confidence: z.number().min(0).max(1)
     });
-
+ 
     try {
       const enhancementResult = await this.llmService.sendStructuredPrompt<{ explanation: string; confidence: number }>(
         enhancementPrompt, 
@@ -493,7 +410,7 @@ Respond with JSON: {"explanation": "your explanation here", "confidence": 0.8}`;
         {}, // Pass empty llmOptions as per previous instruction
         correlationId
       );
-
+ 
       if (enhancementResult.success && enhancementResult.data) {
         return enhancementResult.data;
       }
@@ -503,14 +420,14 @@ Respond with JSON: {"explanation": "your explanation here", "confidence": 0.8}`;
         operation: 'enhanceKnowledgeGraphResults' 
       });
     }
-
+ 
     // Fallback enhancement
     return {
       explanation: `These wines were selected from our database based on your ${payload.input.ingredients ? 'ingredient preferences' : 'stated preferences'}.`,
       confidence: 0.6
     };
   }
-
+ 
   private buildContextForEnhancement(payload: RecommendationMessagePayload): string {
     const parts: string[] = [];
     
@@ -528,7 +445,7 @@ Respond with JSON: {"explanation": "your explanation here", "confidence": 0.8}`;
     
     return parts.join('. ') || 'General wine recommendation request';
   }
-
+ 
   private async handleNoRecommendations(message: AgentMessage<unknown>, correlationId: string): Promise<Result<AgentMessage | null, AgentError>> {
     const responseMessage = createAgentMessage(
       'recommendation-response',
@@ -543,15 +460,15 @@ Respond with JSON: {"explanation": "your explanation here", "confidence": 0.8}`;
       correlationId,
       message.sourceAgent
     );
-
+ 
     this.logger.warn(`[${message.correlationId}] No recommendations could be generated`, { // Use message.correlationId here
       agentId: this.id,
       operation: 'handleNoRecommendations'
     });
-
+ 
     return { success: true, data: responseMessage };
   }
-
+ 
   private async handleRequestError(message: AgentMessage<unknown>, error: unknown, correlationId: string): Promise<Result<AgentMessage | null, AgentError>> {
     const errorMessage = error instanceof Error ? error.message : String(error);
     const agentError = error instanceof AgentError ? error : new AgentError(
@@ -562,19 +479,19 @@ Respond with JSON: {"explanation": "your explanation here", "confidence": 0.8}`;
       true, 
       { originalError: errorMessage }
     );
-
+ 
     await this.deadLetterProcessor.process(message.payload, agentError, { 
       source: this.id, 
       stage: 'RecommendationProcessing', 
       correlationId 
     });
-
+ 
     this.logger.error(`[${message.correlationId}] Error processing recommendation request: ${errorMessage}`, { // Use message.correlationId here
       agentId: this.id,
       operation: 'handleRecommendationRequest',
       originalError: errorMessage
     });
-
+ 
     return { success: false, error: agentError };
   }
 }

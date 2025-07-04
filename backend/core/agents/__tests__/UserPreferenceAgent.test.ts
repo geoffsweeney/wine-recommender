@@ -56,7 +56,6 @@ describe('UserPreferenceAgent', () => {
       mockBus,
       mockDeadLetter,
       mockPreferenceExtractionService,
-      mockKnowledgeGraphService,
       mockPreferenceNormalizationService,
       mockLogger,
       mockAgentConfig
@@ -142,7 +141,6 @@ describe('UserPreferenceAgent', () => {
         'user-preference-agent'
       );
 
-      (mockKnowledgeGraphService.getPreferences as jest.Mock).mockResolvedValueOnce([]);
       (mockPreferenceExtractionService.attemptFastExtraction as jest.Mock).mockResolvedValueOnce({
         success: true,
         data: { color: 'red', type: 'wine' }
@@ -156,10 +154,9 @@ describe('UserPreferenceAgent', () => {
 
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(mockKnowledgeGraphService.getPreferences).toHaveBeenCalledWith('user123', false);
+        // Removed KnowledgeGraphService interactions
         expect(mockPreferenceExtractionService.attemptFastExtraction).toHaveBeenCalledWith('I like red wine');
         expect(mockPreferenceNormalizationService.normalizePreferences).toHaveBeenCalledTimes(1);
-        expect(mockKnowledgeGraphService.addOrUpdatePreference).toHaveBeenCalledTimes(2); // For color and type
         expect(mockBus.publishToAgent).toHaveBeenCalledTimes(1);
         expect(mockBus.publishToAgent).toHaveBeenCalledWith(
           '*',
@@ -209,7 +206,7 @@ describe('UserPreferenceAgent', () => {
         'user-preference-agent'
       );
 
-      (mockKnowledgeGraphService.getPreferences as jest.Mock).mockResolvedValueOnce([]);
+      // Removed KnowledgeGraphService interaction
       (mockPreferenceExtractionService.attemptFastExtraction as jest.Mock).mockResolvedValueOnce({
         success: false, // Fast extraction fails
         error: new AgentError('Fast extraction failed', 'FAST_EXTRACTION_FAILED', 'test-agent', 'corr-async-queue')
@@ -219,7 +216,7 @@ describe('UserPreferenceAgent', () => {
 
       expect(result.success).toBe(true); // Agent still returns success as it queued the task
       if (result.success) {
-        expect(mockKnowledgeGraphService.getPreferences).toHaveBeenCalledWith('user123', false);
+        // Removed KnowledgeGraphService interaction
         expect(mockPreferenceExtractionService.attemptFastExtraction).toHaveBeenCalledWith('I like red wine');
         expect(mockBus.publishToAgent).toHaveBeenCalledTimes(1);
         expect(mockBus.publishToAgent).toHaveBeenCalledWith(
@@ -265,9 +262,13 @@ describe('UserPreferenceAgent', () => {
         'user-preference-agent'
       );
 
-      (mockKnowledgeGraphService.getPreferences as jest.Mock).mockImplementationOnce(() => {
-        throw new Error('Database error');
-      });
+      // Removed KnowledgeGraphService interaction
+      // (mockKnowledgeGraphService.getPreferences as jest.Mock).mockImplementationOnce(() => {
+      //   throw new Error('Database error');
+      // });
+      // Simulate an error from PreferenceExtractionService instead
+      (mockPreferenceExtractionService.attemptFastExtraction as jest.Mock).mockRejectedValueOnce(new Error('Simulated extraction error'));
+
 
       const result = await agent.handleMessage(message);
 
@@ -281,7 +282,7 @@ describe('UserPreferenceAgent', () => {
           expect.any(Object)
         );
         expect(mockLogger.error).toHaveBeenCalledWith(
-          expect.stringContaining('[corr-general-exception] Error processing preference request: Database error'),
+          expect.stringContaining('[corr-general-exception] Error processing preference request: Simulated extraction error'),
           expect.any(Object)
         );
       }
@@ -333,21 +334,22 @@ describe('UserPreferenceAgent', () => {
     });
   });
 
-  describe('persistPreferences', () => {
-    it('should call knowledgeGraphService.addOrUpdatePreference for each preference', async () => {
-      const preferences: PreferenceNode[] = [
-        { type: 'color', value: 'red', source: 'user', confidence: 1, timestamp: '2023-01-01T00:00:00Z', active: true },
-        { type: 'body', value: 'full', source: 'user', confidence: 1, timestamp: '2023-01-01T00:00:00Z', active: true },
-      ];
-      const userId = 'testUser';
+  // Commented out as preference persistence is no longer handled by KnowledgeGraphService
+  // describe('persistPreferences', () => {
+  //   it('should call knowledgeGraphService.addOrUpdatePreference for each preference', async () => {
+  //     const preferences: PreferenceNode[] = [
+  //       { type: 'color', value: 'red', source: 'user', confidence: 1, timestamp: '2023-01-01T00:00:00Z', active: true },
+  //       { type: 'body', value: 'full', source: 'user', confidence: 1, timestamp: '2023-01-01T00:00:00Z', active: true },
+  //     ];
+  //     const userId = 'testUser';
 
-      await agent.testPersistPreferences(preferences, userId);
+  //     await agent.testPersistPreferences(preferences, userId);
 
-      expect(mockKnowledgeGraphService.addOrUpdatePreference).toHaveBeenCalledTimes(2);
-      expect(mockKnowledgeGraphService.addOrUpdatePreference).toHaveBeenCalledWith(userId, preferences[0]);
-      expect(mockKnowledgeGraphService.addOrUpdatePreference).toHaveBeenCalledWith(userId, preferences[1]);
-    });
-  });
+  //     expect(mockKnowledgeGraphService.addOrUpdatePreference).toHaveBeenCalledTimes(2);
+  //     expect(mockKnowledgeGraphService.addOrUpdatePreference).toHaveBeenCalledWith(userId, preferences[0]);
+  //     expect(mockKnowledgeGraphService.addOrUpdatePreference).toHaveBeenCalledWith(userId, preferences[1]);
+  //   });
+  // });
 
   describe('queueAsyncLLMExtraction', () => {
     it('should publish an llm-preference-extraction message to LLMPreferenceExtractorAgent', async () => {

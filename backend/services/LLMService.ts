@@ -123,7 +123,7 @@ export class LLMService {
             const parsedResponse = await this.ollamaClient.generateStructured(prompt, jsonSchema, validationSchema, {
                 options: {
                     temperature: llmOptions.temperature !== undefined ? llmOptions.temperature : this.ollamaClient.defaultOptions.temperature,
-                    num_predict: llmOptions.num_predict !== undefined ? llmOptions.num_predict : this.ollamaClient.defaultOptions.num_predict
+                    num_predict: llmOptions.num_predict !== undefined ? llmOptions.num_predict : 4096 // Increased num_predict
                 }
             });
             this.logger.debug(`Received structured Ollama response: ${JSON.stringify(parsedResponse)}`);
@@ -147,6 +147,12 @@ export class LLMService {
         } catch (error: unknown) {
             const errorMessage = error instanceof Error ? error.message : String(error);
             this.logger.error(`Error sending structured prompt to LLM: ${errorMessage} (Correlation ID: ${correlationId})`);
+            
+            // Check for JSON parsing errors specifically
+            if (errorMessage.includes('JSON') && (errorMessage.includes('Unterminated string') || errorMessage.includes('Expected'))) {
+                return { success: false, error: new AgentError(`LLM returned malformed JSON: ${errorMessage}`, 'LLM_MALFORMED_JSON', 'LLMService', correlationId, true, { originalError: errorMessage }) };
+            }
+
             return { success: false, error: new AgentError(`Error in LLMService (structured): ${errorMessage}`, 'LLM_UNEXPECTED_ERROR', 'LLMService', correlationId, false, { originalError: errorMessage }) };
         }
     }

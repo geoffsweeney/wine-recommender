@@ -42,6 +42,7 @@ export interface PreferenceExtractionResultPayload {
         // Add other preference properties as they are extracted
     };
     ingredients: string[];
+    wineCharacteristics?: { [key: string]: string[] }; // Added for food pairing characteristics
     pairingRecommendations?: string[]; // Added for food pairing
     error?: string;
     originalSourceAgent?: string;

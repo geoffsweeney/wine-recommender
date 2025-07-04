@@ -143,8 +143,11 @@ export class PreferenceNormalizationService {
             : pref.value;
         this.logger.info(`normalizePreferences: Trimmed/lowercased value: ${JSON.stringify(value)}`); // Log the value after trimming/lowercasing
 
-        // Resolve synonyms using registry or LLM
-        if (typeof value === 'string' && this.synonymRegistry.has(pref.type)) {
+        // Resolve synonyms using registry or LLM, but skip for pairingExplanation
+        if (pref.type === 'pairingExplanation') {
+            this.logger.info(`normalizePreferences: Skipping LLM resolution for pairingExplanation type.`);
+            // Do nothing, keep the value as is
+        } else if (typeof value === 'string' && this.synonymRegistry.has(pref.type)) {
             const synonyms = this.synonymRegistry.get(pref.type);
             this.logger.info(`normalizePreferences: Synonym registry for type: ${pref.type}, Synonyms: ${JSON.stringify(synonyms)}`); // Log the synonym registry for the type
             if (synonyms && typeof value === 'string' && synonyms.has(value.toLowerCase())) {

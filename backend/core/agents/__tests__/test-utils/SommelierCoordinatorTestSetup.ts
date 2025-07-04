@@ -6,6 +6,9 @@ import { mockDeep } from 'jest-mock-extended';
 import { TYPES } from '../../../../di/Types';
 import { ILogger } from '../../../../services/LLMService';
 import { AgentMessage } from '../../communication/AgentMessage';
+import { Result } from '../../../types/Result'; // Import Result
+import { AgentError } from '../../AgentError'; // Import AgentError
+import { v4 as uuidv4 } from 'uuid'; // Import uuidv4
 
 interface AgentResponse {
     recommendation: string;
@@ -26,15 +29,15 @@ import { BasicDeadLetterProcessor } from '../../../BasicDeadLetterProcessor';
 import { EnhancedAgentCommunicationBus } from '../../communication/EnhancedAgentCommunicationBus';
 
 // Agents
-import { SommelierCoordinator } from '../../SommelierCoordinator.new';
-import { InputValidationAgent } from '../../InputValidationAgent.new';
-import { RecommendationAgent } from '../../RecommendationAgent.new';
-import { LLMRecommendationAgent } from '../../LLMRecommendationAgent.new';
-import { UserPreferenceAgent } from '../../UserPreferenceAgent.new';
-import { ValueAnalysisAgent } from '../../ValueAnalysisAgent.new';
-import { ExplanationAgent } from '../../ExplanationAgent.new';
-import { FallbackAgent } from '../../FallbackAgent.new';
-import { MCPAdapterAgent } from '../../MCPAdapterAgent.new';
+import { SommelierCoordinator } from '../../SommelierCoordinator';
+import { InputValidationAgent } from '../../InputValidationAgent';
+import { RecommendationAgent } from '../../RecommendationAgent';
+import { LLMRecommendationAgent } from '../../LLMRecommendationAgent';
+import { UserPreferenceAgent } from '../../UserPreferenceAgent';
+import { ValueAnalysisAgent } from '../../ValueAnalysisAgent';
+import { ExplanationAgent } from '../../ExplanationAgent';
+import { FallbackAgent } from '../../FallbackAgent';
+import { MCPAdapterAgent } from '../../MCPAdapterAgent';
 
 // Neo4j related imports (assuming these are needed for mocking Neo4jService)
 import { Driver } from 'neo4j-driver';
@@ -65,7 +68,7 @@ interface SommelierCoordinatorTestContext {
     explanationAgent: jest.Mocked<ExplanationAgent>;
     fallbackAgent: jest.Mocked<FallbackAgent>;
     mcpAdapterAgent: jest.Mocked<MCPAdapterAgent>;
-    orchestrationMonitorAgent: jest.Mocked<{ handleMessage: (message: AgentMessage) => Promise<void> }>; // Dummy agent for orchestration monitor
+    orchestrationMonitorAgent: jest.Mocked<{ handleMessage: (message: AgentMessage) => Promise<Result<AgentMessage | null, AgentError>> }>; // Dummy agent for orchestration monitor
 }
 
 export function setupSommelierCoordinatorTest(): SommelierCoordinatorTestContext {
@@ -92,22 +95,22 @@ export function setupSommelierCoordinatorTest(): SommelierCoordinatorTestContext
     mockUserProfileService.loadPreferences.mockResolvedValue([]);
     mockUserProfileService.savePreferences.mockResolvedValue(undefined);
 
-    mockKnowledgeGraphService.getPreferences.mockResolvedValue([]);
+    // mockKnowledgeGraphService.getPreferences.mockResolvedValue([]); // Removed as KnowledgeGraphService no longer handles preferences
     mockKnowledgeGraphService.findWinesByPreferences.mockResolvedValue([]);
 
-    mockPreferenceExtractionService.attemptFastExtraction.mockResolvedValue({});
+    mockPreferenceExtractionService.attemptFastExtraction.mockResolvedValue({ success: true, data: {} }); // Return Result type
 
     (mockPreferenceNormalizationService.normalizePreferences as jest.Mock).mockReturnValue([]); // It's a synchronous method
 
-    mockDeadLetterProcessor.process.mockResolvedValue(undefined);
+    mockDeadLetterProcessor.process.mockResolvedValue(undefined); // Corrected to return void
 
     (mockConversationHistoryService.getConversationHistory as jest.Mock).mockReturnValue([]);
     mockConversationHistoryService.addConversationTurn.mockImplementation(() => {}); // Assuming this method exists and is void
 
-    mockLLMService.sendPrompt.mockResolvedValue('Mock LLM response');
+    mockLLMService.sendPrompt.mockResolvedValue({ success: true, data: 'Mock LLM response' }); // Return Result type
 
     // Internal map to store registered handlers for the mocked bus
-    const registeredHandlers = new Map<string, Map<string, (message: AgentMessage) => Promise<void>>>();
+    const registeredHandlers = new Map<string, Map<string, (message: AgentMessage) => Promise<Result<AgentMessage | null, AgentError>>>>(); // Updated handler type
     (communicationBus as any).registeredHandlers = registeredHandlers;
 // Dummy agent for orchestration monitor
     // Mock communicationBus methods
@@ -115,15 +118,15 @@ export function setupSommelierCoordinatorTest(): SommelierCoordinatorTestContext
         if (!registeredHandlers.has(agentId)) {
             registeredHandlers.set(agentId, new Map());
         }
-        registeredHandlers.get(agentId)!.set(messageType, handler);
+        registeredHandlers.get(agentId)!.set(messageType, handler); // No cast needed if handler is correctly typed
         console.log(`Mocked bus: Registered handler for ${agentId}, type ${messageType}. Current handlers:`, registeredHandlers);
     });
 
     // Dummy agent for orchestration monitor
-    const orchestrationMonitorAgent = mockDeep<{ handleMessage: (message: AgentMessage) => Promise<void> }>();
+    const orchestrationMonitorAgent = mockDeep<{ handleMessage: (message: AgentMessage) => Promise<void> }>(); // Reverted to Promise<void>
     communicationBus.registerMessageHandler('orchestration-monitor', 'orchestration-status', orchestrationMonitorAgent.handleMessage);
 
-    communicationBus.sendMessageAndWaitForResponse.mockImplementation(async <T>(targetAgentId: string, message: AgentMessage, timeoutMs?: number): Promise<AgentMessage<T>> => {
+    communicationBus.sendMessageAndWaitForResponse.mockImplementation(async <T>(targetAgentId: string, message: AgentMessage, timeoutMs?: number): Promise<Result<AgentMessage<T> | null, AgentError>> => { // Updated return type
         console.log(`Mocked bus (sendMessageAndWaitForResponse): Attempting to route message to ${targetAgentId}, type ${message.type}. Current handlers:`, registeredHandlers);
         console.log(`Mocked bus (publishToAgent): Attempting to route message to ${targetAgentId}, type ${message.type}. Current handlers:`, registeredHandlers);
         const agentHandlers = registeredHandlers.get(targetAgentId);
@@ -133,67 +136,78 @@ export function setupSommelierCoordinatorTest(): SommelierCoordinatorTestContext
                 // Execute the handler for the target agent
                 // Note: In a real scenario, the agent would send a response back to the bus.
                 // Here, we directly simulate the response for the test.
-                await handler(message); // Execute the agent's handler
+                const handlerResult = await handler(message); // Execute the agent's handler and get its Result
 
-                // Simulate the response based on the message type
-                let responsePayload: any;
-                let responseType: string;
+                if (handlerResult.success) {
+                    // Simulate the response based on the message type
+                    let responsePayload: any;
+                    let responseType: string;
 
-                switch (targetAgentId) {
-                    case 'input-validation-agent':
-                        responsePayload = { isValid: true, processedInput: { recommendationSource: 'knowledgeGraph', preferences: { wineType: 'red' }, message: 'recommend a red wine' } };
-                        responseType = 'validation-result';
-                        break;
-                    case 'recommendation-agent':
-                        responsePayload = { recommendation: 'Mock Red Wine (Red, Mock Region) - Pairs well with...', source: 'Knowledge Graph' };
-                        responseType = 'recommendation-response';
-                        break;
-                    case 'llm-recommendation':
-                        responsePayload = { recommendedWines: [{ id: 'mock-wine-id-1', name: 'Mock Enhanced Red Wine', region: 'Mock Enhanced Region', type: 'Red', price: 25 }], llmEnhancement: 'This is an enhanced recommendation based on your preferences.' };
-                        responseType = 'llm-recommendation-response';
-                        break;
-                    case 'user-preference-agent':
-                        responsePayload = { preferences: [{ type: 'wineType', value: 'red', source: 'user-input', confidence: 1, timestamp: new Date().toISOString(), active: true }], success: true };
-                        responseType = 'preference-update-result';
-                        break;
-                    case 'value-analysis-agent':
-                        responsePayload = { success: true, wineId: 'mock-wine-id', valueScore: 10, priceQualityRatio: 'Good', tastingNotes: [], agingPotential: 'Medium' };
-                        responseType = 'value-analysis-result';
-                        break;
-                    case 'explanation-agent':
-                        responsePayload = { explanation: 'Mock explanation.', recommendedWines: [] };
-                        responseType = 'explanation-response';
-                        break;
-                    case 'mcp-adapter-agent':
-                        responsePayload = { status: 'success', result: 'Mock MCP result.' };
-                        responseType = 'mcp-tool-response';
-                        break;
-                    case 'fallback-agent':
-                        responsePayload = { recommendation: 'Sorry, I encountered an issue and cannot provide a recommendation at this time. Please try again later.' };
-                        responseType = 'fallback-response';
-                        break;
-                    default:
-                        throw new Error(`Mocked bus: Unknown agent for response simulation: ${targetAgentId}`);
-                }
+                    switch (targetAgentId) {
+                        case 'input-validation-agent':
+                            responsePayload = { isValid: true, processedInput: { recommendationSource: 'knowledgeGraph', preferences: { wineType: 'red' }, message: 'recommend a red wine' } };
+                            responseType = 'validation-result';
+                            break;
+                        case 'recommendation-agent':
+                            responsePayload = { recommendation: 'Mock Red Wine (Red, Mock Region) - Pairs well with...', source: 'Knowledge Graph' };
+                            responseType = 'recommendation-response';
+                            break;
+                        case 'llm-recommendation':
+                            responsePayload = { recommendedWines: [{ id: 'mock-wine-id-1', name: 'Mock Enhanced Red Wine', region: 'Mock Enhanced Region', type: 'Red', price: 25 }], llmEnhancement: 'This is an enhanced recommendation based on your preferences.' };
+                            responseType = 'llm-recommendation-response';
+                            break;
+                        case 'user-preference-agent':
+                            responsePayload = { preferences: [{ type: 'wineType', value: 'red', source: 'user-input', confidence: 1, timestamp: new Date().toISOString(), active: true }], success: true };
+                            responseType = 'preference-update-result';
+                            break;
+                        case 'value-analysis-agent':
+                            responsePayload = { success: true, wineId: 'mock-wine-id', valueScore: 10, priceQualityRatio: 'Good', tastingNotes: [], agingPotential: 'Medium' };
+                            responseType = 'value-analysis-result';
+                            break;
+                        case 'explanation-agent':
+                            responsePayload = { explanation: 'Mock explanation.', recommendedWines: [] };
+                            responseType = 'explanation-response';
+                            break;
+                        case 'mcp-adapter-agent':
+                            responsePayload = { status: 'success', result: 'Mock MCP result.' };
+                            responseType = 'mcp-tool-response';
+                            break;
+                        case 'fallback-agent':
+                            responsePayload = { recommendation: 'Sorry, I encountered an issue and cannot provide a recommendation at this time. Please try again later.' };
+                            responseType = 'fallback-response';
+                            break;
+                        default:
+                            throw new Error(`Mocked bus: Unknown agent for response simulation: ${targetAgentId}`);
+                    }
 
-                return {
-                    metadata: {
-                        traceId: `${message.metadata.traceId}-response`,
+                    // Ensure all required AgentMessage properties are present
+                    const responseMessage: AgentMessage<T> = {
+                        id: uuidv4(), // Generate a new ID
+                        timestamp: new Date(),
+                        correlationId: message.correlationId, // Use original correlationId
+                        sourceAgent: targetAgentId, // The agent sending the response
+                        targetAgent: message.sourceAgent, // The original sender
+                        type: responseType,
+                        payload: responsePayload,
+                        userId: message.userId,
                         priority: 'NORMAL',
-                        timestamp: Date.now(),
-                        sender: targetAgentId
-                    },
-                    payload: responsePayload,
-                    type: responseType,
-                    userId: message.userId
-                } as AgentMessage<T>;
+                        conversationId: message.conversationId, // Added conversationId
+                        metadata: {
+                            traceId: `${message.metadata?.traceId || message.correlationId}-response`, // Use traceId from metadata or correlationId
+                            sender: targetAgentId
+                        }
+                    };
+                    return { success: true, data: responseMessage };
+                } else {
+                    return { success: false, error: handlerResult.error };
+                }
             } else {
                 console.warn(`Mocked bus (sendMessageAndWaitForResponse): No handler for message type ${message.type} in agent ${targetAgentId}`);
-                throw new Error(`No handler for message type ${message.type} in agent ${targetAgentId}`);
+                return { success: false, error: new AgentError(`No handler for message type ${message.type} in agent ${targetAgentId}`, 'MOCK_HANDLER_NOT_FOUND', 'mock-bus', message.correlationId) };
             }
         } else {
             console.warn(`Mocked bus (sendMessageAndWaitForResponse): No handlers registered for agent: ${targetAgentId}`);
-            throw new Error(`No handlers registered for agent: ${targetAgentId}`);
+            return { success: false, error: new AgentError(`No handlers registered for agent: ${targetAgentId}`, 'MOCK_AGENT_NOT_REGISTERED', 'mock-bus', message.correlationId) };
         }
     });
 
@@ -211,14 +225,14 @@ export function setupSommelierCoordinatorTest(): SommelierCoordinatorTestContext
         }
     });
 
-    communicationBus.sendLLMPrompt.mockImplementation(async (prompt): Promise<string | undefined> => {
+    communicationBus.sendLLMPrompt.mockImplementation(async (prompt, correlationId): Promise<Result<string, AgentError>> => { // Added correlationId parameter
         if (prompt.includes('Analyze the following user input')) {
-            return '{"isValid": true, "preferences": {"wineType": "red"}}';
+            return { success: true, data: '{"isValid": true, "preferences": {"wineType": "red"}}' };
         }
         if (prompt.includes('Based on the following error')) {
-            return '{"recommendation": "Sorry, I cannot provide a recommendation at this time."}';
+            return { success: true, data: '{"recommendation": "Sorry, I cannot provide a recommendation at this time."}' };
         }
-        return '{"isValid": false, "error": "Mock LLM response not configured for this prompt."}';
+        return { success: false, error: new AgentError('Mock LLM response not configured for this prompt.', 'MOCK_LLM_ERROR', 'mock-llm', correlationId || 'unknown') };
     });
 
     // Register all services in test container using interface-based DI
@@ -263,29 +277,29 @@ export function setupSommelierCoordinatorTest(): SommelierCoordinatorTestContext
 
     // Mock agent methods (simplified for now, can be expanded as needed)
     jest.spyOn(inputValidationAgent, 'handleMessage').mockImplementation(async (message) => {
-        return Promise.resolve(undefined); // Assuming handleMessage returns void
+        return { success: true, data: null }; // Assuming handleMessage returns Result
     });
     jest.spyOn(recommendationAgent, 'handleMessage').mockImplementation(async (message) => {
-        return Promise.resolve(undefined); // Assuming handleMessage returns void
+        return { success: true, data: null }; // Assuming handleMessage returns Result
     });
     jest.spyOn(llmRecommendationAgent, 'handleMessage').mockImplementation(async (message) => {
-        return Promise.resolve(undefined); // Assuming handleMessage returns void
+        return { success: true, data: null }; // Assuming handleMessage returns Result
     });
     jest.spyOn(userPreferenceAgent, 'handleMessage').mockImplementation(async (message) => {
-        return Promise.resolve(undefined); // Assuming handleMessage returns void
+        return { success: true, data: null }; // Assuming handleMessage returns Result
     });
     jest.spyOn(valueAnalysisAgent, 'handleMessage').mockImplementation(async (message) => {
         // ValueAnalysisAgent's handleMessage returns ValueAnalysisResponse
-        return { success: true, wineId: 'mock-wine-id', valueScore: 10, priceQualityRatio: 'Good', tastingNotes: [], agingPotential: 'Medium' };
+        return { success: true, data: { success: true, wineId: 'mock-wine-id', valueScore: 10, priceQualityRatio: 'Good', tastingNotes: [], agingPotential: 'Medium' } }; // Wrap in Result
     });
     jest.spyOn(explanationAgent, 'handleMessage').mockImplementation(async (message) => {
-        return Promise.resolve(undefined); // Assuming handleMessage returns void
+        return { success: true, data: null }; // Assuming handleMessage returns Result
     });
     jest.spyOn(fallbackAgent, 'handleMessage').mockImplementation(async (message) => {
-        return Promise.resolve(undefined); // Assuming handleMessage returns void
+        return { success: true, data: null }; // Assuming handleMessage returns Result
     });
     jest.spyOn(mcpAdapterAgent, 'handleMessage').mockImplementation(async (message) => {
-        return Promise.resolve(undefined); // Assuming handleMessage returns void
+        return { success: true, data: null }; // Assuming handleMessage returns Result
     });
 
     return {

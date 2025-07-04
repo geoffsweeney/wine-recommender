@@ -1,112 +1,94 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="jest tests" tests="36" failures="0" errors="0" time="19.169">
-  <testsuite name="End-to-End Live Recommendation API" errors="0" failures="0" skipped="35" timestamp="2025-06-29T05:53:23" time="18.973" tests="36">
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Classic Food &amp; Wine Pairings should recommend Cabernet Sauvignon or Malbec for grilled steak" name="End-to-End Live Recommendation API POST /recommendations - Classic Food &amp; Wine Pairings should recommend Cabernet Sauvignon or Malbec for grilled steak" time="17.034">
+<testsuites name="jest tests" tests="13" failures="5" errors="0" time="1.57">
+  <testsuite name="LLMPreferenceExtractorAgent" errors="0" failures="5" skipped="0" timestamp="2025-06-29T06:21:30" time="1.405" tests="13">
+    <testcase classname="LLMPreferenceExtractorAgent should initialize correctly" name="LLMPreferenceExtractorAgent should initialize correctly" time="0.002">
     </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Classic Food &amp; Wine Pairings should recommend Pinot Grigio or Sauvignon Blanc for grilled fish" name="End-to-End Live Recommendation API POST /recommendations - Classic Food &amp; Wine Pairings should recommend Pinot Grigio or Sauvignon Blanc for grilled fish" time="0">
-      <skipped/>
+    <testcase classname="LLMPreferenceExtractorAgent handleMessage should return an error for unhandled message types" name="LLMPreferenceExtractorAgent handleMessage should return an error for unhandled message types" time="0.001">
     </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Classic Food &amp; Wine Pairings should recommend Pinot Noir or light red for roasted chicken" name="End-to-End Live Recommendation API POST /recommendations - Classic Food &amp; Wine Pairings should recommend Pinot Noir or light red for roasted chicken" time="0">
-      <skipped/>
+    <testcase classname="LLMPreferenceExtractorAgent handleExtractionRequest should return an error if payload is missing" name="LLMPreferenceExtractorAgent handleExtractionRequest should return an error if payload is missing" time="0.001">
     </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Classic Food &amp; Wine Pairings should recommend Champagne or Prosecco for oysters" name="End-to-End Live Recommendation API POST /recommendations - Classic Food &amp; Wine Pairings should recommend Champagne or Prosecco for oysters" time="0">
-      <skipped/>
+    <testcase classname="LLMPreferenceExtractorAgent handleExtractionRequest should process a preference extraction request successfully" name="LLMPreferenceExtractorAgent handleExtractionRequest should process a preference extraction request successfully" time="0.304">
+      <failure>Error: expect(received).toBe(expected) // Object.is equality
+
+Expected: true
+Received: false
+    at Object.&lt;anonymous&gt; (/home/geoff/src/roo/wine-recommender/backend/core/agents/__tests__/LLMPreferenceExtractorAgent.test.ts:142:30)</failure>
     </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Pasta &amp; Italian Food Pairings should recommend Chianti or Sangiovese for tomato-based pasta" name="End-to-End Live Recommendation API POST /recommendations - Pasta &amp; Italian Food Pairings should recommend Chianti or Sangiovese for tomato-based pasta" time="0">
-      <skipped/>
+    <testcase classname="LLMPreferenceExtractorAgent handleExtractionRequest should handle LLM service failure" name="LLMPreferenceExtractorAgent handleExtractionRequest should handle LLM service failure" time="0.304">
+      <failure>Error: expect(jest.fn()).toHaveBeenCalledWith(...expected)
+
+Expected: StringContaining &quot;[corr-llm-fail] Preference extraction attempt 1 failed: Error: LLM API is down&quot;, Any&lt;Object&gt;
+Received
+       1: &quot;[corr-llm-fail] Preference extraction attempt 1 failed: TypeError: Cannot read properties of undefined (reading &apos;success&apos;)&quot;, {&quot;agentId&quot;: &quot;llm-preference-extractor&quot;, &quot;correlationId&quot;: &quot;corr-llm-fail&quot;, &quot;error&quot;: &quot;TypeError: Cannot read properties of undefined (reading &apos;success&apos;)&quot;, &quot;operation&quot;: &quot;handleExtractionRequestWithRetry&quot;}
+       2: &quot;[corr-llm-fail] Preference extraction attempt 2 failed: TypeError: Cannot read properties of undefined (reading &apos;success&apos;)&quot;, {&quot;agentId&quot;: &quot;llm-preference-extractor&quot;, &quot;correlationId&quot;: &quot;corr-llm-fail&quot;, &quot;error&quot;: &quot;TypeError: Cannot read properties of undefined (reading &apos;success&apos;)&quot;, &quot;operation&quot;: &quot;handleExtractionRequestWithRetry&quot;}
+       3: &quot;[corr-llm-fail] Preference extraction attempt 3 failed: TypeError: Cannot read properties of undefined (reading &apos;success&apos;)&quot;, {&quot;agentId&quot;: &quot;llm-preference-extractor&quot;, &quot;correlationId&quot;: &quot;corr-llm-fail&quot;, &quot;error&quot;: &quot;TypeError: Cannot read properties of undefined (reading &apos;success&apos;)&quot;, &quot;operation&quot;: &quot;handleExtractionRequestWithRetry&quot;}
+
+Number of calls: 3
+    at Object.&lt;anonymous&gt; (/home/geoff/src/roo/wine-recommender/backend/core/agents/__tests__/LLMPreferenceExtractorAgent.test.ts:199:33)</failure>
     </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Pasta &amp; Italian Food Pairings should recommend Pinot Grigio or Vermentino for seafood pasta" name="End-to-End Live Recommendation API POST /recommendations - Pasta &amp; Italian Food Pairings should recommend Pinot Grigio or Vermentino for seafood pasta" time="0">
-      <skipped/>
+    <testcase classname="LLMPreferenceExtractorAgent parseLLMResponse should return an error if LLM response is empty" name="LLMPreferenceExtractorAgent parseLLMResponse should return an error if LLM response is empty" time="0">
+      <failure>TypeError: this.parseLLMResponse is not a function
+    at TestLLMPreferenceExtractorAgent.testParseLLMResponse (/home/geoff/src/roo/wine-recommender/backend/core/agents/__tests__/LLMPreferenceExtractorAgent.test.ts:18:26)
+    at Object.&lt;anonymous&gt; (/home/geoff/src/roo/wine-recommender/backend/core/agents/__tests__/LLMPreferenceExtractorAgent.test.ts:213:34)
+    at Promise.then.completed (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/utils.js:298:28)
+    at new Promise (&lt;anonymous&gt;)
+    at callAsyncCircusFn (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/utils.js:231:10)
+    at _callCircusTest (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/run.js:316:40)
+    at _runTest (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/run.js:252:3)
+    at _runTestsForDescribeBlock (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/run.js:126:9)
+    at _runTestsForDescribeBlock (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/run.js:121:9)
+    at _runTestsForDescribeBlock (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/run.js:121:9)
+    at run (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/run.js:71:3)
+    at runAndTransformResultsToJestFormat (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)
+    at jestAdapter (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)
+    at runTestInternal (/home/geoff/src/roo/wine-recommender/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/home/geoff/src/roo/wine-recommender/node_modules/jest-runner/build/runTest.js:444:34)</failure>
     </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Cheese &amp; Charcuterie Pairings should recommend Port or Cabernet for aged cheddar" name="End-to-End Live Recommendation API POST /recommendations - Cheese &amp; Charcuterie Pairings should recommend Port or Cabernet for aged cheddar" time="0">
-      <skipped/>
+    <testcase classname="LLMPreferenceExtractorAgent parseLLMResponse should parse a valid JSON response from LLM" name="LLMPreferenceExtractorAgent parseLLMResponse should parse a valid JSON response from LLM" time="0.001">
+      <failure>TypeError: this.parseLLMResponse is not a function
+    at TestLLMPreferenceExtractorAgent.testParseLLMResponse (/home/geoff/src/roo/wine-recommender/backend/core/agents/__tests__/LLMPreferenceExtractorAgent.test.ts:18:26)
+    at Object.&lt;anonymous&gt; (/home/geoff/src/roo/wine-recommender/backend/core/agents/__tests__/LLMPreferenceExtractorAgent.test.ts:223:34)
+    at Promise.then.completed (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/utils.js:298:28)
+    at new Promise (&lt;anonymous&gt;)
+    at callAsyncCircusFn (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/utils.js:231:10)
+    at _callCircusTest (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/run.js:316:40)
+    at _runTest (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/run.js:252:3)
+    at _runTestsForDescribeBlock (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/run.js:126:9)
+    at _runTestsForDescribeBlock (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/run.js:121:9)
+    at _runTestsForDescribeBlock (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/run.js:121:9)
+    at run (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/run.js:71:3)
+    at runAndTransformResultsToJestFormat (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)
+    at jestAdapter (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)
+    at runTestInternal (/home/geoff/src/roo/wine-recommender/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/home/geoff/src/roo/wine-recommender/node_modules/jest-runner/build/runTest.js:444:34)</failure>
     </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Cheese &amp; Charcuterie Pairings should recommend Sauvignon Blanc or Loire Valley for goat cheese" name="End-to-End Live Recommendation API POST /recommendations - Cheese &amp; Charcuterie Pairings should recommend Sauvignon Blanc or Loire Valley for goat cheese" time="0">
-      <skipped/>
+    <testcase classname="LLMPreferenceExtractorAgent parseLLMResponse should return an error for invalid JSON response" name="LLMPreferenceExtractorAgent parseLLMResponse should return an error for invalid JSON response" time="0">
+      <failure>TypeError: this.parseLLMResponse is not a function
+    at TestLLMPreferenceExtractorAgent.testParseLLMResponse (/home/geoff/src/roo/wine-recommender/backend/core/agents/__tests__/LLMPreferenceExtractorAgent.test.ts:18:26)
+    at Object.&lt;anonymous&gt; (/home/geoff/src/roo/wine-recommender/backend/core/agents/__tests__/LLMPreferenceExtractorAgent.test.ts:236:34)
+    at Promise.then.completed (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/utils.js:298:28)
+    at new Promise (&lt;anonymous&gt;)
+    at callAsyncCircusFn (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/utils.js:231:10)
+    at _callCircusTest (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/run.js:316:40)
+    at _runTest (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/run.js:252:3)
+    at _runTestsForDescribeBlock (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/run.js:126:9)
+    at _runTestsForDescribeBlock (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/run.js:121:9)
+    at _runTestsForDescribeBlock (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/run.js:121:9)
+    at run (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/run.js:71:3)
+    at runAndTransformResultsToJestFormat (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)
+    at jestAdapter (/home/geoff/src/roo/wine-recommender/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)
+    at runTestInternal (/home/geoff/src/roo/wine-recommender/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/home/geoff/src/roo/wine-recommender/node_modules/jest-runner/build/runTest.js:444:34)</failure>
     </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Dessert Pairings should recommend Moscato or Riesling for fruit desserts" name="End-to-End Live Recommendation API POST /recommendations - Dessert Pairings should recommend Moscato or Riesling for fruit desserts" time="0">
-      <skipped/>
+    <testcase classname="LLMPreferenceExtractorAgent calculateConfidenceScore should return a base score for empty result" name="LLMPreferenceExtractorAgent calculateConfidenceScore should return a base score for empty result" time="0">
     </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Dessert Pairings should recommend Port or Madeira for chocolate desserts" name="End-to-End Live Recommendation API POST /recommendations - Dessert Pairings should recommend Port or Madeira for chocolate desserts" time="0">
-      <skipped/>
+    <testcase classname="LLMPreferenceExtractorAgent calculateConfidenceScore should increase score for isValid true" name="LLMPreferenceExtractorAgent calculateConfidenceScore should increase score for isValid true" time="0.001">
     </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Spicy &amp; Ethnic Cuisine Pairings should recommend Riesling or Gewürztraminer for spicy Thai food" name="End-to-End Live Recommendation API POST /recommendations - Spicy &amp; Ethnic Cuisine Pairings should recommend Riesling or Gewürztraminer for spicy Thai food" time="0">
-      <skipped/>
+    <testcase classname="LLMPreferenceExtractorAgent calculateConfidenceScore should increase score for preferences" name="LLMPreferenceExtractorAgent calculateConfidenceScore should increase score for preferences" time="0">
     </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Spicy &amp; Ethnic Cuisine Pairings should recommend Tempranillo or Rioja for Spanish paella" name="End-to-End Live Recommendation API POST /recommendations - Spicy &amp; Ethnic Cuisine Pairings should recommend Tempranillo or Rioja for Spanish paella" time="0">
-      <skipped/>
+    <testcase classname="LLMPreferenceExtractorAgent calculateConfidenceScore should increase score for ingredients" name="LLMPreferenceExtractorAgent calculateConfidenceScore should increase score for ingredients" time="0.001">
     </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Validation and Error Cases should return 400 for missing userId" name="End-to-End Live Recommendation API POST /recommendations - Validation and Error Cases should return 400 for missing userId" time="0">
-      <skipped/>
-    </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Validation and Error Cases should return 400 for missing input object" name="End-to-End Live Recommendation API POST /recommendations - Validation and Error Cases should return 400 for missing input object" time="0">
-      <skipped/>
-    </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Validation and Error Cases should return 400 for empty message" name="End-to-End Live Recommendation API POST /recommendations - Validation and Error Cases should return 400 for empty message" time="0">
-      <skipped/>
-    </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Validation and Error Cases should return 400 for null or undefined message" name="End-to-End Live Recommendation API POST /recommendations - Validation and Error Cases should return 400 for null or undefined message" time="0">
-      <skipped/>
-    </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Edge Cases and Challenging Requests should handle vague requests gracefully" name="End-to-End Live Recommendation API POST /recommendations - Edge Cases and Challenging Requests should handle vague requests gracefully" time="0">
-      <skipped/>
-    </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Edge Cases and Challenging Requests should handle conflicting preferences intelligently" name="End-to-End Live Recommendation API POST /recommendations - Edge Cases and Challenging Requests should handle conflicting preferences intelligently" time="0">
-      <skipped/>
-    </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Edge Cases and Challenging Requests should provide response for unusual food combinations" name="End-to-End Live Recommendation API POST /recommendations - Edge Cases and Challenging Requests should provide response for unusual food combinations" time="0">
-      <skipped/>
-    </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Edge Cases and Challenging Requests should handle budget constraints appropriately" name="End-to-End Live Recommendation API POST /recommendations - Edge Cases and Challenging Requests should handle budget constraints appropriately" time="0">
-      <skipped/>
-    </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Edge Cases and Challenging Requests should handle dietary restrictions and preferences" name="End-to-End Live Recommendation API POST /recommendations - Edge Cases and Challenging Requests should handle dietary restrictions and preferences" time="0">
-      <skipped/>
-    </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Edge Cases and Challenging Requests should respond appropriately to impossible wine requests" name="End-to-End Live Recommendation API POST /recommendations - Edge Cases and Challenging Requests should respond appropriately to impossible wine requests" time="0">
-      <skipped/>
-    </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Edge Cases and Challenging Requests should handle occasion-based requests" name="End-to-End Live Recommendation API POST /recommendations - Edge Cases and Challenging Requests should handle occasion-based requests" time="0">
-      <skipped/>
-    </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Edge Cases and Challenging Requests should handle regional cuisine expertise requests" name="End-to-End Live Recommendation API POST /recommendations - Edge Cases and Challenging Requests should handle regional cuisine expertise requests" time="0">
-      <skipped/>
-    </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Wine Style and Varietal Specific Tests should recommend appropriate wine for barbecue ribs" name="End-to-End Live Recommendation API POST /recommendations - Wine Style and Varietal Specific Tests should recommend appropriate wine for barbecue ribs" time="0">
-      <skipped/>
-    </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Wine Style and Varietal Specific Tests should recommend rosé for summer salads" name="End-to-End Live Recommendation API POST /recommendations - Wine Style and Varietal Specific Tests should recommend rosé for summer salads" time="0">
-      <skipped/>
-    </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Australian Wine Pairings should recommend Australian Shiraz for kangaroo or game meat" name="End-to-End Live Recommendation API POST /recommendations - Australian Wine Pairings should recommend Australian Shiraz for kangaroo or game meat" time="0">
-      <skipped/>
-    </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Australian Wine Pairings should recommend Australian Riesling for Asian fusion cuisine" name="End-to-End Live Recommendation API POST /recommendations - Australian Wine Pairings should recommend Australian Riesling for Asian fusion cuisine" time="0">
-      <skipped/>
-    </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Australian Wine Pairings should recommend Australian Chardonnay for seafood" name="End-to-End Live Recommendation API POST /recommendations - Australian Wine Pairings should recommend Australian Chardonnay for seafood" time="0">
-      <skipped/>
-    </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Australian Wine Pairings should recommend Australian Pinot Noir for duck or poultry" name="End-to-End Live Recommendation API POST /recommendations - Australian Wine Pairings should recommend Australian Pinot Noir for duck or poultry" time="0">
-      <skipped/>
-    </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Australian Wine Pairings should recommend Australian Grenache for Mediterranean-style dishes" name="End-to-End Live Recommendation API POST /recommendations - Australian Wine Pairings should recommend Australian Grenache for Mediterranean-style dishes" time="0">
-      <skipped/>
-    </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Australian Wine Pairings should recommend Australian Semillon for lighter dishes" name="End-to-End Live Recommendation API POST /recommendations - Australian Wine Pairings should recommend Australian Semillon for lighter dishes" time="0">
-      <skipped/>
-    </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Australian Wine Pairings should recommend Australian Cabernet Sauvignon for red meat" name="End-to-End Live Recommendation API POST /recommendations - Australian Wine Pairings should recommend Australian Cabernet Sauvignon for red meat" time="0">
-      <skipped/>
-    </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Australian Wine Pairings should recommend Australian sparkling wine for celebrations" name="End-to-End Live Recommendation API POST /recommendations - Australian Wine Pairings should recommend Australian sparkling wine for celebrations" time="0">
-      <skipped/>
-    </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Australian Wine Pairings should recommend cool-climate Australian wines for delicate dishes" name="End-to-End Live Recommendation API POST /recommendations - Australian Wine Pairings should recommend cool-climate Australian wines for delicate dishes" time="0">
-      <skipped/>
-    </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Australian Wine Pairings should recommend fortified Australian wines for rich desserts" name="End-to-End Live Recommendation API POST /recommendations - Australian Wine Pairings should recommend fortified Australian wines for rich desserts" time="0">
-      <skipped/>
+    <testcase classname="LLMPreferenceExtractorAgent calculateConfidenceScore should return max score for all valid fields" name="LLMPreferenceExtractorAgent calculateConfidenceScore should return max score for all valid fields" time="0.001">
     </testcase>
   </testsuite>
 </testsuites>

@@ -116,12 +116,16 @@ export class LLMPreferenceExtractorAgent extends CommunicatingAgent {
          'Output: { "isValid": true, "ingredients": ["chicken", "mushrooms"], "preferences": {} }',
          '\nExample 3:',
          'Input: "I am having a juicy grilled ribeye steak tonight. What wine should I drink?"',
-         'Output: { "isValid": true, "ingredients": ["beef"], "preferences": { "pairing": "beef" } }'
+         'Output: { "isValid": true, "ingredients": ["beef"], "preferences": { "pairing": "beef" } }',
+         '\nExample 4:',
+         'Input: "What about wines from New Zealand?"',
+         'Output: { "isValid": true, "preferences": { "country": "New Zealand" }, "ingredients": [] }'
        ].join('\n');
 
-       const llmPrompt = `Analyze this wine request and extract structured preferences:\n${examples}\n\nCurrent request: "${input}"\n\n${
-         conversationHistory ? 'Conversation context:\n' + conversationHistory.map(turn => `${turn.role}: ${turn.content}`).join('\n') : ''
-       }\n\nOutput JSON matching the examples exactly:`;
+       const limitedConversationHistory = conversationHistory ? conversationHistory.slice(-5) : []; // Limit to last 5 turns
+       const llmPrompt = `Analyze this wine request and extract structured preferences:\n${examples}\n\nCurrent request: "${input}"\n\nExtract *only* new or updated preferences from this current request. Use the conversation context to understand the overall user intent, but do not re-extract preferences already present in the conversation history unless they are explicitly modified or contradicted by the current request.\n\n${
+         limitedConversationHistory.length > 0 ? 'Conversation context:\n' + limitedConversationHistory.map(turn => `${turn.role}: ${turn.content}`).join('\n') : ''
+       }\n\nOutput JSON matching the examples exactly. Ensure all fields from the schema are present in the output, even if empty (e.g., "preferences": {}, "ingredients": []):`;
  
        let lastError: AgentError | undefined;
        
@@ -243,12 +247,13 @@ export class LLMPreferenceExtractorAgent extends CommunicatingAgent {
            maxItems: 2,
            nullable: true
          },
+         country: { type: "string" }, // Added country preference
          ingredients: {
            type: "array",
            items: { type: "string" }
          }
        },
-       required: []
+       required: [] // No required properties within preferences for flexibility
      },
      ingredients: {
        type: "array",

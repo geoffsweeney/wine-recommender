@@ -14,7 +14,6 @@ export class KnowledgeGraphService {
   ) {
     this.logger.info('KnowledgeGraphService initialized');
   }
-
   async createWineNode(wine: WineNode): Promise<void> {
     await this.neo4j.executeQuery(`
       MERGE (w:Wine {id: $id})
@@ -97,6 +96,10 @@ export class KnowledgeGraphService {
       parameters.maxPrice = preferences.priceRange[1];
     }
 
+    if (preferences.country) {
+      conditions.push('w.region = $country');
+      parameters.country = preferences.country;
+    }
 
     // TODO: Enhance foodPairing logic to support multiple ingredients, flavor profiles, and more nuanced matching.
     // Current implementation assumes a direct match to a single Food node by name.
@@ -138,6 +141,83 @@ export class KnowledgeGraphService {
     return wines;
   }
 
+
+async findWinesByCombinedCriteria(ingredients: string[], preferences: UserPreferences): Promise<WineNode[]> {
+    this.logger.debug('KnowledgeGraphService: Finding wines by combined criteria:', { ingredients, preferences });
+
+    if ((!ingredients || ingredients.length === 0) && (!preferences || Object.keys(preferences).length === 0)) {
+      this.logger.debug('KnowledgeGraphService: No ingredients or preferences provided for combined search, returning empty array.');
+      return [];
+    }
+
+    let query = 'MATCH (w:Wine)';
+    const parameters: any = {};
+    const conditions: string[] = [];
+
+    // Add ingredient matching
+    if (ingredients && ingredients.length > 0) {
+      query += ' MATCH (w)<-[:PAIRS_WITH]-(i:Ingredient) WHERE i.name IN $ingredients'; // Filter ingredients first
+      parameters.ingredients = ingredients;
+      // Ensure all ingredients are matched
+      query += ' WITH w, COLLECT(DISTINCT i.name) as matchedIngredients';
+      // Replace apoc.coll.intersection with standard Cypher for checking all ingredients are matched
+      conditions.push('ALL(ing IN $ingredients WHERE ing IN matchedIngredients)');
+    }
+
+    // Add preference matching
+    if (preferences && Object.keys(preferences).length > 0) {
+      if (preferences.wineType) {
+        conditions.push('w.type = $wineType');
+        parameters.wineType = preferences.wineType;
+      }
+      if (preferences.sweetness) {
+        conditions.push('w.sweetness = $sweetness');
+        parameters.sweetness = preferences.sweetness;
+      }
+      if (preferences.priceRange) {
+        conditions.push('w.price >= $minPrice AND w.price <= $maxPrice');
+        parameters.minPrice = preferences.priceRange[0];
+        parameters.maxPrice = preferences.priceRange[1];
+      }
+      if (preferences.foodPairing) {
+        query += ' MATCH (w)-[:PAIRS_WITH]->(f:Food)';
+        conditions.push('f.name = $foodPairing');
+        parameters.foodPairing = preferences.foodPairing;
+      }
+      if (preferences.country) {
+        conditions.push('w.region = $country');
+        parameters.country = preferences.country;
+      }
+      // Add wine characteristics from food pairing
+      if (preferences.wineCharacteristics) {
+        for (const charType in preferences.wineCharacteristics) {
+          if (Object.prototype.hasOwnProperty.call(preferences.wineCharacteristics, charType)) {
+            const values = preferences.wineCharacteristics[charType];
+            if (values && values.length > 0) {
+              // Assuming wine properties match characteristic types (e.g., w.color, w.style)
+              conditions.push(`w.${charType} IN $${charType}`);
+              parameters[charType] = values;
+            }
+          }
+        }
+      }
+    }
+
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ');
+    }
+
+    query += ' RETURN w';
+
+    this.logger.debug(`KnowledgeGraphService - findWinesByCombinedCriteria query: ${query}`);
+    this.logger.debug(`KnowledgeGraphService - findWinesByCombinedCriteria parameters: ${JSON.stringify(parameters)}`);
+
+    const wines = await this.neo4j.executeQuery<WineNode>(query, parameters);
+
+    this.logger.debug(`KnowledgeGraphService - findWinesByCombinedCriteria found ${wines.length} wines: ${JSON.stringify(wines)}`);
+
+    return wines;
+  }
 
   async findWinesByType(wineType: string): Promise<WineNode[]> {
     if (!wineType) {

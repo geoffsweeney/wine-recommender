@@ -273,9 +273,11 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
 
       // Handle preference extraction, which might be asynchronous
       const preferenceMessageCorrelationId = this.generateCorrelationId();
+      // Limit conversation history to the last 3 turns for preference extraction to reduce prompt length
+      const limitedConversationHistory = userInput.conversationHistory ? userInput.conversationHistory.slice(-3) : [];
       const preferenceRequestMessage = createAgentMessage(
         MessageTypes.GET_PREFERENCES,
-        { input: userInput.input.message, userId: userInput.userId, conversationHistory: userInput.conversationHistory },
+        { input: userInput.input.message, userId: userInput.userId, conversationHistory: limitedConversationHistory },
         this.id,
         conversationId,
         preferenceMessageCorrelationId,
@@ -295,7 +297,7 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
           'llm-preference-extractor',
           createAgentMessage(
             MessageTypes.PREFERENCE_EXTRACTION_REQUEST, // This message type is what LLMPreferenceExtractorAgent expects
-            { input: userInput.input.message, userId: userInput.userId, history: userInput.conversationHistory },
+            { input: userInput.input.message, userId: userInput.userId, history: limitedConversationHistory }, // Use limited history
             this.id,
             conversationId,
             preferenceMessageCorrelationId, // Use the same correlation ID

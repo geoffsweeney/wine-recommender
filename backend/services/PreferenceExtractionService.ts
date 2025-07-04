@@ -376,7 +376,8 @@ export class PreferenceExtractionService {
               preferences.timePreference = entity.value.value;
               break;
             case 'location':
-              preferences.region = entity.value.value;
+              // Duckling's location can be a country or region. Map to 'country' for now.
+              preferences.country = entity.value.value;
               break;
             case 'temperature':
               preferences.servingTemperature = entity.value.value;
@@ -443,6 +444,8 @@ ${enhancedExamples}
 
 Current request: "${userInput}"
 
+Extract *only* new or updated preferences from this current request. Use the conversation context to understand the overall user intent, but do not re-extract preferences already present in the conversation history unless they are explicitly modified or contradicted by the current request.
+
 ${conversationHistory ? 'Conversation context:\n' + conversationHistory.map(turn => `${turn.role}: ${turn.content}`).join('\n') + '\n' : ''}
 
 Consider:
@@ -468,25 +471,62 @@ Output JSON matching the examples exactly with enhanced pairing recommendations:
       );
 
       if (!llmResponseResult.success) {
-        return { 
-          success: false, 
-          error: new AgentError(
-            `LLM service failed during preference extraction: ${llmResponseResult.error?.message}`,
-            'LLM_SERVICE_ERROR',
-            'PreferenceExtractionService',
-            correlationId ?? '',
-            true,
-            { originalError: llmResponseResult.error?.message }
-          )
-        };
+        if (llmResponseResult.error?.code === 'LLM_MALFORMED_JSON') {
+          this.logger.warn(`[${correlationId}] LLM returned malformed JSON. Attempting fallback extraction.`, {
+            agentId: 'PreferenceExtractionService',
+            operation: 'extractPreferencesWithLLM',
+            originalError: llmResponseResult.error?.message
+          });
+          // Attempt a fallback extraction using regex/duckling if LLM fails to produce valid JSON
+          const fallbackPreferencesResult = await this.attemptFastExtraction(userInput); // Await the promise
+          if (fallbackPreferencesResult.success && fallbackPreferencesResult.data) {
+            // If fallback extraction is successful, return it as a valid (but less comprehensive) payload
+            return {
+              success: true,
+              data: {
+                isValid: true,
+                preferences: fallbackPreferencesResult.data,
+                ingredients: fallbackPreferencesResult.data.detectedFoods || [],
+                pairingRecommendations: [],
+                error: 'Partial preferences extracted due to LLM malformed JSON.'
+              }
+            };
+          } else {
+            // If fallback also fails, then return the original LLM error
+            return {
+              success: false,
+              error: new AgentError(
+                `LLM returned malformed JSON and fallback extraction failed: ${llmResponseResult.error?.message}`,
+                'LLM_MALFORMED_JSON_FALLBACK_FAILED',
+                'PreferenceExtractionService',
+                correlationId ?? '',
+                true,
+                { originalError: llmResponseResult.error?.message }
+              )
+            };
+          }
+        } else {
+          // For other LLM service errors, return the original error
+          return {
+            success: false,
+            error: new AgentError(
+              `LLM service failed during preference extraction: ${llmResponseResult.error?.message}`,
+              'LLM_SERVICE_ERROR',
+              'PreferenceExtractionService',
+              correlationId ?? '',
+              true,
+              { originalError: llmResponseResult.error?.message }
+            )
+          };
+        }
       }
 
       const extractedData = llmResponseResult.data;
-      if (!extractedData || !extractedData.isValid) {
-        return { 
-          success: false, 
+      if (!extractedData || extractedData.isValid === false) { // Only fail if isValid is explicitly false
+        return {
+          success: false,
           error: new AgentError(
-            extractedData?.error || 'LLM returned invalid preference data',
+            extractedData?.error || 'LLM returned invalid preference data (isValid was false)',
             'LLM_INVALID_RESPONSE',
             'PreferenceExtractionService',
             correlationId ?? '',
@@ -503,8 +543,8 @@ Output JSON matching the examples exactly with enhanced pairing recommendations:
 
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: new AgentError(
           `Error during LLM preference extraction: ${errorMessage}`,
           'LLM_EXTRACTION_ERROR',
@@ -518,7 +558,7 @@ Output JSON matching the examples exactly with enhanced pairing recommendations:
   }
 
   private enhanceWithLocalPairingKnowledge(
-    llmData: PreferenceExtractionResultPayload, 
+    llmData: PreferenceExtractionResultPayload,
     userInput: string
   ): PreferenceExtractionResultPayload {
     const localPairingResult = this.extractFoodWinePairings(userInput);
@@ -540,6 +580,14 @@ Output JSON matching the examples exactly with enhanced pairing recommendations:
         llmData.preferences = {
           ...llmData.preferences,
           pairingConfidence: localData.pairingConfidence
+        };
+      }
+
+      // Add wine characteristics from local pairing knowledge
+      if (localData.wineCharacteristics) {
+        llmData.wineCharacteristics = {
+          ...llmData.wineCharacteristics,
+          ...localData.wineCharacteristics
         };
       }
     }

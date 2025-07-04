@@ -16,7 +16,6 @@ import { ILogger } from '../../services/LLMService';
 @injectable()
 export class UserPreferenceController extends BaseController {
   constructor(
-    @inject(TYPES.KnowledgeGraphService) private readonly knowledgeGraphService: KnowledgeGraphService,
     @inject(TYPES.Logger) private logger: ILogger
   ) {
     super();
