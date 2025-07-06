@@ -123,7 +123,7 @@ export function setupContainer() {
   
   // Define PromptManagerConfig
   const promptManagerConfig: PromptManagerConfig = {
-    baseDir: path.join(__dirname, '../../prompts'), // Default to a 'prompts' directory outside of services
+    baseDir: path.join(__dirname, '../prompts'), // Default to a 'prompts' directory outside of services
     defaultVersion: 'v1',
     enableCaching: true,
     enableValidation: true,

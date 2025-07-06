@@ -1,9 +1,8 @@
-import { injectable, inject } from 'tsyringe';
+import { inject, injectable } from 'tsyringe';
+import { ILogger, TYPES } from '../di/Types';
 import { IWineRepository } from './interfaces/IWineRepository';
-import { Neo4jService } from './Neo4jService';
 import { Wine } from './models/Wine';
-import { TYPES } from '../di/Types';
-import { ILogger } from '../di/Types';
+import { Neo4jService } from './Neo4jService';
 
 @injectable()
 export class Neo4jWineRepository implements IWineRepository {

@@ -1,12 +1,10 @@
-import { injectable, inject } from 'tsyringe';
-import { TYPES } from '../di/Types';
-import { LLMService } from './LLMService';
-import { ILogger } from '../di/Types';
-import { Result } from '../core/types/Result';
+import { inject, injectable } from 'tsyringe';
 import { AgentError } from '../core/agents/AgentError';
 import { ConversationTurn } from '../core/ConversationHistoryService';
-import { PreferenceExtractionResultPayload, PreferenceExtractionResultPayloadSchema } from '../types/agent-outputs';
-import { z } from 'zod';
+import { Result } from '../core/types/Result';
+import { ILogger, TYPES } from '../di/Types';
+import { PreferenceExtractionResultPayload } from '../types/agent-outputs';
+import { LLMService } from './LLMService';
 
 // Enhanced interface for HTTP client
 interface IHttpClient {

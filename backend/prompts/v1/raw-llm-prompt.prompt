@@ -1,1 +1,8 @@
+---
+name: rawLlmPrompt
+description: A generic prompt for sending raw text to the LLM.
+version: 1.0.0
+input_schema: z.object({ promptContent: z.string() })
+output_schema: z.string()
+---
 {{promptContent}}

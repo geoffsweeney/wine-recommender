@@ -1,10 +1,9 @@
-import { CircuitBreaker, CircuitOptions } from '../core/CircuitBreaker';
 import { Driver, Record, Session } from 'neo4j-driver';
-import { injectable, inject } from 'tsyringe'; // Import injectable and inject
-import { TYPES } from '../di/Types'; // Import TYPES from centralized location
-import { ILogger } from '../di/Types'; // Import ILogger
-import { Result } from '../core/types/Result'; // Import Result
+import { inject, injectable } from 'tsyringe'; // Import injectable and inject
 import { AgentError } from '../core/agents/AgentError'; // Import AgentError
+import { CircuitBreaker, CircuitOptions } from '../core/CircuitBreaker';
+import { Result } from '../core/types/Result'; // Import Result
+import { ILogger, TYPES } from '../di/Types'; // Import TYPES from centralized location
 
 
 export interface INeo4jCircuitWrapper<T = Driver> {

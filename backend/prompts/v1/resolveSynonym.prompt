@@ -1,3 +1,10 @@
+---
+name: resolveSynonym
+description: Map user input to a canonical wine term.
+version: 1.0.0
+input_schema: z.object({ type: z.string(), synonym: z.string(), examples: z.string(), schema: z.string() })
+output_schema: z.object({ canonicalTerm: z.string().optional() })
+---
 Given the preference type "{{type}}" and the user's input "{{synonym}}", identify the most appropriate canonical term. The canonical term should be a standardized, widely recognized term within the wine domain for this preference. If the input is already a canonical term or cannot be mapped, return the input as is.
 
 Examples:

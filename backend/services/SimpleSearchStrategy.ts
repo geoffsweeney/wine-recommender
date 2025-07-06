@@ -1,9 +1,8 @@
-import { injectable, inject } from 'tsyringe';
-import { ISearchStrategy } from './interfaces/ISearchStrategy';
+import { inject, injectable } from 'tsyringe';
 import { SearchRequest } from '../api/dtos/SearchRequest.dto';
-import { ILogger } from '../di/Types';
-import { TYPES } from '../di/Types';
-import { IWineRepository } from './interfaces/IWineRepository'
+import { ILogger, TYPES } from '../di/Types';
+import { ISearchStrategy } from './interfaces/ISearchStrategy';
+import { IWineRepository } from './interfaces/IWineRepository';
 
 @injectable()
 export class SimpleSearchStrategy implements ISearchStrategy {

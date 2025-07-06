@@ -1,9 +1,8 @@
 import { inject, injectable } from 'tsyringe';
-import { Neo4jService } from './Neo4jService';
-import { RecommendationRequest } from '../api/dtos/RecommendationRequest.dto';
-import { WineNode, PreferenceNode, UserPreferences } from '../types'; // Import UserPreferences
-import { TYPES } from '../di/Types';
 import winston from 'winston';
+import { TYPES } from '../di/Types';
+import { UserPreferences, WineNode } from '../types'; // Import UserPreferences
+import { Neo4jService } from './Neo4jService';
 
 @injectable()
 export class KnowledgeGraphService {

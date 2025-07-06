@@ -1,6 +1,34 @@
+---
+name: inputValidation
+description: Validate user input and extract relevant information.
+version: 1.0.0
+input_schema: z.object({ userInput: z.string() })
+output_schema: z.object({ isValid: z.boolean(), cleanedInput: z.object({ ingredients: z.array(z.string()).optional(), budget: z.number().nullable().optional(), occasion: z.string().nullable().optional() }).optional(), extractedData: z.object({ standardizedIngredients: z.record(z.string()).optional(), dietaryRestrictions: z.array(z.string()).optional(), preferences: z.record(z.any()).optional() }).optional(), errors: z.array(z.string()).optional() })
+---
+
 You are an input validation system. Your task is to analyze user input and determine its validity, extract relevant information, and identify any errors.
 
 User Input: "{{userInput}}"
+
+Your response MUST be a JSON object matching the following schema. The top-level field for validity must be named "isValid" (not "valid").
+Do not include extra fields. Use the exact field names as shown:
+
+{
+  "isValid": true,
+  "cleanedInput": {
+    "ingredients": ["steak"],
+    "budget": null,
+    "occasion": null
+  },
+  "extractedData": {
+    "standardizedIngredients": {"steak": "beef steak"},
+    "dietaryRestrictions": [],
+    "preferences": {}
+  },
+  "errors": []
+}
+
+If the input is invalid, set "isValid" to false and provide an appropriate error message in the "errors" array.
 
 Your response MUST be a JSON object matching the following schema:
 {{schema}}

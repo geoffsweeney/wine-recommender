@@ -260,11 +260,11 @@ export class PromptManager {
   private async loadPrompts(): Promise<void> {
     try {
       const versions = await this.fileSystem.readdir(this.config.baseDir);
-      
+
       for (const version of versions) {
         const promptDir = this.path.join(this.config.baseDir, version);
         const stat = await this.fileSystem.stat(promptDir);
-        
+
         if (!stat.isDirectory()) continue;
 
         const template: Partial<PromptTemplate> = {};
@@ -275,17 +275,21 @@ export class PromptManager {
 
           const task = this.path.basename(file, '.prompt') as keyof PromptTemplate;
           const filePath = this.path.join(promptDir, file);
-          const content = await this.fileSystem.readFile(filePath, 'utf-8');
-          
-          const { template: templateContent, metadata } = this.parsePromptFile(content);
-          
-          template[task] = {
-            template: templateContent.trim(),
-            description: metadata?.description || '',
-            inputSchema: this.getInputSchemaForTask(task), // Use input_schema from mapping
-            outputSchema: this.getOutputSchemaForTask(task), // Use output_schema from mapping
-            metadata,
-          };
+          let content: string;
+          try {
+            content = await this.fileSystem.readFile(filePath, 'utf-8');
+            const { template: templateContent, metadata } = this.parsePromptFile(content);
+            template[task] = {
+              template: templateContent.trim(),
+              description: metadata?.description || '',
+              inputSchema: this.getInputSchemaForTask(task), // Use input_schema from mapping
+              outputSchema: this.getOutputSchemaForTask(task), // Use output_schema from mapping
+              metadata,
+            };
+          } catch (parseError) {
+            this.logger.error(`PromptManager: Error parsing prompt file: ${filePath}\n${parseError instanceof Error ? parseError.message : String(parseError)}`);
+            throw new Error(`Failed to load prompts: Error in file ${filePath}: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+          }
         }
 
         this.prompts[version] = template as PromptTemplate;
