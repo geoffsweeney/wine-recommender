@@ -30,6 +30,7 @@ The system is built on a modular, agent-based architecture, where different AI a
 
 *   **`SommelierCoordinator` (Orchestration Agent):** The central brain, orchestrating the entire workflow. It uses `sendMessageAndWaitForResponse` for critical steps where a response is expected, and `publishToAgent` for "fire and forget" messages.
 *   **`EnhancedAgentCommunicationBus`:** The central nervous system for all inter-agent communication. It handles message routing, manages `correlationId`s for request-response matching, and ensures callbacks are correctly managed. It automatically sends responses when handlers return a `Result` with data.
+*   **`PromptManager`:** A core service responsible for centralizing, versioning, and templating all LLM prompts. It ensures type-safe variable injection, direct schema validation, and efficient prompt retrieval through caching.
 *   **Specialized Agents:** (`InputValidationAgent`, `UserPreferenceAgent`, `LLMPreferenceExtractorAgent`, `RecommendationAgent`, `LLMRecommendationAgent`, `ShopperAgent`, `ExplanationAgent`, `FallbackAgent`) Each agent has a specific role and communicates with the `SommelierCoordinator` and other agents via the `EnhancedAgentCommunicationBus`.
 *   **`correlationId`:** A unique identifier crucial for linking requests to their corresponding responses across asynchronous agent interactions. It ensures that the correct callback is triggered when a response is received.
 *   **`conversationId`:** Maintains the overall context of a user's interaction across multiple turns and agent calls.
@@ -47,9 +48,10 @@ The system is designed with robustness in mind, incorporating several mechanisms
 
 *   **Intelligent Natural Language Processing:** Understands complex and nuanced user requests for wine recommendations.
 *   **Contextual and Personalized Recommendations:** Leverages user preferences, conversation history, and specific ingredients to provide highly relevant wine suggestions, now including detailed grape variety information.
-*   **LLM-Powered Core:** Integrates Large Language Models for advanced reasoning, preference extraction, and recommendation generation.
+*   **LLM-Powered Core & Structured Prompt Engineering:** Integrates Large Language Models for advanced reasoning, preference extraction, and recommendation generation, leveraging the `PromptManager` for structured, versioned, and type-safe prompt management with explicitly defined and directly mapped schemas.
 *   **Modular and Scalable Architecture:** The agent-based design allows for easy extension and maintenance of individual components.
 *   **Robust Error Handling:** Built-in mechanisms for fault tolerance and resilience ensure a stable user experience.
+*   **Comprehensive Testing:** Supported by a robust and extensive test suite, ensuring reliability and maintainability.
 *   **Transparent Explanations:** Provides clear reasons behind recommendations, fostering user trust and understanding.
 *   **Availability Awareness:** Attempts to recommend wines that are actually available, enhancing the practical utility of the recommendations.
 

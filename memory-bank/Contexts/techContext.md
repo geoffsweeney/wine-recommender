@@ -28,7 +28,9 @@
     - @modelcontextprotocol/sdk (MCP communication)
     - iron-session (Session management)
     - sql.js (SQLite database)
-    - zod (Validation)
+    - zod (Validation, now also for LLM prompt variables)
+    - fs/promises (Node.js built-in for asynchronous file system operations)
+    - path (Node.js built-in for handling and transforming file paths)
     - jest (Testing)
 
 ## Environment Variables

@@ -4,6 +4,7 @@ import { EnhancedAgentCommunicationBus } from './communication/EnhancedAgentComm
 import { AgentMessage, createAgentMessage } from './communication/AgentMessage';
 import { DeadLetterProcessor } from '../DeadLetterProcessor';
 import { LLMService } from '../../services/LLMService';
+import { PromptManager } from '../../services/PromptManager'; // Import PromptManager
 import { TYPES } from '../../di/Types';
 import winston from 'winston';
 import { Result } from '../types/Result';
@@ -12,6 +13,7 @@ import { LogContext } from '../../types/LogContext';
 import { RecommendationResult } from '../../types/agent-outputs';
 import { z } from 'zod'; // Import z for schema definition
 import { GrapeVariety } from '../../services/models/Wine'; // Import GrapeVariety
+import { UserPreferences } from '../../types'; // Import UserPreferences
 
 interface LLMRecommendationRequestPayload {
   preferences?: Record<string, any>;
@@ -48,6 +50,7 @@ export interface LLMRecommendationAgentConfig {
 export class LLMRecommendationAgent extends CommunicatingAgent {
   constructor(
     @inject(LLMService) private readonly llmService: LLMService,
+    @inject(TYPES.PromptManager) private readonly promptManager: PromptManager, // Inject PromptManager
     @inject(TYPES.DeadLetterProcessor) private readonly deadLetterProcessor: DeadLetterProcessor,
     @inject(TYPES.Logger) protected readonly logger: winston.Logger,
     @inject(EnhancedAgentCommunicationBus) private readonly injectedCommunicationBus: EnhancedAgentCommunicationBus,
@@ -115,10 +118,8 @@ export class LLMRecommendationAgent extends CommunicatingAgent {
 
   private async handleRecommendationRequest(message: AgentMessage<unknown>): Promise<Result<AgentMessage | null, AgentError>> {
     const correlationId = message.correlationId;
-    this.logger.info(`[${correlationId}] Processing recommendation request`, { 
-      agentId: this.id, 
-      operation: 'handleRecommendationRequest' 
-    });
+    const logContext: LogContext = { correlationId, agentId: this.id, operation: 'handleRecommendationRequest' };
+    this.logger.info(`[${correlationId}] Processing recommendation request`, logContext);
 
     try {
       const payload = message.payload as LLMRecommendationRequestPayload;
@@ -136,34 +137,39 @@ export class LLMRecommendationAgent extends CommunicatingAgent {
         return { success: false, error };
       }
 
-      const prompt = this.buildEnhancedPrompt(payload);
-      
-      // Log the prompt for debugging (consider removing in production)
-      this.logger.debug(`[${correlationId}] Generated prompt for LLM`, { 
-        agentId: this.id, 
-        promptLength: prompt.length,
+      const promptVariables = {
+        userPreferences: payload.preferences as UserPreferences || {},
+        conversationHistory: payload.conversationHistory || [],
+        priceRange: payload.priceRange,
+        occasion: payload.occasion,
+        wineStyle: payload.wineStyle,
+        bodyPreference: payload.bodyPreference,
+        sweetness: payload.sweetness,
+        // availableWines: payload.availableWines // Assuming availableWines might be passed in payload
+      };
+
+      // Log the prompt variables for debugging
+      this.logger.debug(`[${correlationId}] Prompt variables for LLM recommendation`, {
+        agentId: this.id,
+        promptVariables: promptVariables,
         hasPreferences: !!payload.preferences,
         hasIngredients: !!payload.ingredients,
         conversationLength: payload.conversationHistory?.length || 0
       });
 
       // Simulate an error for testing fallback
-      if (prompt.includes('simulate_error')) {
+      if (payload.message && payload.message.includes('simulate_error')) { // Check message payload for error simulation
         const error = new AgentError('Simulated LLM error for fallback test', 'SIMULATED_LLM_ERROR', this.id, correlationId, true);
         await this.deadLetterProcessor.process(message.payload, error, { source: this.id, stage: 'recommendation-simulated-error', correlationId });
         return { success: false, error };
       }
 
-      const llmResponseResult = await this.llmService.sendStructuredPrompt<RecommendationResult>(
-        prompt,
-        EnhancedRecommendationSchema,
-        null, // zodSchema is null
-        { // llmOptions
-          temperature: this.agentConfig.modelTemperature || 0.7,
-          num_predict: 2048 // Assuming a default num_predict if not specified in config
-        },
-        correlationId
-      );
+
+const llmResponseResult = await this.llmService.sendStructuredPrompt<"recommendWines", RecommendationResult>(
+  'recommendWines',
+  promptVariables,
+  logContext // Pass logContext
+);
 
       if (!llmResponseResult.success) {
         const error = new AgentError(
@@ -244,139 +250,6 @@ export class LLMRecommendationAgent extends CommunicatingAgent {
     }
   }
 
-  private buildEnhancedPrompt(payload: LLMRecommendationRequestPayload): string {
-    // Build a comprehensive system prompt with better structure and examples
-    const systemPrompt = this.buildSystemPrompt();
-    const contextSection = this.buildContextSection(payload);
-    const examplesSection = this.buildExamplesSection();
-    const requestSection = this.buildRequestSection(payload);
-    const outputInstructions = this.buildOutputInstructions();
-
-    return [
-      systemPrompt,
-      examplesSection,
-      contextSection,
-      requestSection,
-      outputInstructions
-    ].filter(section => section.trim()).join('\n\n');
-  }
-
-  private buildSystemPrompt(): string {
-    return `You are an expert sommelier with extensive knowledge of wines from around the world. Your role is to provide personalized wine recommendations based on user preferences, food pairings, budget constraints, and occasion requirements.
-
-Key principles for recommendations:
-- Always consider the user's stated preferences and constraints
-- Match wine characteristics to food if ingredients are provided
-- Respect budget limitations when specified
-- Provide specific wine names and producers when possible
-- Consider the occasion and setting
-- Explain your reasoning clearly and concisely
-- Be honest about confidence levels`;
-  }
-
-  private buildExamplesSection(): string {
-    return `## Examples of Good Recommendations:
-
-Example 1 - Food Pairing:
-User: "I'm making grilled salmon with lemon and herbs for dinner tonight"
-Response: {
-  "recommendations": [
-    { "name": "Sancerre Loire Valley", "grapeVarieties": [{ "name": "Sauvignon Blanc", "percentage": 100 }] },
-    { "name": "Chablis Premier Cru", "grapeVarieties": [{ "name": "Chardonnay", "percentage": 100 }] },
-    { "name": "Oregon Pinot Noir", "grapeVarieties": [{ "name": "Pinot Noir", "percentage": 100 }] }
-  ],
-  "confidence": 0.9,
-  "reasoning": "Sancerre's mineral acidity complements salmon's richness, while Chablis adds citrus harmony. Oregon Pinot Noir offers a light red option that pairs beautifully with grilled salmon.",
-  "pairingNotes": "The mineral notes in these wines enhance the fish while complementing the lemon and herbs.",
-  "alternatives": [
-    { "name": "Albariño", "grapeVarieties": [{ "name": "Albariño", "percentage": 100 }] },
-    { "name": "Grüner Veltliner", "grapeVarieties": [{ "name": "Grüner Veltliner", "percentage": 100 }] }
-  ]
-}
-
-Example 2 - Preference-based:
-User: "I love bold, full-bodied red wines under $25"
-Response: {
-  "recommendations": [
-    { "name": "Côtes du Rhône Villages", "grapeVarieties": [{ "name": "Grenache", "percentage": 70 }, { "name": "Syrah", "percentage": 30 }] },
-    { "name": "Spanish Garnacha", "grapeVarieties": [{ "name": "Garnacha", "percentage": 100 }] },
-    { "name": "Portuguese Douro Red", "grapeVarieties": [{ "name": "Touriga Nacional", "percentage": 50 }, { "name": "Touriga Franca", "percentage": 50 }] }
-  ],
-  "confidence": 0.85,
-  "reasoning": "These regions offer excellent value for bold, full-bodied reds with rich fruit and robust tannins within your budget.",
-  "pairingNotes": "Perfect with grilled meats, hearty stews, or aged cheeses.",
-  "alternatives": [
-    { "name": "Montepulciano d'Abruzzo", "grapeVarieties": [{ "name": "Montepulciano", "percentage": 100 }] },
-    { "name": "Côtes du Roussillon", "grapeVarieties": [{ "name": "Grenache", "percentage": 60 }, { "name": "Syrah", "percentage": 40 }] }
-  ]
-}`;
-  }
-
-  private buildContextSection(payload: LLMRecommendationRequestPayload): string {
-    let context = "## Current Request Context:";
-    
-    if (payload.conversationHistory && payload.conversationHistory.length > 0) {
-      context += "\n### Previous Conversation:";
-      payload.conversationHistory.slice(-3).forEach(turn => { // Only include last 3 turns
-        context += `\n${turn.role}: ${turn.content}`;
-      });
-    }
-
-    if (payload.preferences && Object.keys(payload.preferences).length > 0) {
-      context += `\n### User Preferences: ${JSON.stringify(payload.preferences, null, 2)}`;
-    }
-
-    if (payload.priceRange) {
-      context += `\n### Budget: $${payload.priceRange.min || 'any'} - $${payload.priceRange.max || 'any'}`;
-    }
-
-    if (payload.occasion) {
-      context += `\n### Occasion: ${payload.occasion}`;
-    }
-
-    return context;
-  }
-
-  private buildRequestSection(payload: LLMRecommendationRequestPayload): string {
-    let request = "## Current Request:";
-
-    if (payload.message) {
-      request += `\nUser Message: "${payload.message}"`;
-    }
-
-    if (payload.ingredients && payload.ingredients.length > 0) {
-      request += `\nFood/Ingredients: ${payload.ingredients.join(', ')}`;
-    }
-
-    if (payload.wineStyle && payload.wineStyle.length > 0) {
-      request += `\nPreferred Wine Styles: ${payload.wineStyle.join(', ')}`;
-    }
-
-    if (payload.bodyPreference) {
-      request += `\nBody Preference: ${payload.bodyPreference}`;
-    }
-
-    if (payload.sweetness) {
-      request += `\nSweetness Preference: ${payload.sweetness}`;
-    }
-
-    return request;
-  }
-
-  private buildOutputInstructions(): string {
-    const maxRecs = this.agentConfig.maxRecommendations || 3;
-    
-    return `## Instructions:
-Provide exactly ${maxRecs} specific wine recommendations in the JSON format below. 
-- Use specific wine names and producers when possible (e.g., "Kendall-Jackson Vintner's Reserve Chardonnay" rather than just "Chardonnay")
-- For each wine, include an array of \`grapeVarieties\` with \`name\` and \`percentage\`. If the percentage is not explicitly known, estimate it (e.g., 100% for single varietals, or an even split for blends if no other information is available).
-- Confidence should be between 0.1 and 1.0 based on how well the recommendations match the request
-- Reasoning should be 1-2 sentences explaining why these wines fit the request
-- Include pairing notes if food/ingredients are mentioned
-- Alternatives should be 2-3 backup options
-
-## Required JSON Output Format:`;
-  }
 
   private validateRecommendationResult(result: any, correlationId: string): { isValid: boolean; error?: string } {
     if (!result) {
@@ -450,8 +323,9 @@ export const EnhancedRecommendationSchema = z.object({
 });
 
 // Keep the original schema for backward compatibility
-export const RecommendationSchema = z.object({
-  recommendations: z.array(z.string()),
-  confidence: z.number(),
-  reasoning: z.string()
-});
+// The original RecommendationSchema is no longer needed as we are using the schema from PromptManager
+// export const RecommendationSchema = z.object({
+//   recommendations: z.array(z.string()),
+//   confidence: z.number(),
+//   reasoning: z.string()
+// });

@@ -1,16 +1,12 @@
-import { Router, Request, Response } from 'express';
+import { Request, Response, Router } from 'express';
+import { DependencyContainer } from 'tsyringe'; // Added DependencyContainer
 import { v4 as uuidv4 } from 'uuid';
-import { z } from 'zod'; // Import z for schema definition
-import { createAgentMessage, MessageTypes } from '../core/agents/communication/AgentMessage';
-import { DependencyContainer, container } from 'tsyringe'; // Added DependencyContainer
-import { TYPES } from '../di/Types';
 import { SommelierCoordinator } from '../core/agents/SommelierCoordinator';
+import { createAgentMessage, MessageTypes } from '../core/agents/communication/AgentMessage';
 import { EnhancedAgentCommunicationBus } from '../core/agents/communication/EnhancedAgentCommunicationBus';
-import type { Result } from '../core/types/Result';
-import type { AgentMessage } from '../core/agents/communication/AgentMessage';
-import type { AgentError } from '../core/agents/AgentError';
-import { validateRequest } from './middleware/validation'; // Import validation middleware
+import { TYPES } from '../di/Types';
 import { RecommendationRequest as RecommendationRequestSchema } from './dtos/RecommendationRequest.dto'; // Import the DTO schema
+import { validateRequest } from './middleware/validation'; // Import validation middleware
 
 // Define a local interface to extend Request with validatedBody/Query
 interface ValidatedRequest extends Request {
@@ -24,7 +20,6 @@ export default function createRouter(dependencyContainer: DependencyContainer): 
 
   // Resolve dependencies inside the function, so they are resolved when the function is called
   // and the container is properly configured.
-  const sommelierCoordinator = dependencyContainer.resolve<SommelierCoordinator>(TYPES.SommelierCoordinator);
   const communicationBus = dependencyContainer.resolve<EnhancedAgentCommunicationBus>(TYPES.AgentCommunicationBus);
 
   router.post(
@@ -38,11 +33,16 @@ export default function createRouter(dependencyContainer: DependencyContainer): 
         // req.validatedBody is now guaranteed to conform to RecommendationRequestSchema due to validation middleware
         const message = createAgentMessage(
           MessageTypes.ORCHESTRATE_RECOMMENDATION_REQUEST,
-          { userInput: req.validatedBody }, // Wrap validated body in userInput object
+          { // Wrap req.validatedBody in an OrchestrationInput object
+            userInput: req.validatedBody,
+            conversationId: conversationId,
+            correlationId: correlationId,
+            sourceAgent: 'api'
+          },
           'api',
           conversationId,
           correlationId,
-          'sommelier-coordinator' // Corrected target agent ID
+          'sommelier-coordinator'
         );
 
         const result = await communicationBus.sendMessageAndWaitForResponse(

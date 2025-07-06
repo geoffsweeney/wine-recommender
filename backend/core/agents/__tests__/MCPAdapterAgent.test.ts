@@ -1,9 +1,9 @@
 import { mockDeep } from 'jest-mock-extended';
 import { AgentError } from '../AgentError';
 import { MCPAdapterAgent, MCPAdapterAgentConfig } from '../MCPAdapterAgent';
-import { BasicDeadLetterProcessor } from '../../BasicDeadLetterProcessor';
+import { BasicDeadLetterProcessor } from '../../DeadLetterProcessor';
 import { EnhancedAgentCommunicationBus } from '../communication/EnhancedAgentCommunicationBus';
-import { MCPClient } from '@src/mcp/mcpClient';
+import { MCPClient } from '../../../mcp/mcpClient';
 import winston from 'winston';
 import { createAgentMessage } from '../communication/AgentMessage';
 

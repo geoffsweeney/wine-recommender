@@ -4,7 +4,7 @@ import { Request, Response } from 'express';
 import { IRecommendationStrategy } from '../../../services/interfaces/IRecommendationStrategy';
 import { ISearchStrategy } from '../../../services/interfaces/ISearchStrategy';
 import { LLMService } from '../../../services/LLMService';
-import { ILogger } from '../../../services/LLMService'; // Assuming ILogger is defined here or similar
+import { ILogger } from '../../../di/Types'; // Corrected import path for ILogger
 import { TYPES } from '../../../di/Types';
 import { mock } from 'jest-mock-extended';
 import { RecommendationRequest } from '../../dtos/RecommendationRequest.dto';

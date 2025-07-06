@@ -5,7 +5,7 @@ export const createMockLLMService = (): DeepMockProxy<LLMService> => {
   const mockLLMService = mockDeep<LLMService>();
 
   // Default mock implementation for sendPrompt
-  mockLLMService.sendPrompt.mockResolvedValue('Mocked LLM response');
+  mockLLMService.sendPrompt.mockResolvedValue({ success: true, data: 'Mocked LLM response' });
 
   return mockLLMService;
 };

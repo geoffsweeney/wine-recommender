@@ -2,7 +2,7 @@ import 'reflect-metadata';
 import { Neo4jService } from '../Neo4jService';
 import { mock, instance, when, anything, verify, reset, deepEqual } from 'ts-mockito';
 import { INeo4jCircuitWrapper } from '../Neo4jCircuitWrapper';
-import { ILogger } from '../LLMService';
+import { ILogger } from '../../di/Types';
 import neo4j from 'neo4j-driver';
 import { Record, QueryResult } from 'neo4j-driver';
 import { Result } from '../../core/types/Result'; // Import Result

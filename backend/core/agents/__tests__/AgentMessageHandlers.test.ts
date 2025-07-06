@@ -1,13 +1,14 @@
 import { mockDeep } from 'jest-mock-extended';
 import { container } from 'tsyringe';
-import { AgentMessage, createAgentMessage } from '../communication/AgentMessage';
-import { InputValidationAgent, InputValidationAgentConfig } from '../InputValidationAgent';
-import { BasicDeadLetterProcessor } from '../../BasicDeadLetterProcessor';
-import { LLMService } from '../../../services/LLMService'; // Corrected LLMService import path
-import { EnhancedAgentCommunicationBus } from '../communication/EnhancedAgentCommunicationBus';
 import winston from 'winston';
-import { AgentError } from '../AgentError';
 import { TYPES } from '../../../di/Types';
+import { LLMService } from '../../../services/LLMService'; // Corrected LLMService import path
+import { PromptManager } from '../../../services/PromptManager'; // Import PromptManager
+import { BasicDeadLetterProcessor } from '../../DeadLetterProcessor';
+import { AgentError } from '../AgentError';
+import { createAgentMessage } from '../communication/AgentMessage';
+import { EnhancedAgentCommunicationBus } from '../communication/EnhancedAgentCommunicationBus';
+import { InputValidationAgent, InputValidationAgentConfig } from '../InputValidationAgent';
 
 describe('Agent Message Handlers', () => {
   let mockBus: EnhancedAgentCommunicationBus;
@@ -32,8 +33,12 @@ describe('Agent Message Handlers', () => {
       maxIngredients: 5
     };
 
-    // Create a mock LLMService
+    // Create mocks for LLMService and PromptManager
     const mockLLMService = mockDeep<LLMService>();
+    const mockPromptManager = mockDeep<PromptManager>(); // Add mock for PromptManager
+    const mockLlmApiUrl = 'http://mock-llm-api.com'; // Mock the LLM API URL
+    const mockLlmModel = 'mock-model'; // Mock the LLM Model
+    const mockLlmApiKey = 'mock-api-key'; // Mock the LLM API Key
 
     // Register mocks with the container
     container.registerInstance(TYPES.AgentCommunicationBus, mockBus);
@@ -41,6 +46,10 @@ describe('Agent Message Handlers', () => {
     container.registerInstance(TYPES.Logger, mockLogger);
     container.registerInstance(TYPES.InputValidationAgentConfig, mockAgentConfig);
     container.registerInstance(TYPES.LLMService, mockLLMService); // Register mock LLMService
+    container.registerInstance(TYPES.PromptManager, mockPromptManager); // Register mock PromptManager
+    container.registerInstance(TYPES.LlmApiUrl, mockLlmApiUrl); // Register mock LLM API URL
+    container.registerInstance(TYPES.LlmModel, mockLlmModel); // Register mock LLM Model
+    container.registerInstance(TYPES.LlmApiKey, mockLlmApiKey); // Register mock LLM API Key
 
     // Resolve the agent from the container
     agent = container.resolve(InputValidationAgent);
@@ -68,7 +77,7 @@ describe('Agent Message Handlers', () => {
 
       const testMessage = createAgentMessage(
         'validate-input',
-        { wineType: 'red', priceRange: [20, 50] },
+        { userInput: 'red wine, 20-50', recommendationSource: 'test' },
         'test-sender',
         'test-conversation-id',
         'test-trace',
@@ -95,7 +104,7 @@ describe('Agent Message Handlers', () => {
 
       const testMessage = createAgentMessage(
         'validate-input',
-        { wineType: 'invalid', priceRange: [0, 0] },
+        { userInput: 'invalid wine type, price 0-0', recommendationSource: 'test' },
         'test-sender',
         'test-conversation-id',
         'test-trace',
@@ -118,7 +127,7 @@ describe('Agent Message Handlers', () => {
 
       const testMessage = createAgentMessage(
         'validate-input',
-        { input: "red wine" },
+        { userInput: "red wine", recommendationSource: 'test' },
         'test-sender',
         'test-conversation-id',
         'test-trace',
@@ -152,8 +161,8 @@ describe('Agent Message Handlers', () => {
       const testMessage = createAgentMessage(
         'validate-input',
         {
-          wineType: 'red',
-          priceRange: '20-30',
+          userInput: 'red wine, 20-30, dry, full-bodied',
+          recommendationSource: 'test',
           preferences: { sweetness: 'dry', body: 'full' }
         },
         'test-sender',

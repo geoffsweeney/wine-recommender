@@ -133,7 +133,7 @@ export class AgentCommunicationBus {
       return { success: false, error: new AgentError('LLMService not configured', 'LLM_SERVICE_NOT_CONFIGURED', 'AgentCommunicationBus', correlationId) };
     }
     try {
-      const llmResponseResult = await this.llmService.sendPrompt(prompt, correlationId);
+      const llmResponseResult = await this.llmService.sendPrompt('rawLlmPrompt', { promptContent: prompt }, { correlationId: correlationId });
       if (!llmResponseResult.success) {
         return { success: false, error: llmResponseResult.error };
       }

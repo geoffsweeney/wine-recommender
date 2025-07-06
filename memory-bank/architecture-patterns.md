@@ -65,6 +65,9 @@ const CACHE_TTL = {
   AGENT_RESPONSE: 300,     // 5 minutes
   CONVERSATION: 600        // 10 minutes
 } as const;
++
++// The PromptManager utilizes an in-memory cache for rendered prompts,
++// aligning with the L1 caching strategy for frequently accessed data.
 ```
 
 #### Database Access Patterns
@@ -105,6 +108,8 @@ interface ServiceError { // This is equivalent to the `AgentError` type defined 
   details?: Record<string, unknown>;
   statusCode: number;
 }
++
++// The PromptManager's methods consistently return `Result` types, adhering to this mandatory pattern.
 
 // Error Handling with Circuit Breakers for Services
 // Services interacting with external dependencies (databases, APIs) should utilize Circuit Breakers
@@ -466,4 +471,8 @@ function createTestMessage<T>(content: T): AgentMessage<T> {
     metadata: { testRun: true }
   };
 }
+
+**Jest Configuration and Mocking Best Practices:**
+*   **`jest.mock` Placement:** Always place `jest.mock` calls at the top level of the test file, outside of any `describe` or `beforeEach` blocks. This ensures mocks are correctly applied before test execution.
+*   **Explicit Jest Configuration:** When running specific test files, use the `--config` flag (e.g., `npx jest --config jest.config.backend.js <test_file_path>`) to explicitly specify the Jest configuration file. This prevents `rootDir` errors and ensures the correct configuration is used.
 ```

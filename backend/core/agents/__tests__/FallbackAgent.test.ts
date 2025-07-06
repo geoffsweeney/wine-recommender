@@ -1,8 +1,8 @@
 import { mockDeep } from 'jest-mock-extended';
 import { AgentError } from '../AgentError';
 import { FallbackAgent, FallbackAgentConfig } from '../FallbackAgent';
-import { BasicDeadLetterProcessor } from '../../BasicDeadLetterProcessor';
-import { LLMService } from '@src/services/LLMService';
+import { BasicDeadLetterProcessor } from '../../DeadLetterProcessor';
+import { LLMService } from '../../../services/LLMService';
 import winston from 'winston';
 import { createAgentMessage } from '../communication/AgentMessage';
 import { EnhancedAgentCommunicationBus } from '../communication/EnhancedAgentCommunicationBus';

@@ -8,28 +8,34 @@ import { TYPES } from '../../di/Types';
 import winston from 'winston';
 import { Result } from '../types/Result';
 import { AgentError } from './AgentError';
-import { LogContext } from '../../types/LogContext';
 import { UserPreferences } from '../../types'; // Import UserPreferences
+import { PromptManager } from '../../services/PromptManager'; // Import PromptManager
+import { z } from 'zod'; // Import Zod
 
 interface ExplanationMessagePayload {
-  recommendedWines: Array<{
-    id: string;
-    name: string;
-    region: string;
-    type: string;
-    price?: number;
-  }>;
-  recommendationContext: {
-    ingredients?: string[];
-    preferences?: UserPreferences; // Use stronger typing
-  };
-  userId?: string; // Keep userId in payload for now, will refactor later if needed
+  wineName: string | null;
+  ingredients: string[];
+  preferences: UserPreferences;
+  recommendationContext: any;
+  userId?: string;
 }
 
 // Define the configuration interface for ExplanationAgent
 export interface ExplanationAgentConfig {
   defaultExplanation: string;
 }
+
+// Define schemas directly in this file
+export const ExplanationInputSchema = z.object({
+  wineName: z.string().optional().nullable(),
+  ingredients: z.array(z.string()).optional(),
+  preferences: z.any().optional(), // UserPreferences schema is complex, using any for now
+  recommendationContext: z.any().optional(), // Full conversation state
+});
+
+export const ExplanationOutputSchema = z.object({
+  explanation: z.string().describe('A conversational explanation for the wine recommendation.'),
+});
 
 @injectable()
 export class ExplanationAgent extends CommunicatingAgent {
@@ -38,7 +44,8 @@ export class ExplanationAgent extends CommunicatingAgent {
     @inject(TYPES.DeadLetterProcessor) private readonly deadLetterProcessor: DeadLetterProcessor,
     @inject(TYPES.Logger) protected readonly logger: winston.Logger,
     @inject(EnhancedAgentCommunicationBus) private readonly injectedCommunicationBus: EnhancedAgentCommunicationBus,
-    @inject(TYPES.ExplanationAgentConfig) private readonly agentConfig: ExplanationAgentConfig // Inject agent config
+    @inject(TYPES.ExplanationAgentConfig) private readonly agentConfig: ExplanationAgentConfig, // Inject agent config
+    @inject(TYPES.PromptManager) private readonly promptManager: PromptManager // Inject PromptManager
   ) {
     const id = 'explanation-agent';
     const dependencies: CommunicatingAgentDependencies = {
@@ -68,7 +75,8 @@ export class ExplanationAgent extends CommunicatingAgent {
 
   protected validateConfig(config: ExplanationAgentConfig): void {
     if (!config.defaultExplanation) {
-      this.logger.warn(`[${this.id}] Default explanation is not provided in config.`, { agentId: this.id, operation: 'validateConfig' });
+      // Use this.dependencies.logger as this.logger is not yet assigned in BaseAgent constructor
+      this.dependencies.logger.warn(`[${this.id}] Default explanation is not provided in config.`, { agentId: this.id, operation: 'validateConfig' });
     }
   }
 
@@ -123,7 +131,7 @@ export class ExplanationAgent extends CommunicatingAgent {
     try {
       // Validate and cast payload
       const payload = message.payload as ExplanationMessagePayload;
-      if (!payload || typeof payload.recommendedWines === 'undefined' || typeof payload.recommendationContext === 'undefined') { // Basic validation
+      if (!payload || typeof payload.wineName === 'undefined' || typeof payload.recommendationContext === 'undefined') { // Basic validation
         const error = new AgentError('Invalid or missing payload in explanation request', 'MISSING_OR_INVALID_PAYLOAD', this.id, correlationId);
         await this.deadLetterProcessor.process(message.payload, error, { source: this.id, stage: 'explanation-validation', correlationId });
         this.logger.error(
@@ -138,22 +146,24 @@ export class ExplanationAgent extends CommunicatingAgent {
         return { success: false, error };
       }
       const explanation = await this.generateExplanation(
-        payload.recommendedWines,
+        payload.wineName,
+        payload.ingredients,
+        payload.preferences,
         payload.recommendationContext,
-        message
+        correlationId
       );
 
       const responseMessage = createAgentMessage(
         'explanation-response',
         {
           explanation,
-          recommendedWines: payload.recommendedWines,
-          userId: payload.userId // Pass userId from payload
+          wineName: payload.wineName,
+          userId: payload.userId
         },
         this.id,
-        message.conversationId, // Corrected: conversationId
-        correlationId, // Corrected: correlationId
-        message.sourceAgent // Corrected: targetAgent
+        message.conversationId,
+        correlationId,
+        message.sourceAgent
       );
       this.logger.info(
         '[ExplanationAgent] Explanation request processed successfully',
@@ -196,38 +206,68 @@ export class ExplanationAgent extends CommunicatingAgent {
     }
   }
 
-  private async generateExplanation(wines: any[], context: any, message: AgentMessage<unknown>): Promise<string> {
+  private async generateExplanation(
+    wineName: string | null,
+    ingredients: string[],
+    preferences: UserPreferences,
+    recommendationContext: any,
+    correlationId: string
+  ): Promise<string> {
     this.logger.info(
-      `[ExplanationAgent] Generating explanation for wines: ${wines.length} (message.correlationId: ${message.correlationId})`,
+      `[ExplanationAgent] Generating explanation for wine: ${wineName} (correlationId: ${correlationId})`,
       {
         agentId: this.id,
         operation: 'generateExplanation',
-        correlationId: message.correlationId // Keep full reference here since it's in generateExplanation
+        correlationId: correlationId
       }
     );
-    const prompt = `Given these wines: ${JSON.stringify(wines)} and context: ${JSON.stringify(context)}, generate a natural language explanation...`;
-    
+
+    const promptVariables = {
+      wineName,
+      ingredients,
+      preferences,
+      recommendationContext,
+    };
+
     try {
-      console.log(`[ExplanationAgent] DEBUG: Calling llmService.sendPrompt with prompt: ${prompt}`);
-      const llmResponseResult = await this.llmService.sendPrompt(prompt);
+      const explanationPromptResult = await this.promptManager.getPrompt('explanation', promptVariables);
+
+      if (!explanationPromptResult.success) {
+        throw new AgentError(
+          `Failed to get explanation prompt: ${explanationPromptResult.error.message}`,
+          'PROMPT_GENERATION_ERROR',
+          this.id,
+          correlationId
+        );
+      }
+
+      const llmResponseResult = await this.llmService.sendStructuredPrompt<
+        'explanation', // Task name
+        { explanation: string } // Explicitly define the expected output structure
+      >(
+        'explanation', // Task name
+        promptVariables, // Variables
+        { correlationId: correlationId } // Log context
+      );
+
       if (!llmResponseResult.success) {
         throw new AgentError(
           `LLM service returned error: ${llmResponseResult.error.message}`,
           'LLM_SERVICE_ERROR',
           this.id,
-          message.correlationId
+          correlationId
         );
       }
-      return llmResponseResult.data;
+      return llmResponseResult.data.explanation; // Assuming the output schema has an 'explanation' field
     } catch (error) {
       if (error instanceof AgentError) {
-        throw error; // Rethrow if already an AgentError
+        throw error;
       }
       throw new AgentError(
-        `LLM service error: ${error instanceof Error ? error.message : String(error)}`,
-        'LLM_SERVICE_EXCEPTION',
+        `Error generating explanation: ${error instanceof Error ? error.message : String(error)}`,
+        'EXPLANATION_GENERATION_ERROR',
         this.id,
-        message.correlationId
+        correlationId
       );
     }
   }

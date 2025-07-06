@@ -104,7 +104,7 @@ describe('Neo4jCircuitWrapper', () => {
         map: jest.fn(),
         slice: jest.fn(),
         toArray: jest.fn(),
-        toObject: jest.fn(() => ({ n: { properties: { id: 1 } } })),
+        toObject: jest.fn(() => ({ id: 1 })),
         getIdentity: jest.fn()
       } as unknown as Record;
       

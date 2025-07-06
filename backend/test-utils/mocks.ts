@@ -1,5 +1,6 @@
 import { LLMService } from '../services/LLMService';
-import { ILogger } from '../services/LLMService';
+import { ILogger } from '../di/Types';
+import { mock } from 'jest-mock-extended'; // Import mock
 
 import { INeo4jCircuitWrapper } from '../services/Neo4jCircuitWrapper';
 
@@ -10,16 +11,12 @@ type CircuitBreaker = {
 };
 
 export function createMockLLMService(): jest.Mocked<LLMService> {
+  const mockLogger = mock<ILogger>(); // Use mock from jest-mock-extended
   return {
     apiUrl: 'http://mock-llm-api',
     model: 'mock-model',
     apiKey: 'mock-api-key',
-    logger: {
-      info: jest.fn(),
-      error: jest.fn(),
-      warn: jest.fn(),
-      debug: jest.fn()
-    } as ILogger,
+    logger: mockLogger, // Assign the mocked logger
     sendPrompt: jest.fn(),
     generateCompletion: jest.fn(),
     generateEmbedding: jest.fn()

@@ -1,25 +1,24 @@
-import { FinalRecommendationPayload } from '../../types/agent-outputs';
-import { WineRecommendationOutput } from './LLMRecommendationAgent';
-import { singleton, inject } from 'tsyringe'; // Import singleton and inject decorator
+import { inject, singleton } from 'tsyringe'; // Import singleton and inject decorator
+import { ILogger, SommelierCoordinatorDependencies, TYPES } from '../../di/Types'; // Import SommelierCoordinatorDependencies and TYPES
+import { LLMService } from '../../services/LLMService'; // Import LLMService
+import { PromptManager } from '../../services/PromptManager'; // Import PromptManager
+import { FinalRecommendationPayload, PreferenceExtractionResultPayload, RecommendationResult, RecommendationResultSchema } from '../../types/agent-outputs';
+import { AgentError } from '../agents/AgentError'; // Corrected import path for AgentError
+import { CircuitBreaker } from '../CircuitBreaker';
+import { Result } from '../types/Result';
+import { Agent } from './Agent'; // Import Agent interface
 import { BaseAgent } from './BaseAgent';
 import { AgentMessage, MessageTypes, createAgentMessage } from './communication/AgentMessage';
-import { Result } from '../types/Result';
-import { AgentError } from '../agents/AgentError'; // Corrected import path for AgentError
-import { AgentDependencies, SommelierCoordinatorDependencies, TYPES } from '../../di/Types'; // Import SommelierCoordinatorDependencies and TYPES
-import { ILogger } from '../../di/Types'; // Import ILogger from Types.ts
-import { logger } from '../../utils/logger'; // Import the logger instance
 import { EnhancedAgentCommunicationBus } from './communication/EnhancedAgentCommunicationBus';
-import { CircuitBreaker } from '../CircuitBreaker';
-import { Agent } from './Agent'; // Import Agent interface
-import { PreferenceExtractionResultPayload, RecommendationResult } from '../../types/agent-outputs'; // Import RecommendationResult and PreferenceExtractionResultPayload
-import { WineNode } from '../../types'; // Import WineNode
+import { WineRecommendationOutput } from './LLMRecommendationAgent';
+// Removed RefineSuggestionsOutput as it's no longer needed
 
 // --- Type Definitions for SommelierCoordinator ---
 
 /**
  * Configuration for the SommelierCoordinator Agent.
  */
-interface SommelierCoordinatorConfig {
+export interface SommelierCoordinatorConfig { // Export the interface
   maxRecommendationAttempts: number;
   agentTimeoutMs: number;
   circuitBreakerFailureThreshold: number;
@@ -92,7 +91,9 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
   constructor(
     @inject(TYPES.SommelierCoordinatorId) id: string,
     @inject(TYPES.SommelierCoordinatorConfig) config: SommelierCoordinatorConfig,
-    @inject(TYPES.SommelierCoordinatorDependencies) dependencies: SommelierCoordinatorDependencies // Changed to SommelierCoordinatorDependencies
+    @inject(TYPES.SommelierCoordinatorDependencies) dependencies: SommelierCoordinatorDependencies, // Changed to SommelierCoordinatorDependencies
+    @inject(TYPES.PromptManager) private readonly promptManager: PromptManager, // Inject PromptManager
+    @inject(TYPES.LLMService) private readonly llmService: LLMService // Inject LLMService
   ) {
     super(id, config, dependencies);
     this.logger = dependencies.logger;
@@ -256,11 +257,20 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
       // Phase 1: Information Gathering (Parallel Execution)
       this.logger.info(`[${correlationId}] Phase 1: Gathering information in parallel...`, logContext);
       this.logger.debug(`[${correlationId}] Sending validation and preference messages.`, logContext);
+      this.logger.debug(`[${correlationId}] Validation message payload: ${JSON.stringify(userInput.input)}`, logContext); // Added log
       state.phase = 'VALIDATION_COMPLETE'; // Update phase after parallel operations are conceptually complete
 
       const validationResult = await this.sendMessageToAgentWithCircuitBreaker(
         'input-validation-agent',
-        createAgentMessage(MessageTypes.VALIDATE_INPUT, userInput.input, this.id, conversationId, this.generateCorrelationId(), 'input-validation-agent', userInput.userId)
+        createAgentMessage(
+          MessageTypes.VALIDATE_INPUT,
+          { userInput: userInput.input.message }, // Pass the message as userInput
+          this.id,
+          conversationId,
+          this.generateCorrelationId(),
+          'input-validation-agent',
+          userInput.userId
+        )
       );
 
       if (!validationResult.success) {
@@ -430,23 +440,48 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
             this.logger.info(`[${correlationId}] High quality recommendations generated.`, logContext);
             break;
           } else if (qualityScore > 0.6) {
-            this.logger.warn(`[${correlationId}] Moderate quality, attempting to refine recommendations...`, logContext);
-            const refinementMessage = createAgentMessage(MessageTypes.REFINE_RECOMMENDATIONS, {
-              input: {
-                currentRecommendations: recommendationsResult.data,
-                qualityIssues: this.identifyQualityIssues(recommendationsResult.data, state)
-              }
-            }, this.id, conversationId, this.generateCorrelationId(), 'Recommendation', userInput.userId);
-            this.logger.debug(`[${correlationId}] Sending refinement request.`, logContext);
-            const refinementResult = await this.sendMessageToAgentWithCircuitBreaker('recommendation-agent', refinementMessage);
-            this.logger.debug(`[${correlationId}] Received refinement result.`, logContext);
-            if (refinementResult.success) {
-              recommendationsResult = refinementResult; // Use refined recommendations
-              this.logger.info(`[${correlationId}] Recommendations refined successfully.`, logContext);
-              break;
+            this.logger.warn(`[${correlationId}] Moderate quality, attempting to refine recommendations using LLM...`, logContext);
+
+            const refinementInput = {
+              currentRecommendations: recommendationsResult.data.payload, // Pass the full recommendation result
+              reasoning: recommendationsResult.data.payload.reasoning, // Pass existing reasoning
+              userInput: userInput.input.message, // Pass original user input
+              conversationHistory: userInput.conversationHistory, // Pass conversation history
+              preferences: state.userPreferences, // Pass user preferences
+              ingredients: state.ingredients // Pass ingredients
+            };
+
+            const refinedResult = await this.llmService.sendStructuredPrompt<
+              'refineSuggestions',
+              RecommendationResult // Expect RecommendationResult as output
+            >(
+              'refineSuggestions',
+              refinementInput,
+              { ...logContext, operation: 'refineRecommendations' } // Pass logContext
+            );
+
+            if (refinedResult.success) {
+              // Update state with refined recommendations and reasoning
+              state.recommendations = refinedResult.data; // refinedResult.data is now RecommendationResult
+              state.confidence = refinedResult.data.confidence;
+              state.qualityScore = this.evaluateRecommendationQuality(refinedResult.data, state); // Re-evaluate quality
+              
+              state.decisions.push({
+                timestamp: Date.now(),
+                decision: 'Recommendations refined by LLM',
+                reasoning: refinedResult.data.reasoning || '', // Handle undefined reasoning
+                agent: this.id,
+                phase: state.phase
+              });
+
+              // Update recommendationsResult to reflect the refined recommendations for subsequent steps
+              recommendationsResult = { success: true, data: createAgentMessage(MessageTypes.GENERATE_RECOMMENDATIONS, refinedResult.data, this.id, conversationId, this.generateCorrelationId(), 'Recommendation', userInput.userId) };
+              
+              this.logger.info(`[${correlationId}] Recommendations refined successfully by LLM.`, logContext);
+              break; // Exit the loop as recommendations are refined
             } else {
-              state.errors.push(refinementResult.error);
-              this.logger.error(`[${correlationId}] Recommendation refinement failed: ${refinementResult.error.message}`, logContext);
+              state.errors.push(refinedResult.error);
+              this.logger.error(`[${correlationId}] LLM refinement failed: ${refinedResult.error.message}`, logContext);
             }
           } else {
             this.logger.warn(`[${correlationId}] Low quality recommendations, trying different approach...`, logContext);
@@ -694,16 +729,24 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
     }
  
     this.logger.debug(`[${correlationId}] Generating explanation for wine: ${wineName}`);
+
+    const promptVariables = {
+      wineName: wineName,
+      ingredients: ingredients,
+      preferences: preferences,
+      recommendationContext: state // Pass the full state as context
+    };
+
     const explanationMessage = createAgentMessage(MessageTypes.GENERATE_EXPLANATION, {
-      recommendedWines: wineName ? [wineName] : [], // Pass wine name as string
-      recommendationContext: {
-        ingredients: ingredients,
-        preferences: preferences
-      }
+      wineName: wineName,
+      ingredients: ingredients,
+      preferences: preferences,
+      recommendationContext: state, // Pass the full state as context
     }, this.id, state.conversationId, this.generateCorrelationId(), 'Explanation');
 
     const explanationResult = await this.sendMessageToAgentWithCircuitBreaker('explanation-agent', explanationMessage);
     if (explanationResult.success) {
+      // Assuming ExplanationAgent will return the explanation directly in its payload
       return explanationResult.data.explanation;
     } else {
       this.logger.error(`[${correlationId}] Failed to generate explanation: ${explanationResult.error.message}`);

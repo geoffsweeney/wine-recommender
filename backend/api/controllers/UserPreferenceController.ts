@@ -1,4 +1,7 @@
 import { Request, Response } from 'express';
+import { inject, injectable } from 'tsyringe';
+import { ILogger, TYPES } from '../../di/Types';
+import { BaseController } from '../BaseController';
 
 // Define a local interface to extend Request with validatedBody/Query/Params
 interface ValidatedRequest extends Request {
@@ -6,37 +9,45 @@ interface ValidatedRequest extends Request {
   validatedQuery?: any;
   validatedParams?: any;
 }
-import { injectable, inject } from 'tsyringe';
-import { BaseController } from '../BaseController';
-import { TYPES } from '../../di/Types';
-import { KnowledgeGraphService } from '../../services/KnowledgeGraphService';
-import { PreferenceNode } from '../../types';
-import { ILogger } from '../../services/LLMService';
 
 @injectable()
 export class UserPreferenceController extends BaseController {
   constructor(
-    @inject(TYPES.Logger) private logger: ILogger
+    @inject(TYPES.UserProfileService) private readonly userProfileService: any, // Use correct DI token
+    @inject(TYPES.Logger) private readonly logger: ILogger
   ) {
     super();
   }
 
-  protected async executeImpl(req: ValidatedRequest, res: Response): Promise<void> { // Cast req to ValidatedRequest
+  protected async executeImpl(req: ValidatedRequest, res: Response): Promise<void> {
     const { method } = req;
-    const userId = req.validatedParams.userId; // Use validatedParams
+    const userId = req.validatedParams.userId;
 
-    // No need for manual validation here, as it's handled by middleware
     if (!userId) {
       this.fail(res, 'User ID is required', 400);
       return;
     }
 
     switch (method) {
-      case 'GET':
-        // Since preferences are no longer persisted in Neo4j, return an empty array
-        this.ok(res, []);
+      case 'GET': {
+        try {
+          const preferences = await this.userProfileService.getPreferences(userId);
+          this.ok(res, preferences);
+        } catch (err) {
+          this.fail(res, err instanceof Error ? err : String(err), 500);
+        }
         break;
-
+      }
+      case 'POST': {
+        try {
+          const preferences = req.validatedBody;
+          await this.userProfileService.savePreferences(userId, preferences);
+          this.ok(res, { message: 'Preferences saved successfully' });
+        } catch (err) {
+          this.fail(res, err instanceof Error ? err : String(err), 500);
+        }
+        break;
+      }
       default:
         this.fail(res, 'Method not allowed', 405);
     }

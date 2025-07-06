@@ -48,7 +48,10 @@ describe('Agent Capabilities', () => {
       'conversational-recommendation',
       'preference-analysis',
       'ingredient-matching',
-      'confidence-scoring'
+      'confidence-scoring',
+      'food-pairing',
+      'budget-awareness',
+      'style-matching'
     ]);
   });
 
@@ -128,25 +131,48 @@ describe('Agent Capabilities', () => {
         }
       });
       
+      // Register ShopperAgentConfig
+      container.register(TYPES.ShopperAgentConfig, { useValue: {} });
+
       agentRegistry = container.resolve(AgentRegistry);
     });
 
     it('should register all agents with their capabilities', () => {
       agentRegistry.registerAgents(mockBus);
       
-      expect(mockBus.registerAgent).toHaveBeenCalledWith('InputValidationAgent', {
-        name: 'InputValidationAgent',
+      expect(mockBus.registerAgent).toHaveBeenCalledWith('InputValidationAgent', { // Use getName()
+        name: 'InputValidationAgent', // Use getName()
         capabilities: expect.arrayContaining([
           'input-validation',
-          'llm-integration'
+          'llm-integration',
+          'dead-letter-processing'
         ])
       });
       
-      expect(mockBus.registerAgent).toHaveBeenCalledWith('LLMRecommendationAgent', {
-        name: 'LLMRecommendationAgent',
+      expect(mockBus.registerAgent).toHaveBeenCalledWith('llm-recommendation-agent', { // Use getName()
+        name: 'llm-recommendation-agent', // Use getName()
         capabilities: expect.arrayContaining([
           'llm-recommendation',
-          'conversational-recommendation'
+          'conversational-recommendation',
+          'preference-analysis',
+          'ingredient-matching',
+          'confidence-scoring',
+          'food-pairing',
+          'budget-awareness',
+          'style-matching'
+        ])
+      });
+
+      expect(mockBus.registerAgent).toHaveBeenCalledWith('RecommendationAgent', { // Use getName()
+        name: 'RecommendationAgent', // Use getName()
+        capabilities: expect.arrayContaining([
+          'wine-recommendation',
+          'ingredient-matching',
+          'preference-matching',
+          'llm-enhancement',
+          'knowledge-graph-integration',
+          'hybrid-recommendation',
+          'contextual-recommendation'
         ])
       });
     });

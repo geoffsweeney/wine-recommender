@@ -1,159 +1,308 @@
-import { injectable, inject } from 'tsyringe';
-import { TYPES } from '../di/Types'; // Import the TYPES symbol
-import { Result } from '../core/types/Result'; // Import Result type
-import { AgentError } from '../core/agents/AgentError'; // Import AgentError
-import winston from 'winston'; // Import winston for logger type
-import { OllamaStructuredClient } from '../utils/ollama_structured_output'; // Import the new client
-import { z } from 'zod'; // Import Zod
-import { zodToJsonSchema } from 'zod-to-json-schema'; // Import zodToJsonSchema
+import { inject, injectable } from 'tsyringe';
+import { AgentError } from '../core/agents/AgentError';
+import { Result } from '../core/types/Result';
+import { ILogger, TYPES } from '../di/Types';
+import { LogContext } from '../types/LogContext';
+import { failure, success } from '../utils/result-utils';
+import { PromptManager, PromptTask, PromptTemplate, PromptVariables } from './PromptManager';
+import { z } from 'zod'; // Added import for Zod
 
-/**
- * Interface for logger dependency.
- */
-export interface ILogger extends winston.Logger {} // Extend winston.Logger for consistency
+interface OllamaChatResponse {
+  model: string;
+  created_at: string;
+  message: {
+    role: string;
+    content: string;
+  };
+  done: boolean;
+  total_duration: number;
+  load_duration: number;
+  prompt_eval_count: number;
+  prompt_eval_duration: number;
+  eval_count: number;
+  eval_duration: number;
+}
 
-/**
- * Service for interacting with the Language Model (LLM).
- * This service abstracts the specifics of the LLM provider.
- */
-interface LLMResponse {
-    response: string; // Ollama's generate API uses 'response' field for the output
+// Assuming these types exist for LLM configuration
+interface LLMServiceConfig {
+  apiUrl: string;
+  model: string;
+  apiKey: string; // Ollama typically doesn't use an API key, but keeping it for consistency
+}
+
+export interface ILLMService {
+  sendPrompt<T extends keyof PromptTemplate>(
+    task: T,
+    variables: PromptTemplate[T] extends PromptTask<infer V> ? V : PromptVariables,
+    logContext: LogContext
+  ): Promise<Result<string, AgentError>>;
+
+  sendStructuredPrompt<T extends keyof PromptTemplate, U>(
+    task: T,
+    variables: PromptTemplate[T] extends PromptTask<infer V> ? V : PromptVariables,
+    logContext: LogContext
+  ): Promise<Result<U, AgentError>>;
 }
 
 @injectable()
-export class LLMService {
-    private ollamaClient: OllamaStructuredClient; // Use the new structured client
-    private model: string;
-    private maxRetries: number;
-    private retryDelayMs: number;
+export class LLMService implements ILLMService {
+  private config: LLMServiceConfig;
 
-    constructor(
-        @inject(TYPES.LlmApiUrl) private apiUrl: string, // Keep apiUrl for OllamaStructuredClient
-        @inject(TYPES.LlmModel) model: string,
-        @inject(TYPES.LlmApiKey) apiKey: string = '',
-        @inject(TYPES.Logger) public logger: ILogger,
-        @inject(TYPES.LlmMaxRetries) maxRetries: number = 3, // Default to 3 retries
-        @inject(TYPES.LlmRetryDelayMs) retryDelayMs: number = 1000 // Default to 1000ms delay
-    ) {
-        this.model = model;
-        this.maxRetries = maxRetries;
-        this.retryDelayMs = retryDelayMs;
-        this.ollamaClient = new OllamaStructuredClient({
-            host: apiUrl,
-            model: model,
-            apiKey: apiKey,
-            temperature: 0.7, // Default temperature for structured output
-            numPredict: 2048, // Default num_predict
-            defaultOptions: {
-                top_p: 0.9,
-                repeat_penalty: 1.1
-            }
+  constructor(
+    @inject(TYPES.PromptManager) private promptManager: PromptManager,
+    @inject(TYPES.Logger) private logger: ILogger,
+    @inject(TYPES.LlmApiUrl) apiUrl: string,
+    @inject(TYPES.LlmModel) model: string,
+    @inject(TYPES.LlmApiKey) apiKey: string,
+  ) {
+    this.config = { apiUrl, model, apiKey };
+  }
+
+  public async sendPrompt<T extends keyof PromptTemplate>(
+    task: T,
+    variables: PromptTemplate[T] extends PromptTask<infer V> ? V : PromptVariables,
+    logContext: LogContext
+  ): Promise<Result<string, AgentError>> {
+    const startTime = Date.now();
+    this.logger.info('Sending LLM prompt', { ...logContext, task: String(task) });
+
+    try {
+      await this.promptManager.ensureLoaded();
+
+      const systemPromptResult = await this.promptManager.getSystemPrompt();
+      const promptResult = await this.promptManager.getPrompt(task, variables);
+
+      if (!promptResult.success) {
+        this.logger.error('Failed to get prompt from PromptManager', {
+          ...logContext,
+          task: String(task),
+          error: promptResult.error.message,
         });
-        this.logger.info(`LLMService initialized for Ollama at ${this.apiUrl} with model: ${this.model}, maxRetries: ${this.maxRetries}, retryDelayMs: ${this.retryDelayMs}`);
+        return failure(
+          new AgentError(
+            `Failed to get prompt for task ${String(task)}: ${promptResult.error.message}`,
+            'LLM_PROMPT_ERROR',
+            'LLMService',
+            logContext.correlationId || 'unknown',
+            true, // Recoverable
+          ),
+        );
+      }
+
+      const fullPrompt = promptResult.data;
+
+      const llmResponse = await this.callLlmApi(systemPromptResult, fullPrompt, logContext);
+
+      this.logger.info('LLM prompt sent successfully', {
+        ...logContext,
+        task: String(task),
+        duration: Date.now() - startTime,
+      });
+
+      return success(llmResponse);
+    } catch (error) {
+      this.logger.error('Error sending LLM prompt', {
+        ...logContext,
+        task: String(task),
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      return failure(
+        new AgentError(
+          `Error sending LLM prompt for task ${String(task)}: ${error instanceof Error ? error.message : String(error)}`,
+          'LLM_API_CALL_FAILED',
+          'LLMService',
+          logContext.correlationId || 'unknown',
+          true, // Recoverable
+          { originalError: error instanceof Error ? error.message : String(error) },
+        ),
+      );
+    }
+  }
+
+  public async sendStructuredPrompt<T extends keyof PromptTemplate, U>(
+    task: T,
+    variables: PromptTemplate[T] extends PromptTask<infer V> ? V : PromptVariables,
+    logContext: LogContext
+  ): Promise<Result<U, AgentError>> {
+    const startTime = Date.now();
+    this.logger.debug(`LLMService: Entering sendStructuredPrompt. Task: ${String(task)}, Raw Variables: ${JSON.stringify(variables)}`);
+    this.logger.info('Sending structured LLM prompt', { ...logContext, task: String(task) });
+    this.logger.debug(`LLMService: sendStructuredPrompt called with task: ${String(task)}, variables: ${JSON.stringify(variables)}`); // Existing log
+
+    await this.promptManager.ensureLoaded();
+
+    const outputSchema = this.promptManager.getOutputSchemaForTask(task);
+    if (!outputSchema) {
+      this.logger.error(`No output schema found for task ${String(task)}`, { ...logContext, task: String(task) });
+      return failure(
+        new AgentError(
+          `No output schema found for task ${String(task)}`,
+          'LLM_STRUCTURED_PROMPT_ERROR',
+          'LLMService',
+          logContext.correlationId || 'unknown',
+          false, // Not recoverable, as schema is missing
+        ),
+      );
     }
 
-    /**
-     * Sends a prompt to the LLM and returns the response.
-     * Implements basic retry logic.
-     * @param prompt The prompt to send to the LLM.
-     * @param correlationId The correlation ID for tracing.
-     * @returns A promise that resolves with a Result containing the LLM's response (string) or an AgentError.
-     */
-    /**
-     * Sends an unstructured prompt to the LLM and returns the raw string response.
-     * This method is for general text generation, not structured output.
-     * @param prompt The prompt to send to the LLM.
-     * @param correlationId The correlation ID for tracing.
-     * @returns A promise that resolves with a Result containing the LLM's response (string) or an AgentError.
-     */
-    async sendPrompt(prompt: string, correlationId: string = 'N/A'): Promise<Result<string, AgentError>> {
-        this.logger.debug(`Sending unstructured prompt to LLM: ${prompt} (Correlation ID: ${correlationId})`);
-        this.logger.info(`LLM Call (unstructured): Model - ${this.model}, Prompt Length - ${prompt.length} characters. Correlation ID: ${correlationId}`);
- 
-        try {
-            const response = await this.ollamaClient.ollama.generate({
-                model: this.model,
-                prompt: prompt,
-                stream: false,
-                options: {
-                    temperature: this.ollamaClient.defaultOptions.temperature,
-                    num_predict: this.ollamaClient.defaultOptions.num_predict
-                }
-            });
- 
-            if (response && response.response) {
-                this.logger.debug(`Received unstructured Ollama response: ${response.response}`);
-                this.logger.info(`LLM Response (unstructured): Length - ${response.response.length} characters.`);
-                return { success: true, data: response.response };
-            } else {
-                this.logger.error(`Invalid unstructured response format from Ollama API (Correlation ID: ${correlationId})`);
-                return { success: false, error: new AgentError('Invalid unstructured response format from Ollama API', 'LLM_INVALID_RESPONSE_FORMAT', 'LLMService', correlationId, true, { responseBody: response }) };
-            }
-        } catch (error: unknown) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            this.logger.error(`Error sending unstructured prompt to LLM: ${errorMessage} (Correlation ID: ${correlationId})`);
-            return { success: false, error: new AgentError(`Error in LLMService (unstructured): ${errorMessage}`, 'LLM_UNEXPECTED_ERROR', 'LLMService', correlationId, false, { originalError: errorMessage }) };
-        }
+    try {
+      await this.promptManager.ensureLoaded();
+
+      const systemPromptResult = await this.promptManager.getSystemPrompt();
+      const promptResult = await this.promptManager.getPrompt(task, variables);
+
+      if (!promptResult.success) {
+        this.logger.error('Failed to get prompt from PromptManager for structured output', {
+          ...logContext,
+          task: String(task),
+          error: promptResult.error.message,
+        });
+        return failure(
+          new AgentError(
+            `Failed to get structured prompt for task ${String(task)}: ${promptResult.error.message}`,
+            'LLM_STRUCTURED_PROMPT_ERROR',
+            'LLMService',
+            logContext.correlationId || 'unknown',
+            true, // Recoverable
+          ),
+        );
+      }
+
+      const fullPrompt = promptResult.data;
+
+      const llmResponse = await this.callStructuredLlmApi(systemPromptResult, fullPrompt, logContext);
+
+      // Validate the LLM response against the provided outputSchema
+      try {
+        this.logger.debug(`LLMService: Raw LLM response before validation: ${JSON.stringify(llmResponse)}`, logContext);
+        const parsedResponse = outputSchema.parse(llmResponse);
+        this.logger.info('Structured LLM prompt sent successfully and response validated', {
+          ...logContext,
+          task: String(task),
+          duration: Date.now() - startTime,
+        });
+        return success(parsedResponse as U);
+      } catch (validationError) {
+        this.logger.error('Invalid LLM response: Failed to validate against output schema', {
+          ...logContext,
+          task: String(task),
+          error: validationError instanceof Error ? validationError.message : String(validationError),
+          response: llmResponse,
+        });
+        return failure(
+          new AgentError(
+            `Invalid LLM response: Failed to validate against output schema: ${validationError instanceof Error ? validationError.message : String(validationError)}`,
+            'LLM_RESPONSE_VALIDATION_ERROR',
+            'LLMService',
+            logContext.correlationId || 'unknown',
+            true, // Recoverable
+            { originalError: validationError instanceof Error ? validationError.message : String(validationError) },
+          ),
+        );
+      }
+    } catch (error) {
+      this.logger.error('Error sending structured LLM prompt', {
+        ...logContext,
+        task: String(task),
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      return failure(
+        new AgentError(
+          `Error sending structured LLM prompt for task ${String(task)}: ${error instanceof Error ? error.message : String(error)}`,
+          'LLM_STRUCTURED_API_CALL_FAILED',
+          'LLMService',
+          logContext.correlationId || 'unknown',
+          true, // Recoverable
+          { originalError: error instanceof Error ? error.message : String(error) },
+        ),
+      );
     }
- 
-    /**
-     * Sends a structured prompt to the LLM with a JSON schema and returns the parsed object.
-     * @param prompt The prompt to send to the LLM.
-     * @param schema The JSON schema for the expected output.
-     * @param zodSchema Optional Zod schema for additional validation.
-     * @param correlationId The correlation ID for tracing.
-     * @returns A promise that resolves with a Result containing the parsed LLM's response (object) or an AgentError.
-     */
-    async sendStructuredPrompt<T>(prompt: string, schema: object | z.ZodObject<any, any, any>, zodSchema: z.ZodObject<any, any, any> | null = null, llmOptions: { temperature?: number; num_predict?: number } = {}, correlationId: string = 'N/A'): Promise<Result<T, AgentError>> {
-        let jsonSchema: object;
-        let validationSchema: z.ZodObject<any, any, any> | null;
+  }
 
-        if (schema instanceof z.ZodObject) {
-            jsonSchema = zodToJsonSchema(schema); // Convert Zod schema to JSON schema
-            validationSchema = schema;
-        } else {
-            jsonSchema = schema;
-            validationSchema = zodSchema;
-        }
+  private async callLlmApi(systemPrompt: string, userPrompt: string, logContext: LogContext): Promise<string> {
+    try {
+      const response = await fetch(`${this.config.apiUrl}/api/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          // 'Authorization': `Bearer ${this.config.apiKey}`, // Ollama typically doesn't use API keys
+        },
+        body: JSON.stringify({
+          model: this.config.model,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
+          stream: false, // We want a single response
+        }),
+      });
 
-        this.logger.debug(`Sending structured prompt to LLM: ${prompt} (Correlation ID: ${correlationId}) with schema: ${JSON.stringify(jsonSchema)}`);
-        this.logger.info(`LLM Call (structured): Model - ${this.model}, Prompt Length - ${prompt.length} characters. Correlation ID: ${correlationId}`);
- 
-        try {
-            const parsedResponse = await this.ollamaClient.generateStructured(prompt, jsonSchema, validationSchema, {
-                options: {
-                    temperature: llmOptions.temperature !== undefined ? llmOptions.temperature : this.ollamaClient.defaultOptions.temperature,
-                    num_predict: llmOptions.num_predict !== undefined ? llmOptions.num_predict : 4096 // Increased num_predict
-                }
-            });
-            this.logger.debug(`Received structured Ollama response: ${JSON.stringify(parsedResponse)}`);
-            this.logger.info(`LLM Response (structured): Length - ${JSON.stringify(parsedResponse).length} characters.`);
-            // Create a new object to ensure type safety and add missing fields
-            const finalResponse: any = {
-                recommendations: parsedResponse.recommendations || [],
-                confidence: parsedResponse.confidence === undefined || parsedResponse.confidence === null ? 0 : parsedResponse.confidence,
-                reasoning: parsedResponse.reasoning || "No reasoning provided.",
-                pairingNotes: parsedResponse.pairingNotes || "",
-                alternatives: parsedResponse.alternatives || [],
-                primaryRecommendation: null // Default to null
-            };
+      if (!response.ok) {
+        const errorBody = await response.text();
+        throw new Error(`Ollama API call failed with status ${response.status}: ${errorBody}`);
+      }
 
-            if (finalResponse.recommendations && finalResponse.recommendations.length > 0) {
-                finalResponse.primaryRecommendation = finalResponse.recommendations[0];
-            }
-
-            // Now, cast to the expected type T
-            return { success: true, data: finalResponse as T };
-        } catch (error: unknown) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            this.logger.error(`Error sending structured prompt to LLM: ${errorMessage} (Correlation ID: ${correlationId})`);
-            
-            // Check for JSON parsing errors specifically
-            if (errorMessage.includes('JSON') && (errorMessage.includes('Unterminated string') || errorMessage.includes('Expected'))) {
-                return { success: false, error: new AgentError(`LLM returned malformed JSON: ${errorMessage}`, 'LLM_MALFORMED_JSON', 'LLMService', correlationId, true, { originalError: errorMessage }) };
-            }
-
-            return { success: false, error: new AgentError(`Error in LLMService (structured): ${errorMessage}`, 'LLM_UNEXPECTED_ERROR', 'LLMService', correlationId, false, { originalError: errorMessage }) };
-        }
+      const data = (await response.json()) as OllamaChatResponse;
+      return data.message.content;
+    } catch (error) {
+      this.logger.error('Error during Ollama API call', {
+        ...logContext,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      throw error; // Re-throw to be caught by the calling method
     }
+  }
+
+  private async callStructuredLlmApi(systemPrompt: string, userPrompt: string, logContext: LogContext): Promise<any> {
+    try {
+      const response = await fetch(`${this.config.apiUrl}/api/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          // 'Authorization': `Bearer ${this.config.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: this.config.model,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
+          format: 'json', // Request JSON format
+          stream: false,
+          // Ollama doesn't directly support 'response_model' like some other LLMs,
+          // but 'format: "json"' combined with a good system prompt usually suffices.
+          // If a specific JSON schema validation is needed, it would be done client-side.
+        }),
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.text();
+        throw new Error(`Ollama structured API call failed with status ${response.status}: ${errorBody}`);
+      }
+
+      const data = (await response.json()) as OllamaChatResponse;
+      // Ollama returns the JSON object directly in data.message.content if format: 'json' is used.
+      // It might be a stringified JSON, so we need to parse it.
+      try {
+        return JSON.parse(data.message.content);
+      } catch (parseError) {
+        this.logger.error('Failed to parse structured LLM response as JSON', {
+          ...logContext,
+          responseContent: data.message.content,
+          error: parseError instanceof Error ? parseError.message : String(parseError),
+        });
+        throw new Error('Invalid JSON response from LLM');
+      }
+    } catch (error) {
+      this.logger.error('Error during Ollama structured API call', {
+        ...logContext,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      throw error; // Re-throw to be caught by the calling method
+    }
+  }
 }

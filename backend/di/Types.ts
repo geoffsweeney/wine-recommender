@@ -1,9 +1,10 @@
 import winston from 'winston';
-import { LLMRecommendationAgentConfig } from '../core/agents/LLMRecommendationAgent'; // Import LLMRecommendationAgentConfig
 
 export const TYPES = {
     // Core infrastructure
     Logger: Symbol.for('Logger'),
+    FileSystem: Symbol.for('FileSystem'),
+    Path: Symbol.for('Path'),
     HttpClient: Symbol.for('HttpClient'),
     CircuitOptions: Symbol.for('CircuitOptions'),
     CircuitBreaker: Symbol.for('CircuitBreaker'),
@@ -41,6 +42,9 @@ export const TYPES = {
     KnowledgeGraphService: Symbol.for('KnowledgeGraphService'),
     PreferenceExtractionService: Symbol.for('PreferenceExtractionService'),
     PreferenceNormalizationService: Symbol.for('PreferenceNormalizationService'),
+    RecommendationService: Symbol.for('RecommendationService'), // Added RecommendationService
+    PromptManager: Symbol.for('PromptManager'),
+    PromptManagerConfig: Symbol.for('PromptManagerConfig'), // Added
     WineRepository: Symbol.for('WineRepository'),
     WineService: Symbol.for('WineService'),
     
@@ -103,9 +107,9 @@ export interface AgentDependencies {
 }
 
 import { EnhancedAgentCommunicationBus } from '../core/agents/communication/EnhancedAgentCommunicationBus';
+import { ConversationHistoryService } from '../core/ConversationHistoryService';
 import { DeadLetterProcessor } from '../core/DeadLetterProcessor';
 import { UserProfileService } from '../services/UserProfileService';
-import { ConversationHistoryService } from '../core/ConversationHistoryService';
 
 export interface SommelierCoordinatorDependencies extends AgentDependencies {
   communicationBus: EnhancedAgentCommunicationBus;

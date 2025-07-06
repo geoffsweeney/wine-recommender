@@ -3,7 +3,7 @@ import { IWineRepository } from './interfaces/IWineRepository';
 import { Neo4jService } from './Neo4jService';
 import { Wine } from './models/Wine';
 import { TYPES } from '../di/Types';
-import { ILogger } from './LLMService'; // Assuming ILogger is defined here or similar
+import { ILogger } from '../di/Types';
 
 @injectable()
 export class Neo4jWineRepository implements IWineRepository {

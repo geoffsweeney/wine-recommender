@@ -1,12 +1,12 @@
-import request from 'supertest';
 import express, { Express } from 'express';
-import { container, DependencyContainer } from 'tsyringe';
-import { TYPES } from '../../../di/Types';
-import createRouter from '../../routes';
+import { mock } from 'jest-mock-extended';
+import request from 'supertest';
+import { container } from 'tsyringe';
+import { MessageTypes } from '../../../core/agents/communication/AgentMessage';
 import { EnhancedAgentCommunicationBus } from '../../../core/agents/communication/EnhancedAgentCommunicationBus';
 import { SommelierCoordinator } from '../../../core/agents/SommelierCoordinator';
-import { mock } from 'jest-mock-extended';
-import { AgentMessage, MessageTypes } from '../../../core/agents/communication/AgentMessage';
+import { TYPES } from '../../../di/Types';
+import createRouter from '../../routes';
 
 describe('End-to-End Recommendation API', () => {
   let app: Express;
@@ -79,14 +79,18 @@ describe('End-to-End Recommendation API', () => {
         'sommelier-coordinator',
         expect.objectContaining({
           type: MessageTypes.ORCHESTRATE_RECOMMENDATION_REQUEST,
-          payload: {
+          payload: expect.objectContaining({
             userInput: expect.objectContaining({
               userId: 'user-steak',
               input: expect.objectContaining({
                 message: 'I am having a juicy steak tonight. What wine should I drink?',
-              }),
+                recommendationSource: 'knowledgeGraph'
+              })
             }),
-          },
+            conversationId: expect.any(String),
+            correlationId: expect.any(String),
+            sourceAgent: 'api',
+          })
         })
       );
     });
@@ -128,14 +132,18 @@ describe('End-to-End Recommendation API', () => {
         'sommelier-coordinator',
         expect.objectContaining({
           type: MessageTypes.ORCHESTRATE_RECOMMENDATION_REQUEST,
-          payload: {
+          payload: expect.objectContaining({
             userInput: expect.objectContaining({
               userId: 'user-chicken',
               input: expect.objectContaining({
                 message: 'What wine goes well with roasted chicken?',
-              }),
+                recommendationSource: 'knowledgeGraph'
+              })
             }),
-          },
+            conversationId: expect.any(String),
+            correlationId: expect.any(String),
+            sourceAgent: 'api',
+          })
         })
       );
     });
@@ -177,14 +185,18 @@ describe('End-to-End Recommendation API', () => {
         'sommelier-coordinator',
         expect.objectContaining({
           type: MessageTypes.ORCHESTRATE_RECOMMENDATION_REQUEST,
-          payload: {
+          payload: expect.objectContaining({
             userInput: expect.objectContaining({
               userId: 'user-seafood',
               input: expect.objectContaining({
                 message: 'I am making grilled salmon, any wine suggestions?',
-              }),
+                recommendationSource: 'knowledgeGraph'
+              })
             }),
-          },
+            conversationId: expect.any(String),
+            correlationId: expect.any(String),
+            sourceAgent: 'api',
+          })
         })
       );
     });
@@ -226,14 +238,18 @@ describe('End-to-End Recommendation API', () => {
         'sommelier-coordinator',
         expect.objectContaining({
           type: MessageTypes.ORCHESTRATE_RECOMMENDATION_REQUEST,
-          payload: {
+          payload: expect.objectContaining({
             userInput: expect.objectContaining({
               userId: 'user-cheese',
               input: expect.objectContaining({
                 message: 'What wine should I serve with a cheese platter?',
-              }),
+                recommendationSource: 'knowledgeGraph'
+              })
             }),
-          },
+            conversationId: expect.any(String),
+            correlationId: expect.any(String),
+            sourceAgent: 'api',
+          })
         })
       );
     });

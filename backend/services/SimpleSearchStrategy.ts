@@ -1,7 +1,7 @@
 import { injectable, inject } from 'tsyringe';
 import { ISearchStrategy } from './interfaces/ISearchStrategy';
 import { SearchRequest } from '../api/dtos/SearchRequest.dto';
-import { ILogger } from '../services/LLMService';
+import { ILogger } from '../di/Types';
 import { TYPES } from '../di/Types';
 import { IWineRepository } from './interfaces/IWineRepository'
 

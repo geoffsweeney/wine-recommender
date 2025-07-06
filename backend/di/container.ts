@@ -1,40 +1,41 @@
+import axios from 'axios'; // Import axios
+import * as fs from 'fs/promises'; // Import fs/promises
+import neo4j from 'neo4j-driver';
+import * as path from 'path'; // Import path
 import 'reflect-metadata';
 import { container, DependencyContainer } from 'tsyringe';
-import { Driver } from 'neo4j-driver';
-import neo4j from 'neo4j-driver';
 import winston from 'winston';
-import axios from 'axios'; // Import axios
-import { TYPES } from './Types';
-import { Neo4jCircuitWrapper } from '../services/Neo4jCircuitWrapper';
-import { Neo4jService } from '../services/Neo4jService';
-import { CircuitOptions } from '../core/CircuitBreaker';
-import { LLMService } from '../services/LLMService';
-import { KnowledgeGraphService } from '../services/KnowledgeGraphService';
-import { PreferenceExtractionService } from '../services/PreferenceExtractionService';
-import { PreferenceNormalizationService } from '../services/PreferenceNormalizationService';
+import { AgentRegistry } from '../core/agents/AgentRegistry';
 import { EnhancedAgentCommunicationBus } from '../core/agents/communication/EnhancedAgentCommunicationBus';
-import { SommelierCoordinator } from '../core/agents/SommelierCoordinator';
-import { InputValidationAgent } from '../core/agents/InputValidationAgent';
-import { ValueAnalysisAgent } from '../core/agents/ValueAnalysisAgent';
-import { LLMRecommendationAgent } from '../core/agents/LLMRecommendationAgent';
-import { UserPreferenceAgent } from '../core/agents/UserPreferenceAgent';
-import { RecommendationAgent } from '../core/agents/RecommendationAgent';
 import { ExplanationAgent } from '../core/agents/ExplanationAgent';
 import { FallbackAgent } from '../core/agents/FallbackAgent';
+import { InputValidationAgent } from '../core/agents/InputValidationAgent';
 import { LLMPreferenceExtractorAgent } from '../core/agents/LLMPreferenceExtractorAgent';
+import { LLMRecommendationAgent } from '../core/agents/LLMRecommendationAgent';
 import { MCPAdapterAgent } from '../core/agents/MCPAdapterAgent';
+import { RecommendationAgent } from '../core/agents/RecommendationAgent';
 import { ShopperAgent } from '../core/agents/ShopperAgent'; // Import ShopperAgent
-import { AgentRegistry } from '../core/agents/AgentRegistry';
-import { CommunicatingAgent } from '../core/agents/CommunicatingAgent';
-import { UserProfileService } from '../services/UserProfileService';
+import { SommelierCoordinator } from '../core/agents/SommelierCoordinator';
+import { UserPreferenceAgent } from '../core/agents/UserPreferenceAgent';
+import { ValueAnalysisAgent } from '../core/agents/ValueAnalysisAgent';
+import { CircuitOptions } from '../core/CircuitBreaker';
 import { ConversationHistoryService } from '../core/ConversationHistoryService';
-import { BasicDeadLetterProcessor } from '../core/BasicDeadLetterProcessor';
+import { BasicDeadLetterProcessor } from '../core/DeadLetterProcessor';
+import { KnowledgeGraphService } from '../services/KnowledgeGraphService';
+import { LLMService } from '../services/LLMService';
+import { Neo4jCircuitWrapper } from '../services/Neo4jCircuitWrapper';
+import { Neo4jService } from '../services/Neo4jService';
 import { Neo4jWineRepository } from '../services/Neo4jWineRepository'; // Import Neo4jWineRepository
+import { PreferenceExtractionService } from '../services/PreferenceExtractionService';
+import { PreferenceNormalizationService } from '../services/PreferenceNormalizationService';
+import { PromptManager, PromptManagerConfig } from '../services/PromptManager'; // Import PromptManager and PromptManagerConfig
 import { SimpleSearchStrategy } from '../services/SimpleSearchStrategy'; // Import SimpleSearchStrategy
-import { RecommendationStrategyProvider } from '../services/strategies/RecommendationStrategyProvider'; // Import RecommendationStrategyProvider
-import { UserPreferencesStrategy } from '../services/strategies/UserPreferencesStrategy'; // Import UserPreferencesStrategy
 import { CollaborativeFilteringStrategy } from '../services/strategies/CollaborativeFilteringStrategy'; // Import CollaborativeFilteringStrategy
 import { PopularWinesStrategy } from '../services/strategies/PopularWinesStrategy'; // Import PopularWinesStrategy
+import { RecommendationStrategyProvider } from '../services/strategies/RecommendationStrategyProvider'; // Import RecommendationStrategyProvider
+import { UserPreferencesStrategy } from '../services/strategies/UserPreferencesStrategy'; // Import UserPreferencesStrategy
+import { UserProfileService } from '../services/UserProfileService';
+import { TYPES } from './Types';
 
 export function setupContainer() {
   // Environment configuration
@@ -101,6 +102,10 @@ export function setupContainer() {
   container.registerInstance(TYPES.DucklingUrl, process.env.DUCKLING_URL || 'http://localhost:8000'); // Register DucklingUrl
   container.registerInstance(TYPES.HttpClient, axios); // Register HttpClient
 
+  // Register fs and path
+  container.registerInstance(TYPES.FileSystem, fs);
+  container.registerInstance(TYPES.Path, path);
+
   // Register services
   container.registerSingleton(TYPES.Neo4jCircuitWrapper, Neo4jCircuitWrapper);
   // Register Neo4jService as a factory to ensure init() is called
@@ -115,6 +120,20 @@ export function setupContainer() {
   container.registerSingleton(TYPES.KnowledgeGraphService, KnowledgeGraphService);
   container.registerSingleton(TYPES.PreferenceExtractionService, PreferenceExtractionService);
   container.registerSingleton(TYPES.PreferenceNormalizationService, PreferenceNormalizationService);
+  
+  // Define PromptManagerConfig
+  const promptManagerConfig: PromptManagerConfig = {
+    baseDir: path.join(__dirname, '../../prompts'), // Default to a 'prompts' directory outside of services
+    defaultVersion: 'v1',
+    enableCaching: true,
+    enableValidation: true,
+    watchForChanges: false,
+  };
+  // Register PromptManagerConfig as an instance
+  container.registerInstance(TYPES.PromptManagerConfig, promptManagerConfig);
+
+  // Register PromptManager as a singleton
+  container.registerSingleton(TYPES.PromptManager, PromptManager);
 
   // Register Wine Repository
   container.registerSingleton(TYPES.WineRepository, Neo4jWineRepository);
@@ -131,8 +150,8 @@ export function setupContainer() {
   container.registerSingleton(TYPES.IRecommendationStrategy, RecommendationStrategyProvider);
 
   // Register UserProfileService and ConversationHistoryService as singletons
-  container.registerSingleton(UserProfileService);
-  container.registerSingleton(ConversationHistoryService);
+  container.registerSingleton(TYPES.UserProfileService, UserProfileService);
+  container.registerSingleton(TYPES.ConversationHistoryService, ConversationHistoryService);
 
   // Register DeadLetterProcessor with its concrete implementation
   container.registerSingleton(TYPES.DeadLetterProcessor, BasicDeadLetterProcessor);

@@ -2,7 +2,7 @@ import { mockDeep } from 'jest-mock-extended';
 import { createAgentMessage } from '../communication/AgentMessage';
 import { AgentError } from '../AgentError';
 import { InputValidationAgent } from '../InputValidationAgent';
-import { BasicDeadLetterProcessor } from '../../BasicDeadLetterProcessor';
+import { BasicDeadLetterProcessor } from '../../DeadLetterProcessor';
 
 import winston from 'winston';
 
@@ -24,6 +24,8 @@ describe('InputValidationAgent', () => {
   let mockLogger: winston.Logger;
   let agent: TestInputValidationAgent;
   let mockAgentConfig: any;
+  let mockLLMService: any; // Declare mockLLMService here
+  let mockPromptManager: any; // Declare mockPromptManager here
 
   beforeEach(() => {
     mockBus = mockDeep<any>();
@@ -38,25 +40,27 @@ describe('InputValidationAgent', () => {
       },
       maxIngredients: 10
     };
-    agent = new TestInputValidationAgent(mockBus, mockDeadLetter, mockLogger, mockAgentConfig);
+    mockLLMService = mockDeep<any>(); // Initialize mockLLMService here
+    mockPromptManager = mockDeep<any>(); // Initialize mockPromptManager here
+    agent = new TestInputValidationAgent(mockBus, mockDeadLetter, mockLogger, mockAgentConfig, mockLLMService, mockPromptManager);
 
     // Reset mocks before each test to ensure isolation
     jest.clearAllMocks(); // Clear all mocks before each test
   });
 
   describe('validateInput', () => {
-    // Default mock for sendLLMPrompt for validateInput tests
+    // Default mock for sendStructuredPrompt for validateInput tests
     beforeEach(() => {
-      mockBus.sendLLMPrompt.mockResolvedValue({
+      mockLLMService.sendStructuredPrompt.mockResolvedValue({
         success: true,
-        data: JSON.stringify({
+        data: {
           isValid: true,
           cleanedInput: {
             ingredients: ['mocked-ingredient'],
             budget: 100
           },
           extractedData: {}
-        })
+        }
       });
     });
 
@@ -83,11 +87,21 @@ describe('InputValidationAgent', () => {
         correlationId: '123'
       };
 
+      mockLLMService.sendStructuredPrompt.mockResolvedValueOnce({
+        success: true,
+        data: {
+          isValid: false,
+          errors: ['At least one ingredient must be provided'],
+          cleanedInput: { ingredients: [], budget: 50 },
+          extractedData: {}
+        }
+      });
+
       const result = await agent.testValidateInput(invalidInput, invalidInput.correlationId);
-      expect(result.success).toBe(false); // Basic validation should fail before LLM call
-      if (!result.success) {
-        expect(result.error.message).toContain('At least one ingredient must be provided');
-        expect(result.error.correlationId).toBe('123');
+      expect(result.success).toBe(true); // LLM call itself is successful
+      if (result.success) {
+        expect(result.data.isValid).toBe(false);
+        expect(result.data.errors).toContain('At least one ingredient must be provided');
       }
     });
 
@@ -99,11 +113,21 @@ describe('InputValidationAgent', () => {
         correlationId: '123'
       };
 
+      mockLLMService.sendStructuredPrompt.mockResolvedValueOnce({
+        success: true,
+        data: {
+          isValid: false,
+          errors: ['Budget must be a positive number'],
+          cleanedInput: { ingredients: ['chicken'], budget: -10 },
+          extractedData: {}
+        }
+      });
+
       const result = await agent.testValidateInput(invalidInput, invalidInput.correlationId);
-      expect(result.success).toBe(false); // Basic validation should fail before LLM call
-      if (!result.success) {
-        expect(result.error.message).toContain('Budget must be a positive number');
-        expect(result.error.correlationId).toBe('123');
+      expect(result.success).toBe(true); // LLM call itself is successful
+      if (result.success) {
+        expect(result.data.isValid).toBe(false);
+        expect(result.data.errors).toContain('Budget must be a positive number');
       }
     });
 
@@ -116,9 +140,9 @@ describe('InputValidationAgent', () => {
       };
 
       // Specific mock for this test
-      mockBus.sendLLMPrompt.mockResolvedValueOnce({
+      mockLLMService.sendStructuredPrompt.mockResolvedValueOnce({
         success: true,
-        data: JSON.stringify({
+        data: {
           isValid: true,
           cleanedInput: {
             ingredients: ['chicken', 'garlic clove'],
@@ -130,7 +154,7 @@ describe('InputValidationAgent', () => {
               'garlic clove': 'garlic'
             }
           }
-        })
+        }
       });
       const result = await agent.testValidateInput(input, input.correlationId);
       expect(result.success).toBe(true);
@@ -151,14 +175,14 @@ describe('InputValidationAgent', () => {
       };
 
       // Specific mock for this test
-      mockBus.sendLLMPrompt.mockResolvedValueOnce({
+      mockLLMService.sendStructuredPrompt.mockResolvedValueOnce({
         success: true,
-        data: JSON.stringify({
+        data: {
           isValid: false,
           errors: ['Unsupported dietary restriction: invalid-restriction'],
           cleanedInput: input,
           extractedData: {}
-        })
+        }
       });
 
       const result = await agent.testValidateInput(input, input.correlationId);
@@ -180,7 +204,8 @@ describe('InputValidationAgent', () => {
         'corr-unhandled',
         'InputValidationAgent',
         'NORMAL',
-        { sender: 'test-agent', traceId: 'test-trace-unhandled' }
+        undefined, // userId (optional, not used here)
+        { sender: 'test-agent', traceId: 'test-trace-unhandled' } // metadata
       );
 
       const response = await agent.handleMessage(message);
@@ -212,10 +237,11 @@ describe('InputValidationAgent', () => {
         'error-test', // correlationId
         'InputValidationAgent', // Added targetAgent
         'NORMAL', // priority
+        undefined, // userId (optional, not used here)
         { sender: 'test-agent', traceId: 'test-trace-123' } // metadata
       );
 
-      const response = await agent.handleValidationRequest(message); // Use handleValidationRequest
+      const response = await agent.handleValidationRequest({ ...message, payload: { userInput: 'test input', recommendationSource: 'test' } }); // Use handleValidationRequest with correct payload
       expect(response.success).toBe(false);
       if (!response.success) { // Narrow the type for error access
         expect(response.error).toBeInstanceOf(AgentError);

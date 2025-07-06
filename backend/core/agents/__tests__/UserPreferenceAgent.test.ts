@@ -1,14 +1,14 @@
 import { mockDeep } from 'jest-mock-extended';
 import { AgentError } from '../AgentError';
 import { UserPreferenceAgent, UserPreferenceAgentConfig } from '../UserPreferenceAgent';
-import { BasicDeadLetterProcessor } from '../../BasicDeadLetterProcessor';
-import { PreferenceExtractionService } from '@src/services/PreferenceExtractionService';
-import { KnowledgeGraphService } from '@src/services/KnowledgeGraphService';
-import { PreferenceNormalizationService } from '@src/services/PreferenceNormalizationService';
+import { BasicDeadLetterProcessor } from '../../DeadLetterProcessor';
+import { PreferenceExtractionService } from '../../../services/PreferenceExtractionService';
+import { KnowledgeGraphService } from '../../../services/KnowledgeGraphService';
+import { PreferenceNormalizationService } from '../../../services/PreferenceNormalizationService';
 import winston from 'winston';
 import { createAgentMessage } from '../communication/AgentMessage';
 import { EnhancedAgentCommunicationBus } from '../communication/EnhancedAgentCommunicationBus';
-import { PreferenceNode } from '@src/types';
+import { PreferenceNode } from '../../../types';
 
 // Test wrapper to access protected properties for testing
 class TestUserPreferenceAgent extends UserPreferenceAgent {
@@ -21,22 +21,19 @@ class TestUserPreferenceAgent extends UserPreferenceAgent {
   public testPersistPreferences(preferences: PreferenceNode[], userId: string): Promise<void> {
     return (this as any).persistPreferences(preferences, userId);
   }
-  public testQueueAsyncLLMExtraction(
-    userInput: string,
-    userId: string,
-    conversationHistory?: any[],
-    correlationId?: string
-  ): Promise<void> {
-    return (this as any).queueAsyncLLMExtraction(userInput, userId, conversationHistory, correlationId);
+
+  public testHandlePreferenceRequest(message: any): Promise<any> {
+    return (this as any).handlePreferenceRequest(message);
   }
-}
+} // Corrected closing brace
+// Removed testQueueAsyncLLMExtraction as it's not a method in the agent
 
 describe('UserPreferenceAgent', () => {
   let mockBus: EnhancedAgentCommunicationBus;
   let mockDeadLetter: BasicDeadLetterProcessor;
   let mockLogger: winston.Logger;
   let mockPreferenceExtractionService: PreferenceExtractionService;
-  let mockKnowledgeGraphService: KnowledgeGraphService;
+  let mockKnowledgeGraphService: KnowledgeGraphService; // Keep this for now, even if not used in agent
   let mockPreferenceNormalizationService: PreferenceNormalizationService;
   let agent: TestUserPreferenceAgent;
   let mockAgentConfig: UserPreferenceAgentConfig;
@@ -101,14 +98,14 @@ describe('UserPreferenceAgent', () => {
     it('should return an error if payload is missing or invalid', async () => {
       const message = createAgentMessage(
         'preference-request',
-        null, // Invalid payload
+        { }, // Empty payload to trigger validation
         'source-agent',
         'conv-456',
         'corr-invalid-payload',
         'user-preference-agent'
       );
 
-      const result = await agent.handleMessage(message);
+      const result = await agent.testHandlePreferenceRequest(message as any); // Directly call handlePreferenceRequest
 
       expect(result.success).toBe(false);
       if (!result.success) {
@@ -119,11 +116,6 @@ describe('UserPreferenceAgent', () => {
           expect.stringContaining('[corr-invalid-payload] Handling preference request'),
           expect.any(Object)
         );
-        // Temporarily comment out for debugging
-        // expect(mockLogger.error).toHaveBeenCalledWith(
-        //   expect.stringContaining('[corr-invalid-payload] Error processing preference request: Invalid or missing payload in preference request'),
-        //   expect.any(Object)
-        // );
       }
     });
 
@@ -138,7 +130,9 @@ describe('UserPreferenceAgent', () => {
         'source-agent',
         'conv-fast-success',
         'corr-fast-success',
-        'user-preference-agent'
+        'user-preference-agent', // targetAgent (6th argument)
+        'user123', // userId (7th argument)
+        'NORMAL' // priority (8th argument)
       );
 
       (mockPreferenceExtractionService.attemptFastExtraction as jest.Mock).mockResolvedValueOnce({
@@ -150,18 +144,17 @@ describe('UserPreferenceAgent', () => {
         { type: 'type', value: 'wine', source: 'fast-extraction', confidence: 1, timestamp: new Date().toISOString(), active: true }
       ]);
 
-      const result = await agent.handleMessage(message);
+      const result = await agent.testHandlePreferenceRequest(message as any); // Directly call handlePreferenceRequest
 
       expect(result.success).toBe(true);
       if (result.success) {
-        // Removed KnowledgeGraphService interactions
         expect(mockPreferenceExtractionService.attemptFastExtraction).toHaveBeenCalledWith('I like red wine');
         expect(mockPreferenceNormalizationService.normalizePreferences).toHaveBeenCalledTimes(1);
         expect(mockBus.publishToAgent).toHaveBeenCalledTimes(1);
         expect(mockBus.publishToAgent).toHaveBeenCalledWith(
           '*',
           expect.objectContaining({
-            type: 'preferences-updated',
+            type: 'preference-update', // Changed from 'preferences-updated'
             payload: expect.objectContaining({
               userId: 'user123',
               preferences: expect.arrayContaining([
@@ -201,48 +194,54 @@ describe('UserPreferenceAgent', () => {
         'preference-request',
         messagePayload,
         'source-agent',
-        'conv-async-queue',
-        'corr-async-queue',
-        'user-preference-agent'
+        'conv-fast-success',
+        'corr-fast-success',
+        'user-preference-agent', // targetAgent (6th argument)
+        'user123', // userId (7th argument)
+        'NORMAL' // priority (8th argument)
       );
 
-      // Removed KnowledgeGraphService interaction
       (mockPreferenceExtractionService.attemptFastExtraction as jest.Mock).mockResolvedValueOnce({
         success: false, // Fast extraction fails
         error: new AgentError('Fast extraction failed', 'FAST_EXTRACTION_FAILED', 'test-agent', 'corr-async-queue')
       });
+      // Mock LLM extraction service call
+      (mockPreferenceExtractionService.extractPreferencesWithLLM as jest.Mock).mockResolvedValueOnce({
+        success: true,
+        data: {
+          preferences: { color: 'red' },
+          ingredients: [],
+          isValid: true,
+          errors: []
+        }
+      });
+      // Mock normalization service call
+      (mockPreferenceNormalizationService.normalizePreferences as jest.Mock).mockResolvedValueOnce([
+        { type: 'color', value: 'red', source: 'llm-extraction', confidence: 0.8, timestamp: new Date().toISOString(), active: true }
+      ]);
 
-      const result = await agent.handleMessage(message);
+      const result = await agent.testHandlePreferenceRequest(message as any); // Directly call handlePreferenceRequest
 
-      expect(result.success).toBe(true); // Agent still returns success as it queued the task
+      expect(result.success).toBe(true); // Agent still returns success as it processed the request
       if (result.success) {
-        // Removed KnowledgeGraphService interaction
         expect(mockPreferenceExtractionService.attemptFastExtraction).toHaveBeenCalledWith('I like red wine');
-        expect(mockBus.publishToAgent).toHaveBeenCalledTimes(1);
+        expect(mockPreferenceExtractionService.extractPreferencesWithLLM).toHaveBeenCalledTimes(1);
+        expect(mockBus.publishToAgent).toHaveBeenCalledTimes(1); // For preferences-updated
         expect(mockBus.publishToAgent).toHaveBeenCalledWith(
-          'LLMPreferenceExtractorAgent',
+          '*',
           expect.objectContaining({
-            type: 'llm-preference-extraction',
+            type: 'preference-update', // Changed from 'preferences-updated'
             payload: expect.objectContaining({
-              input: 'I like red wine',
-              userId: 'user123'
+              userId: 'user123',
+              preferences: expect.arrayContaining([
+                expect.objectContaining({ type: 'color', value: 'red' })
+              ])
             })
           })
         );
-        expect(mockBus.sendResponse).toHaveBeenCalledTimes(1);
-        expect(mockBus.sendResponse).toHaveBeenCalledWith(
-          'source-agent',
-          expect.objectContaining({
-            type: 'preference-update-result',
-            payload: expect.objectContaining({
-              success: false,
-              preferences: [],
-              error: 'Analyzing your input for preferences asynchronously.'
-            })
-          })
-        );
+        expect(mockBus.sendResponse).toHaveBeenCalledTimes(1); // For preference-update-result
         expect(mockLogger.info).toHaveBeenCalledWith(
-          expect.stringContaining('[corr-async-queue] Preference request queued for async LLM extraction'),
+          expect.stringContaining('[corr-fast-success] Preference request processed successfully (LLM extraction)'), // Corrected correlation ID
           expect.any(Object)
         );
       }
@@ -262,15 +261,9 @@ describe('UserPreferenceAgent', () => {
         'user-preference-agent'
       );
 
-      // Removed KnowledgeGraphService interaction
-      // (mockKnowledgeGraphService.getPreferences as jest.Mock).mockImplementationOnce(() => {
-      //   throw new Error('Database error');
-      // });
-      // Simulate an error from PreferenceExtractionService instead
       (mockPreferenceExtractionService.attemptFastExtraction as jest.Mock).mockRejectedValueOnce(new Error('Simulated extraction error'));
 
-
-      const result = await agent.handleMessage(message);
+      const result = await agent.testHandlePreferenceRequest(message as any); // Directly call handlePreferenceRequest
 
       expect(result.success).toBe(false);
       if (!result.success) {
@@ -350,52 +343,4 @@ describe('UserPreferenceAgent', () => {
   //     expect(mockKnowledgeGraphService.addOrUpdatePreference).toHaveBeenCalledWith(userId, preferences[1]);
   //   });
   // });
-
-  describe('queueAsyncLLMExtraction', () => {
-    it('should publish an llm-preference-extraction message to LLMPreferenceExtractorAgent', async () => {
-      const userInput = 'I want a sweet wine';
-      const userId = 'user456';
-      const correlationId = 'corr-queue';
-      const conversationHistory = [{ role: 'user', content: 'initial query' }];
-
-      await agent.testQueueAsyncLLMExtraction(userInput, userId, conversationHistory, correlationId);
-
-      expect(mockBus.publishToAgent).toHaveBeenCalledTimes(1);
-      expect(mockBus.publishToAgent).toHaveBeenCalledWith(
-        'LLMPreferenceExtractorAgent',
-        expect.objectContaining({
-          type: 'llm-preference-extraction',
-          payload: expect.objectContaining({
-            input: userInput,
-            userId: userId,
-            history: conversationHistory,
-          }),
-          correlationId: correlationId
-        })
-      );
-      expect(mockLogger.info).toHaveBeenCalledWith(
-        expect.stringContaining(`[${correlationId}] Queued async LLM preference extraction for user: ${userId}`),
-        expect.any(Object)
-      );
-    });
-
-    it('should generate a correlationId if not provided', async () => {
-      const userInput = 'I want a sweet wine';
-      const userId = 'user456';
-
-      await agent.testQueueAsyncLLMExtraction(userInput, userId);
-
-      expect(mockBus.publishToAgent).toHaveBeenCalledTimes(1);
-      expect(mockBus.publishToAgent).toHaveBeenCalledWith(
-        'LLMPreferenceExtractorAgent',
-        expect.objectContaining({
-          correlationId: expect.any(String) // Should be generated
-        })
-      );
-      expect(mockLogger.info).toHaveBeenCalledWith(
-        expect.stringContaining(`Queued async LLM preference extraction for user: ${userId}`),
-        expect.any(Object)
-      );
-    });
-  });
 });

@@ -1,210 +1,262 @@
-import 'reflect-metadata';
-import { z } from 'zod'; // Import zod for schema definition
+import { mock } from 'jest-mock-extended';
+import 'reflect-metadata'; // Required for tsyringe
+import { DependencyContainer, container } from 'tsyringe';
+import { z } from 'zod'; // Added Zod import
+import { AgentError } from '../../core/agents/AgentError';
+import { ILogger, TYPES } from '../../di/Types';
+import { failure, success } from '../../utils/result-utils'; // Removed Result from import
 import { LLMService } from '../LLMService';
-import { mock, instance, when, verify, anything } from 'ts-mockito';
-import { ILogger } from '../LLMService';
-import { OllamaStructuredClient } from '../../utils/ollama_structured_output';
-import { GenerateResponse } from 'ollama';
-import { AgentError } from '../../core/agents/AgentError'; // Re-import AgentError explicitly
+import { PromptManager, PromptTemplate, PromptVariables } from '../PromptManager';
 
-// Mocking the 'zod' module
-jest.mock('zod', () => {
-  // Mock ZodObject constructor as a jest.fn()
-  let MockZodObject;
+// Mock global fetch
+const mockFetch = jest.fn();
+global.fetch = mockFetch;
 
-  MockZodObject = jest.fn((schemaDefinition?: any) => ({
-    shape: schemaDefinition?.shape || {},
-    parse: jest.fn(),
-  }));
-
-  // Mock the 'z' object and its methods, using MockZodObject as the constructor
-  const z = {
-    object: jest.fn((schemaDefinition) => MockZodObject(schemaDefinition)),
-    string: jest.fn(() => MockZodObject()),
-    number: jest.fn(() => MockZodObject()),
-  };
-
-  return {
-    z,
-    ZodObject: MockZodObject, // Export the mock constructor
-  };
-});
- 
-jest.mock('../../utils/ollama_structured_output', () => {
-  const mockOllamaInstance = {
-    generate: jest.fn(),
-    chat: jest.fn(), // Add chat method for structured calls
-    list: jest.fn(),
-    pull: jest.fn(),
-  };
- 
-  const MockOllamaStructuredClient = jest.fn().mockImplementation(() => {
-    return {
-      ollama: mockOllamaInstance,
-      defaultOptions: {
-        temperature: 0.1,
-        num_predict: 2048,
-      },
-      generateStructured: jest.fn(),
-      generateWithRetry: jest.fn(),
-      isModelAvailable: jest.fn(),
-      ensureModel: jest.fn(),
-    };
-  });
-  return { OllamaStructuredClient: MockOllamaStructuredClient };
-});
- 
 describe('LLMService', () => {
-  let service: LLMService;
-  let mockLogger: ILogger;
-  let mockOllamaStructuredClientInstance: jest.Mocked<OllamaStructuredClient>;
- 
+  let llmService: LLMService;
+  let mockPromptManager: jest.Mocked<PromptManager>;
+  let mockLogger: jest.Mocked<ILogger>;
+  let testContainer: DependencyContainer;
+
+  const mockLlmApiUrl = 'http://mock-ollama.com';
+  const mockLlmModel = 'mock-model';
+  const mockLlmApiKey = 'mock-api-key'; // Not used by Ollama, but for consistency
+
+  const mockLogContext = {
+    correlationId: 'test-correlation-id',
+    operation: 'test-operation',
+    agentId: 'test-agent',
+  };
+
   beforeEach(() => {
-    // Clear all mocks before each test
+    // Clear and reset the container for each test to ensure isolation
+    container.clearInstances();
+    container.reset();
+    testContainer = container.createChildContainer();
+
+    mockPromptManager = mock<PromptManager>();
+    mockLogger = mock<ILogger>();
+
+    // Register mocks with the container
+    testContainer.registerInstance(TYPES.PromptManager, mockPromptManager);
+    testContainer.registerInstance(TYPES.Logger, mockLogger);
+    testContainer.registerInstance(TYPES.LlmApiUrl, mockLlmApiUrl);
+    testContainer.registerInstance(TYPES.LlmModel, mockLlmModel);
+    testContainer.registerInstance(TYPES.LlmApiKey, mockLlmApiKey);
+
+    // Resolve LLMService from the container
+    llmService = testContainer.resolve(LLMService);
+
+    // Reset mocks for fetch
+    mockFetch.mockReset();
+  });
+
+  afterEach(() => {
     jest.clearAllMocks();
- 
-    mockLogger = mock<ILogger>(); // Initialize mockLogger here
- 
-    // Get the mocked instance of OllamaStructuredClient
-    mockOllamaStructuredClientInstance = new (OllamaStructuredClient as jest.Mock)();
- 
-    // Manually inject the mocked OllamaStructuredClient instance into the service
-    // This bypasses the constructor's new OllamaStructuredClient() call
-    service = new LLMService(
-      'http://test-api',
-      'test-model',
-      'test-key',
-      instance(mockLogger),
-      3, // maxRetries
-      10 // retryDelayMs (reduced for faster tests)
-    );
-    // @ts-ignore - Overwrite the private property with the mock instance
-    service['ollamaClient'] = mockOllamaStructuredClientInstance;
   });
- 
-  describe('sendPrompt (unstructured)', () => {
-    it('should successfully send unstructured prompt and return response', async () => {
-      mockOllamaStructuredClientInstance.ollama.generate.mockResolvedValueOnce({
-        response: 'test-unstructured-response',
-        model: 'test-model',
-        created_at: new Date(),
-        done: true,
-        total_duration: 1000,
-        load_duration: 500,
-        prompt_eval_count: 10,
-        eval_count: 20,
-        eval_duration: 500,
-        done_reason: 'stop',
-        context: [],
-        prompt_eval_duration: 100
-      } as GenerateResponse);
- 
-      const result = await service.sendPrompt('test-prompt');
+
+  describe('sendPrompt', () => {
+    const mockTask = 'recommendWines' as keyof PromptTemplate;
+    const mockVariables: PromptVariables = { wineType: 'red' };
+    const mockSystemPrompt = 'You are a helpful assistant.';
+    const mockUserPrompt = 'Recommend a red wine.';
+    const mockLlmResponseContent = 'Here is a great red wine.';
+
+    beforeEach(() => {
+      mockPromptManager.ensureLoaded.mockResolvedValue(undefined);
+      mockPromptManager.getSystemPrompt.mockResolvedValue(mockSystemPrompt);
+      mockPromptManager.getPrompt.mockResolvedValue(success(mockUserPrompt));
+    });
+
+    it('should send a prompt to Ollama and return success', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ message: { content: mockLlmResponseContent } }),
+      });
+
+      const result = await llmService.sendPrompt(mockTask, mockVariables, mockLogContext);
+
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toBe('test-unstructured-response');
+      if (result.success) { // Type guard
+        expect(result.data).toBe(mockLlmResponseContent);
+      } else {
+        fail('Expected success, but got failure');
       }
-      expect(mockOllamaStructuredClientInstance.ollama.generate).toHaveBeenCalledTimes(1);
-      expect(mockOllamaStructuredClientInstance.ollama.generate).toHaveBeenCalledWith(expect.objectContaining({
-        prompt: 'test-prompt',
-        model: 'test-model'
-      }));
+      expect(mockPromptManager.ensureLoaded).toHaveBeenCalledTimes(1);
+      expect(mockPromptManager.getSystemPrompt).toHaveBeenCalledTimes(1);
+      expect(mockPromptManager.getPrompt).toHaveBeenCalledWith(mockTask, mockVariables);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(mockFetch).toHaveBeenCalledWith(`${mockLlmApiUrl}/api/chat`, expect.any(Object));
+      expect(mockLogger.info).toHaveBeenCalledWith('Sending LLM prompt', expect.any(Object));
+      expect(mockLogger.info).toHaveBeenCalledWith('LLM prompt sent successfully', expect.any(Object));
     });
- 
-    it('should handle errors during unstructured prompt generation', async () => {
-      mockOllamaStructuredClientInstance.ollama.generate.mockRejectedValueOnce(new Error('LLM generation error'));
- 
-      const result = await service.sendPrompt('test-prompt');
+
+    it('should return failure if PromptManager.getPrompt fails', async () => {
+      const promptError = new Error('Prompt not found');
+      mockPromptManager.getPrompt.mockResolvedValue(failure(promptError));
+
+      const result = await llmService.sendPrompt(mockTask, mockVariables, mockLogContext);
+
       expect(result.success).toBe(false);
-      if (!result.success) {
+      if (!result.success) { // Type guard
         expect(result.error).toBeInstanceOf(AgentError);
-        expect(result.error.message).toContain('LLM generation error');
+        expect(result.error.message).toContain('Failed to get prompt');
+        expect(result.error.code).toBe('LLM_PROMPT_ERROR');
+      } else {
+        fail('Expected failure, but got success');
       }
-      expect(mockOllamaStructuredClientInstance.ollama.generate).toHaveBeenCalledTimes(1);
+      expect(mockLogger.error).toHaveBeenCalledWith('Failed to get prompt from PromptManager', expect.any(Object));
+      expect(mockFetch).not.toHaveBeenCalled();
     });
- 
-    it('should handle invalid unstructured response format', async () => {
-      mockOllamaStructuredClientInstance.ollama.generate.mockResolvedValueOnce({
-        invalid: 'format',
-        response: '', // Ensure response property exists
-        model: 'test-model',
-        created_at: new Date(),
-        done: true,
-        total_duration: 0,
-        load_duration: 0,
-        prompt_eval_count: 0,
-        eval_count: 0,
-        eval_duration: 0,
-        done_reason: 'stop',
-        context: [],
-        prompt_eval_duration: 0
-      } as GenerateResponse);
- 
-      const result = await service.sendPrompt('test-prompt');
+
+    it('should return failure if Ollama API call fails', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        text: () => Promise.resolve('Internal Server Error'),
+      });
+
+      const result = await llmService.sendPrompt(mockTask, mockVariables, mockLogContext);
+
       expect(result.success).toBe(false);
-      if (!result.success) {
+      if (!result.success) { // Type guard
         expect(result.error).toBeInstanceOf(AgentError);
-        expect(result.error.message).toContain('Invalid unstructured response format from Ollama API');
+        expect(result.error.message).toContain('Ollama API call failed');
+        expect(result.error.code).toBe('LLM_API_CALL_FAILED');
+      } else {
+        fail('Expected failure, but got success');
       }
-      expect(mockOllamaStructuredClientInstance.ollama.generate).toHaveBeenCalledTimes(1);
+      expect(mockLogger.error).toHaveBeenCalledWith('Error sending LLM prompt', expect.any(Object));
+    });
+
+    it('should return failure if fetch throws an error', async () => {
+      mockFetch.mockRejectedValueOnce(new TypeError('Network error'));
+
+      const result = await llmService.sendPrompt(mockTask, mockVariables, mockLogContext);
+
+      expect(result.success).toBe(false);
+      if (!result.success) { // Type guard
+        expect(result.error).toBeInstanceOf(AgentError);
+        expect(result.error.message).toContain('Network error');
+        expect(result.error.code).toBe('LLM_API_CALL_FAILED');
+      } else {
+        fail('Expected failure, but got success');
+      }
+      expect(mockLogger.error).toHaveBeenCalledWith('Error sending LLM prompt', expect.any(Object));
     });
   });
- 
+
   describe('sendStructuredPrompt', () => {
-    // Define the schema structure using Zod for clarity.
-    // This will be processed by our mocked 'zod' library.
-    const mockSchema = z.object({ key: z.string() });
-    // Define the Zod schema for parsing the LLM's output.
-    const mockZodSchema = z.object({ key: z.string() });
- 
-    it('should successfully send structured prompt and return parsed response', async () => {
-      const mockParsedData = { key: 'value' };
-      mockOllamaStructuredClientInstance.generateStructured.mockResolvedValueOnce(mockParsedData);
- 
-      const result = await service.sendStructuredPrompt('test-structured-prompt', mockSchema, mockZodSchema);
+    const mockTask = 'extractPreferences' as keyof PromptTemplate;
+    const mockVariables: PromptVariables = { userInput: 'I like red wine' };
+    const mockOutputSchema = z.object({ wineType: z.string() });
+    const mockSystemPrompt = 'You are a helpful assistant.';
+    const mockUserPrompt = 'Extract preferences from: I like red wine.';
+    const mockLlmResponseObject = { wineType: 'red' };
+    const mockLlmResponseContent = JSON.stringify(mockLlmResponseObject);
+
+    beforeEach(() => {
+      mockPromptManager.ensureLoaded.mockResolvedValue(undefined);
+      mockPromptManager.getSystemPrompt.mockResolvedValue(mockSystemPrompt);
+      mockPromptManager.getPrompt.mockResolvedValue(success(mockUserPrompt));
+      mockPromptManager.getOutputSchemaForTask.mockReturnValue(mockOutputSchema);
+    });
+
+    it('should send a structured prompt to Ollama and return success', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ message: { content: mockLlmResponseContent } }),
+      });
+
+      const result = await llmService.sendStructuredPrompt(mockTask, mockVariables, mockLogContext);
+
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual(mockParsedData);
+      if (result.success) { // Type guard
+        expect(result.data).toEqual(mockLlmResponseObject);
+      } else {
+        fail('Expected success, but got failure');
       }
-      expect(mockOllamaStructuredClientInstance.generateStructured).toHaveBeenCalledTimes(1);
-      expect(mockOllamaStructuredClientInstance.generateStructured).toHaveBeenCalledWith(
-        'test-structured-prompt',
-        mockSchema,
-        mockZodSchema,
-        expect.any(Object) // options object
-      );
+      expect(mockPromptManager.getSystemPrompt).toHaveBeenCalledTimes(1);
+      expect(mockPromptManager.getPrompt).toHaveBeenCalledWith(mockTask, mockVariables);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(mockFetch).toHaveBeenCalledWith(`${mockLlmApiUrl}/api/chat`, expect.objectContaining({
+        body: expect.stringContaining('"format":"json"')
+      }));
+      expect(mockLogger.info).toHaveBeenCalledWith('Sending structured LLM prompt', expect.any(Object));
+      expect(mockLogger.info).toHaveBeenCalledWith('Structured LLM prompt sent successfully and response validated', expect.any(Object));
     });
- 
-    it('should handle errors during structured prompt generation', async () => {
-      mockOllamaStructuredClientInstance.generateStructured.mockRejectedValueOnce(new Error('Structured generation error'));
- 
-      const result = await service.sendStructuredPrompt('test-structured-prompt', mockSchema, mockZodSchema);
+
+    it('should return failure if PromptManager.getPrompt fails', async () => {
+      const promptError = new Error('Structured prompt not found');
+      mockPromptManager.getPrompt.mockResolvedValue(failure(promptError));
+
+      const result = await llmService.sendStructuredPrompt(mockTask, mockVariables, mockLogContext);
+
       expect(result.success).toBe(false);
-      if (!result.success) {
+      if (!result.success) { // Type guard
         expect(result.error).toBeInstanceOf(AgentError);
-        expect(result.error.message).toContain('Structured generation error');
+        expect(result.error.message).toContain('Failed to get structured prompt');
+        expect(result.error.code).toBe('LLM_STRUCTURED_PROMPT_ERROR');
+      } else {
+        fail('Expected failure, but got success');
       }
-      expect(mockOllamaStructuredClientInstance.generateStructured).toHaveBeenCalledTimes(1);
+      expect(mockLogger.error).toHaveBeenCalledWith('Failed to get prompt from PromptManager for structured output', expect.any(Object));
+      expect(mockFetch).not.toHaveBeenCalled();
     });
-  });
- 
-  describe('constructor', () => {
-    it('should initialize with provided parameters and OllamaStructuredClient', () => {
-      // This test now primarily verifies the constructor's ability to instantiate the service
-      // and that the mock OllamaStructuredClient is used.
-      const testService = new LLMService(
-        'http://another-api',
-        'another-model',
-        'another-key',
-        instance(mockLogger),
-        5,
-        50
-      );
-      expect(testService).toBeInstanceOf(LLMService);
-      // Further verification of OllamaStructuredClient's constructor arguments
-      // would require more advanced Jest mocking of the constructor itself,
-      // which is beyond the scope of simple unit tests for LLMService.
-      // We rely on the mockImplementation above to ensure the mock is created.
+
+    it('should return failure if Ollama API call fails', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        text: () => Promise.resolve('Internal Server Error'),
+      });
+
+      const result = await llmService.sendStructuredPrompt(mockTask, mockVariables, mockLogContext);
+
+      expect(result.success).toBe(false);
+      if (!result.success) { // Type guard
+        expect(result.error).toBeInstanceOf(AgentError);
+        expect(result.error.message).toContain('Ollama structured API call failed');
+        expect(result.error.code).toBe('LLM_STRUCTURED_API_CALL_FAILED');
+      } else {
+        fail('Expected failure, but got success');
+      }
+      expect(mockLogger.error).toHaveBeenCalledWith('Error sending structured LLM prompt', expect.any(Object));
+    });
+
+    it('should return failure if fetch throws an error', async () => {
+      mockFetch.mockRejectedValueOnce(new TypeError('Network error'));
+
+      const result = await llmService.sendStructuredPrompt(mockTask, mockVariables, mockLogContext);
+
+      expect(result.success).toBe(false);
+      if (!result.success) { // Type guard
+        expect(result.error).toBeInstanceOf(AgentError);
+        expect(result.error.message).toContain('Network error');
+        expect(result.error.code).toBe('LLM_STRUCTURED_API_CALL_FAILED');
+      } else {
+        fail('Expected failure, but got success');
+      }
+      expect(mockLogger.error).toHaveBeenCalledWith('Error sending structured LLM prompt', expect.any(Object));
+    });
+
+    it('should return failure if Ollama response is not valid JSON', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ message: { content: 'This is not JSON' } }),
+      });
+
+      const result = await llmService.sendStructuredPrompt(mockTask, mockVariables, mockLogContext);
+
+      expect(result.success).toBe(false);
+      if (!result.success) { // Type guard
+        expect(result.error).toBeInstanceOf(AgentError);
+        expect(result.error.message).toContain('Invalid JSON response from LLM');
+        expect(result.error.code).toBe('LLM_STRUCTURED_API_CALL_FAILED');
+      } else {
+        fail('Expected failure, but got success');
+      }
+      expect(mockLogger.error).toHaveBeenCalledWith('Failed to parse structured LLM response as JSON', expect.any(Object));
     });
   });
 });

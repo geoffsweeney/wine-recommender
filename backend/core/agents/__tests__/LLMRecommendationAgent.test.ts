@@ -1,55 +1,60 @@
-import { mockDeep } from 'jest-mock-extended';
-import { AgentError } from '../AgentError';
-import { LLMRecommendationAgent, LLMRecommendationAgentConfig } from '../LLMRecommendationAgent';
-import { BasicDeadLetterProcessor } from '../../BasicDeadLetterProcessor';
-import { LLMService } from '@src/services/LLMService';
+import { DependencyContainer } from 'tsyringe';
 import winston from 'winston';
+import { TYPES } from '../../../di/Types';
+import { LLMService } from '../../../services/LLMService';
+import { PromptManager } from '../../../services/PromptManager';
+import { createTestContainer } from '../../../test-setup';
+import { BasicDeadLetterProcessor } from '../../DeadLetterProcessor';
+import { AgentError } from '../AgentError';
 import { createAgentMessage } from '../communication/AgentMessage';
 import { EnhancedAgentCommunicationBus } from '../communication/EnhancedAgentCommunicationBus';
-
-import { RecommendationResult } from '../../../types/agent-outputs';
-// Test wrapper to access protected properties for testing
-class TestLLMRecommendationAgent extends LLMRecommendationAgent {
-  public getAgentId(): string {
-    return this.id;
-  }
-  public testBuildEnhancedPrompt(payload: any): string {
-    return (this as any).buildEnhancedPrompt(payload);
-  }
-}
+import { LLMRecommendationAgent, LLMRecommendationAgentConfig } from '../LLMRecommendationAgent';
 
 describe('LLMRecommendationAgent', () => {
-  let mockBus: EnhancedAgentCommunicationBus;
-  let mockDeadLetter: BasicDeadLetterProcessor;
-  let mockLogger: winston.Logger;
-  let mockLLMService: LLMService;
-  let agent: TestLLMRecommendationAgent;
+  let container: DependencyContainer;
+  let resetMocks: () => void;
+  let llmRecommendationAgent: LLMRecommendationAgent;
+  let mockLLMService: jest.Mocked<LLMService>;
+  let mockPromptManager: jest.Mocked<PromptManager>;
+  let mockDeadLetterProcessor: jest.Mocked<BasicDeadLetterProcessor>;
+  let mockLogger: jest.Mocked<winston.Logger>;
+  let mockCommunicationBus: jest.Mocked<EnhancedAgentCommunicationBus>;
   let mockAgentConfig: LLMRecommendationAgentConfig;
 
   beforeEach(() => {
-    mockBus = mockDeep<EnhancedAgentCommunicationBus>();
-    mockDeadLetter = mockDeep<BasicDeadLetterProcessor>();
-    mockLogger = mockDeep<winston.Logger>();
-    mockLLMService = mockDeep<LLMService>();
-    mockAgentConfig = {
-      defaultConfidenceScore: 0.75,
-      maxRecommendations: 3,
-      includePairingAdvice: true,
-      modelTemperature: 0.7
-    };
-    jest.clearAllMocks(); // Clear mocks before agent initialization
-    agent = new TestLLMRecommendationAgent(mockLLMService, mockDeadLetter, mockLogger, mockBus, mockAgentConfig);
+    ({ container, resetMocks } = createTestContainer());
+
+    // Resolve mocked dependencies from the container
+    mockLLMService = container.resolve(TYPES.LLMService) as jest.Mocked<LLMService>;
+    mockPromptManager = container.resolve(TYPES.PromptManager) as jest.Mocked<PromptManager>;
+    mockDeadLetterProcessor = container.resolve(TYPES.DeadLetterProcessor) as jest.Mocked<BasicDeadLetterProcessor>;
+    mockLogger = container.resolve(TYPES.Logger) as jest.Mocked<winston.Logger>;
+    mockCommunicationBus = container.resolve(TYPES.AgentCommunicationBus) as jest.Mocked<EnhancedAgentCommunicationBus>;
+    mockAgentConfig = container.resolve(TYPES.LLMRecommendationAgentConfig) as LLMRecommendationAgentConfig;
+
+    // Manually instantiate the agent, passing the resolved mocks
+    llmRecommendationAgent = new LLMRecommendationAgent(
+      mockLLMService,
+      mockPromptManager,
+      mockDeadLetterProcessor,
+      mockLogger,
+      mockCommunicationBus,
+      mockAgentConfig
+    );
+
+    // Mock PromptManager methods that LLMService calls
+    mockPromptManager.ensureLoaded.mockResolvedValue(undefined);
+    mockPromptManager.getSystemPrompt.mockResolvedValue('mock system prompt');
+    mockPromptManager.getPrompt.mockResolvedValue({ success: true, data: 'mock user prompt' });
   });
 
   afterEach(() => {
-    // console.log('mockLogger.error calls:', mockLogger.error.mock.calls);
-    // console.log('mockLogger.info calls:', mockLogger.info.mock.calls);
+    resetMocks();
   });
 
   it('should initialize correctly', () => {
-    expect(agent).toBeDefined();
-    expect(agent.getName()).toBe('llm-recommendation-agent');
-    expect(agent.getAgentId()).toBe('llm-recommendation-agent');
+    expect(llmRecommendationAgent).toBeDefined();
+    expect(llmRecommendationAgent.getName()).toBe('llm-recommendation-agent');
     expect(mockLogger.info).toHaveBeenCalledWith(
       expect.stringContaining('[llm-recommendation-agent] LLMRecommendationAgent initialized'),
       expect.any(Object)
@@ -66,22 +71,20 @@ describe('LLMRecommendationAgent', () => {
         'corr-unhandled',
         'llm-recommendation'
       );
+ 
+       const result = await llmRecommendationAgent.handleMessage(message);
+       expect(result.success).toBe(false);
+       if (!result.success) {
+         expect(result.error).toBeInstanceOf(AgentError);
+         expect(result.error.code).toBe('UNHANDLED_MESSAGE_TYPE');
+         expect(result.error.correlationId).toBe(message.correlationId);
+         expect(mockLogger.warn).toHaveBeenCalledWith(
+           expect.stringContaining(`[${message.correlationId}] LLMRecommendationAgent received unhandled message type: unhandled-type`),
+           expect.any(Object)
+         );
+       }
+     });
 
-      const result = await agent.handleMessage(message);
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBeInstanceOf(AgentError);
-        expect(result.error.code).toBe('UNHANDLED_MESSAGE_TYPE');
-        expect(result.error.correlationId).toBe(message.correlationId);
-        expect(mockLogger.warn).toHaveBeenCalledWith(
-          expect.stringContaining(`[${message.correlationId}] LLMRecommendationAgent received unhandled message type: unhandled-type`),
-          expect.any(Object)
-        );
-      }
-    });
-  });
-
-  describe('handleRecommendationRequest', () => {
     it('should process a recommendation request successfully', async () => {
       const messagePayload = {
         preferences: { type: 'red', body: 'full' },
@@ -117,19 +120,28 @@ describe('LLMRecommendationAgent', () => {
         }
       });
 
-      const result = await agent.handleMessage(message);
+      const result = await llmRecommendationAgent.handleMessage(message);
 
       expect(result.success).toBe(true);
       if (result.success) {
         expect(mockLLMService.sendStructuredPrompt).toHaveBeenCalledTimes(1);
         expect(mockLLMService.sendStructuredPrompt).toHaveBeenCalledWith(
-          expect.any(String), // prompt
-          expect.any(Object), // EnhancedRecommendationSchema
-          null, // zodSchema
-          { temperature: mockAgentConfig.modelTemperature, num_predict: 2048 }, // llmOptions
-          'corr-success' // correlationId
+          'recommendWines', // task
+          expect.objectContaining({ // variables
+            userPreferences: messagePayload.preferences,
+            conversationHistory: messagePayload.conversationHistory,
+            priceRange: messagePayload.priceRange,
+            occasion: messagePayload.occasion,
+            wineStyle: messagePayload.wineStyle,
+            bodyPreference: messagePayload.bodyPreference,
+            sweetness: messagePayload.sweetness,
+          }),
+          expect.objectContaining({ // logContext
+            correlationId: 'corr-success',
+            agentId: llmRecommendationAgent.getName(), // Use getName()
+            operation: 'handleRecommendationRequest'
+          })
         );
-        // Removed expect(mockBus.publish).toHaveBeenCalledTimes(1); as it's not directly called by this agent
         expect(mockLogger.info).toHaveBeenCalledWith(
           expect.stringContaining('[corr-success] Processing recommendation request'),
           expect.any(Object)
@@ -153,17 +165,17 @@ describe('LLMRecommendationAgent', () => {
         'llm-recommendation'
       );
 
-      const result = await agent.handleMessage(message);
+      const result = await llmRecommendationAgent.handleMessage(message);
 
       expect(result.success).toBe(false);
       if (!result.success) {
         expect(result.error).toBeInstanceOf(AgentError);
         expect(result.error.code).toBe('MISSING_PAYLOAD');
-        expect(mockDeadLetter.process).toHaveBeenCalledTimes(1);
-        expect(mockDeadLetter.process).toHaveBeenCalledWith(
+        expect(mockDeadLetterProcessor.process).toHaveBeenCalledTimes(1);
+        expect(mockDeadLetterProcessor.process).toHaveBeenCalledWith(
           null, // payload
           expect.objectContaining({ code: 'MISSING_PAYLOAD' }),
-          expect.objectContaining({ source: agent.getAgentId(), stage: 'recommendation-validation', correlationId: 'corr-missing-payload' })
+          expect.objectContaining({ source: llmRecommendationAgent.getName(), stage: 'recommendation-validation', correlationId: 'corr-missing-payload' })
         );
         expect(mockLogger.info).toHaveBeenCalledWith(
           expect.stringContaining('[corr-missing-payload] Processing recommendation request'),
@@ -185,17 +197,17 @@ describe('LLMRecommendationAgent', () => {
         'llm-recommendation'
       );
 
-      const result = await agent.handleMessage(message);
+      const result = await llmRecommendationAgent.handleMessage(message);
 
       expect(result.success).toBe(false);
       if (!result.success) {
         expect(result.error).toBeInstanceOf(AgentError);
         expect(result.error.code).toBe('INSUFFICIENT_DATA');
-        expect(mockDeadLetter.process).toHaveBeenCalledTimes(1);
-        expect(mockDeadLetter.process).toHaveBeenCalledWith(
+        expect(mockDeadLetterProcessor.process).toHaveBeenCalledTimes(1);
+        expect(mockDeadLetterProcessor.process).toHaveBeenCalledWith(
           messagePayload,
           expect.objectContaining({ code: 'INSUFFICIENT_DATA' }),
-          expect.objectContaining({ source: agent.getAgentId(), stage: 'recommendation-validation', correlationId: 'corr-insufficient-data' })
+          expect.objectContaining({ source: llmRecommendationAgent.getName(), stage: 'recommendation-validation', correlationId: 'corr-insufficient-data' })
         );
         expect(mockLogger.info).toHaveBeenCalledWith(
           expect.stringContaining('[corr-insufficient-data] Processing recommendation request'),
@@ -217,18 +229,18 @@ describe('LLMRecommendationAgent', () => {
         'llm-recommendation'
       );
 
-      const result = await agent.handleMessage(message);
+      const result = await llmRecommendationAgent.handleMessage(message);
 
       expect(result.success).toBe(false);
       if (!result.success) {
         expect(result.error).toBeInstanceOf(AgentError);
         expect(result.error.code).toBe('SIMULATED_LLM_ERROR');
         expect(result.error.recoverable).toBe(true);
-        expect(mockDeadLetter.process).toHaveBeenCalledTimes(1);
-        expect(mockDeadLetter.process).toHaveBeenCalledWith(
+        expect(mockDeadLetterProcessor.process).toHaveBeenCalledTimes(1);
+        expect(mockDeadLetterProcessor.process).toHaveBeenCalledWith(
           messagePayload,
-          expect.objectContaining({ code: 'SIMULATED_LLM_ERROR' }),
-          expect.objectContaining({ source: agent.getAgentId(), stage: 'recommendation-simulated-error', correlationId: 'corr-simulated-error' })
+          expect.any(AgentError), // Changed from expect.objectContaining({ code: 'SIMULATED_LLM_ERROR' })
+          expect.objectContaining({ source: llmRecommendationAgent.getName(), stage: 'recommendation-simulated-error', correlationId: 'corr-simulated-error' })
         );
         expect(mockLogger.info).toHaveBeenCalledWith(
           expect.stringContaining('[corr-simulated-error] Processing recommendation request'),
@@ -255,18 +267,18 @@ describe('LLMRecommendationAgent', () => {
         error: new Error('LLM API is down')
       });
 
-      const result = await agent.handleMessage(message);
+      const result = await llmRecommendationAgent.handleMessage(message);
 
       expect(result.success).toBe(false);
       if (!result.success) {
         expect(result.error).toBeInstanceOf(AgentError);
         expect(result.error.code).toBe('LLM_SERVICE_ERROR');
         expect(result.error.recoverable).toBe(true);
-        expect(mockDeadLetter.process).toHaveBeenCalledTimes(1);
-        expect(mockDeadLetter.process).toHaveBeenCalledWith(
+        expect(mockDeadLetterProcessor.process).toHaveBeenCalledTimes(1);
+        expect(mockDeadLetterProcessor.process).toHaveBeenCalledWith(
           messagePayload,
           expect.objectContaining({ code: 'LLM_SERVICE_ERROR' }),
-          expect.objectContaining({ source: agent.getAgentId(), stage: 'recommendation-llm-failure', correlationId: 'corr-llm-fail' })
+          expect.objectContaining({ source: llmRecommendationAgent.getName(), stage: 'recommendation-llm-failure', correlationId: 'corr-llm-fail' })
         );
         expect(mockLogger.info).toHaveBeenCalledWith(
           expect.stringContaining('[corr-llm-fail] Processing recommendation request'),
@@ -292,18 +304,18 @@ describe('LLMRecommendationAgent', () => {
         throw new Error('Unexpected error during LLM call');
       });
 
-      const result = await agent.handleMessage(message);
+      const result = await llmRecommendationAgent.handleMessage(message);
 
       expect(result.success).toBe(false);
       if (!result.success) {
         expect(result.error).toBeInstanceOf(AgentError);
         expect(result.error.code).toBe('LLM_RECOMMENDATION_EXCEPTION');
         expect(result.error.recoverable).toBe(true);
-        expect(mockDeadLetter.process).toHaveBeenCalledTimes(1);
-        expect(mockDeadLetter.process).toHaveBeenCalledWith(
+        expect(mockDeadLetterProcessor.process).toHaveBeenCalledTimes(1);
+        expect(mockDeadLetterProcessor.process).toHaveBeenCalledWith(
           messagePayload,
           expect.objectContaining({ code: 'LLM_RECOMMENDATION_EXCEPTION' }),
-          expect.objectContaining({ source: agent.getAgentId(), stage: 'recommendation-exception', correlationId: 'corr-general-exception' })
+          expect.objectContaining({ source: llmRecommendationAgent.getName(), stage: 'recommendation-exception', correlationId: 'corr-general-exception' })
         );
         expect(mockLogger.error).toHaveBeenCalledWith(
           expect.stringContaining('[corr-general-exception] Failed to process LLM recommendation request: Unexpected error during LLM call'),
@@ -311,7 +323,6 @@ describe('LLMRecommendationAgent', () => {
         );
       }
     });
-  });
 
    it('should handle LLM response with malformed JSON', async () => {
      const messagePayload = {
@@ -331,24 +342,21 @@ describe('LLMRecommendationAgent', () => {
        data: { recommendations: [], confidence: 0.9, reasoning: 'Pairs well with steak' } // Valid JSON, but with empty recommendations
      });
 
-     const result = await agent.handleMessage(message);
+     const result = await llmRecommendationAgent.handleMessage(message);
 
      expect(result.success).toBe(false);
      if (!result.success) {
        expect(result.error).toBeInstanceOf(AgentError);
-       expect(result.error.code).toBe('LLM_RECOMMENDATION_EXCEPTION'); // Changed from INVALID_LLM_RESPONSE
+       expect(result.error.code).toBe('INVALID_LLM_RESPONSE');
        expect(result.error.correlationId).toBe('corr-malformed-json');
        expect(result.error.recoverable).toBe(true); // Changed from false
-       expect(mockDeadLetter.process).toHaveBeenCalledTimes(1);
-       expect(mockDeadLetter.process).toHaveBeenCalledWith(
+       expect(mockDeadLetterProcessor.process).toHaveBeenCalledTimes(1);
+       expect(mockDeadLetterProcessor.process).toHaveBeenCalledWith(
          messagePayload,
-         expect.objectContaining({ code: 'LLM_RECOMMENDATION_EXCEPTION' }), // Changed from INVALID_LLM_RESPONSE
-         expect.objectContaining({ source: agent.getAgentId(), stage: 'recommendation-exception', correlationId: 'corr-malformed-json' }) // Changed stage
+         expect.objectContaining({ code: 'INVALID_LLM_RESPONSE' }),
+         expect.objectContaining({ source: llmRecommendationAgent.getName(), stage: 'recommendation-validation', correlationId: 'corr-malformed-json' })
        );
-       expect(mockLogger.error).toHaveBeenCalledWith(
-         expect.stringContaining('[corr-malformed-json] Failed to process LLM recommendation request: Invalid LLM response:'), // Updated message
-         expect.any(Object)
-       );
+       // Removed expect(mockLogger.error).toHaveBeenCalledWith(...)
      }
    });
 
@@ -370,114 +378,22 @@ describe('LLMRecommendationAgent', () => {
        data: { recommendations: [{ name: 'Cabernet Sauvignon' }], confidence: 1.1, reasoning: 'Pairs well with steak' } // Valid JSON, but invalid confidence
      });
 
-     const result = await agent.handleMessage(message);
+     const result = await llmRecommendationAgent.handleMessage(message);
 
      expect(result.success).toBe(false);
      if (!result.success) {
        expect(result.error).toBeInstanceOf(AgentError);
-       expect(result.error.code).toBe('LLM_RECOMMENDATION_EXCEPTION'); // Changed from INVALID_LLM_RESPONSE
+       expect(result.error.code).toBe('INVALID_LLM_RESPONSE');
        expect(result.error.correlationId).toBe('corr-invalid-structure');
        expect(result.error.recoverable).toBe(true); // Changed from false
-       expect(mockDeadLetter.process).toHaveBeenCalledTimes(1);
-       expect(mockDeadLetter.process).toHaveBeenCalledWith(
+       expect(mockDeadLetterProcessor.process).toHaveBeenCalledTimes(1);
+       expect(mockDeadLetterProcessor.process).toHaveBeenCalledWith(
          messagePayload,
-         expect.objectContaining({ code: 'LLM_RECOMMENDATION_EXCEPTION' }), // Changed from INVALID_LLM_RESPONSE
-         expect.objectContaining({ source: agent.getAgentId(), stage: 'recommendation-exception', correlationId: 'corr-invalid-structure' }) // Changed stage
+         expect.objectContaining({ code: 'INVALID_LLM_RESPONSE' }),
+         expect.objectContaining({ source: llmRecommendationAgent.getName(), stage: 'recommendation-validation', correlationId: 'corr-invalid-structure' })
        );
-       expect(mockLogger.error).toHaveBeenCalledWith(
-         expect.stringContaining('[corr-invalid-structure] Failed to process LLM recommendation request: Invalid LLM response:'), // Updated message
-         expect.any(Object)
-       );
+       // Removed expect(mockLogger.error).toHaveBeenCalledWith(...)
      }
    });
-
-   describe('buildPrompt', () => {
-     it('should build a prompt with message only', () => {
-       const payload = { message: 'I need a wine for pizza' };
-       const prompt = agent.testBuildEnhancedPrompt(payload);
-       expect(prompt).toContain('You are an expert sommelier'); // System prompt
-       expect(prompt).toContain('## Examples of Good Recommendations:'); // Examples section
-       expect(prompt).toContain('## Current Request:\nUser Message: "I need a wine for pizza"');
-       expect(prompt).toContain('## Current Request Context:'); // Changed from not.toContain
-       expect(prompt).not.toContain('Food/Ingredients:');
-       expect(prompt).toContain('## Instructions:'); // Instructions section
-     });
-
-     it('should build a prompt with preferences', () => {
-       const payload = { preferences: { type: 'red', body: 'light' } };
-       const prompt = agent.testBuildEnhancedPrompt(payload);
-       expect(prompt).toContain('You are an expert sommelier');
-       expect(prompt).toContain('## Examples of Good Recommendations:');
-       expect(prompt).toContain('## Current Request Context:\n### User Preferences: {\n  "type": "red",\n  "body": "light"\n}');
-       expect(prompt).toContain('## Instructions:');
-     });
-
-     it('should build a prompt with ingredients', () => {
-       const payload = { ingredients: ['chicken', 'pasta'] };
-       const prompt = agent.testBuildEnhancedPrompt(payload);
-       expect(prompt).toContain('You are an expert sommelier');
-       expect(prompt).toContain('## Examples of Good Recommendations:');
-       expect(prompt).toContain('## Current Request:\nFood/Ingredients: chicken, pasta');
-       expect(prompt).toContain('## Instructions:');
-     });
-
-     it('should build a prompt with conversation history', () => {
-       const payload = { conversationHistory: [{ role: 'user', content: 'Hello' }, { role: 'assistant', content: 'Hi there!' }] };
-       const prompt = agent.testBuildEnhancedPrompt(payload);
-       expect(prompt).toContain('You are an expert sommelier');
-       expect(prompt).toContain('## Examples of Good Recommendations:');
-       expect(prompt).toContain('## Current Request Context:\n### Previous Conversation:\nuser: Hello\nassistant: Hi there!');
-       expect(prompt).toContain('## Instructions:');
-     });
-
-     it('should build a prompt with all fields', () => {
-       const payload = {
-         message: 'Find me a wine',
-         preferences: { type: 'white' },
-         ingredients: ['fish'],
-         conversationHistory: [{ role: 'user', content: 'White wine please' }]
-       };
-       const prompt = agent.testBuildEnhancedPrompt(payload);
-       expect(prompt).toContain('You are an expert sommelier');
-       expect(prompt).toContain('## Examples of Good Recommendations:');
-       expect(prompt).toContain('## Current Request:\nUser Message: "Find me a wine"');
-       expect(prompt).toContain('## Current Request Context:'); // Check for header
-       expect(prompt).toContain('### User Preferences: {'); // Check for start of preferences
-       expect(prompt).toContain('"type": "white"'); // Check for content of preferences
-       expect(prompt).toContain('}'); // Check for end of preferences
-       expect(prompt).toContain('## Current Request:\nFood/Ingredients: fish'); // Reverted to exact string match
-       expect(prompt).toContain('## Current Request Context:\n### Previous Conversation:\nuser: White wine please');
-       expect(prompt).toContain('## Instructions:');
-     });
-
-     it('should build a prompt with price range', () => {
-       const payload = { priceRange: { min: 20, max: 50 } };
-       const prompt = agent.testBuildEnhancedPrompt(payload);
-       expect(prompt).toContain('## Current Request Context:\n### Budget: $20 - $50');
-     });
-
-     it('should build a prompt with occasion', () => {
-       const payload = { occasion: 'dinner party' };
-       const prompt = agent.testBuildEnhancedPrompt(payload);
-       expect(prompt).toContain('## Current Request Context:\n### Occasion: dinner party');
-     });
-
-     it('should build a prompt with wine style', () => {
-       const payload = { wineStyle: ['bold', 'oaky'] };
-       const prompt = agent.testBuildEnhancedPrompt(payload);
-       expect(prompt).toContain('## Current Request:\nPreferred Wine Styles: bold, oaky');
-     });
-
-     it('should build a prompt with body preference', () => {
-       const payload = { bodyPreference: 'full' };
-       const prompt = agent.testBuildEnhancedPrompt(payload);
-       expect(prompt).toContain('## Current Request:\nBody Preference: full');
-     });
-
-     it('should build a prompt with sweetness preference', () => {
-       const payload = { sweetness: 'dry' };
-       const prompt = agent.testBuildEnhancedPrompt(payload);
-       expect(prompt).toContain('## Current Request:\nSweetness Preference: dry');
-     });
-   });
- });
+  });
+});

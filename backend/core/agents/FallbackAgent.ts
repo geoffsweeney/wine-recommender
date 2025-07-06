@@ -143,7 +143,11 @@ export class FallbackAgent extends CommunicatingAgent {
     this.logger.info(`[${correlationId}] Generating fallback response`, { agentId: this.id, operation: 'generateFallbackResponse' });
     try {
       const prompt = `A request failed with error: ${payload.error.message}. Context: ${JSON.stringify(payload.context)}. Generate a helpful fallback response.`;
-      const llmResponseResult = await this.llmService.sendPrompt(prompt);
+      const llmResponseResult = await this.llmService.sendPrompt(
+        'rawLlmPrompt',
+        { promptContent: prompt },
+        { correlationId: correlationId }
+      );
       
       if (!llmResponseResult.success) {
         this.logger.warn(`[${correlationId}] LLM failed to generate fallback response: ${llmResponseResult.error.message}`, { agentId: this.id, operation: 'generateFallbackResponse', originalError: llmResponseResult.error.message });

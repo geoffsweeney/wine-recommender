@@ -2,10 +2,10 @@ import { mockDeep } from 'jest-mock-extended';
 import { createAgentMessage } from '../communication/AgentMessage';
 import { AgentError } from '../AgentError';
 import { ExplanationAgent, ExplanationAgentConfig } from '../ExplanationAgent';
-import { BasicDeadLetterProcessor } from '../../BasicDeadLetterProcessor';
-import { LLMService } from '@src/services/LLMService'; // Use alias
+import { BasicDeadLetterProcessor } from '../../DeadLetterProcessor';
+import { LLMService } from '../../../services/LLMService';
 import winston from 'winston';
-import { Result } from '@src/core/types/Result'; // Use alias
+import { PromptManager } from '../../../services/PromptManager'; // Import PromptManager
 
 // Test wrapper to access protected properties for testing
 class TestExplanationAgent extends ExplanationAgent {
@@ -19,6 +19,7 @@ describe('ExplanationAgent', () => {
   let mockDeadLetter: BasicDeadLetterProcessor;
   let mockLogger: winston.Logger;
   let mockLLMService: LLMService;
+  let mockPromptManager: PromptManager; // Added mockPromptManager
   let agent: TestExplanationAgent;
   let mockAgentConfig: ExplanationAgentConfig;
 
@@ -27,10 +28,11 @@ describe('ExplanationAgent', () => {
     mockDeadLetter = mockDeep<BasicDeadLetterProcessor>();
     mockLogger = mockDeep<winston.Logger>();
     mockLLMService = mockDeep<LLMService>();
+    mockPromptManager = mockDeep<PromptManager>(); // Initialized mockPromptManager
     mockAgentConfig = {
       defaultExplanation: 'This is a default explanation.'
     };
-    agent = new TestExplanationAgent(mockLLMService, mockDeadLetter, mockLogger, mockBus, mockAgentConfig);
+    agent = new TestExplanationAgent(mockLLMService, mockDeadLetter, mockLogger, mockBus, mockAgentConfig, mockPromptManager); // Added mockPromptManager
 
     jest.clearAllMocks();
   });
@@ -38,8 +40,10 @@ describe('ExplanationAgent', () => {
   describe('handleExplanationRequestInternal', () => {
     it('should generate and send an explanation for valid request', async () => {
       const messagePayload = {
-        recommendedWines: [{ id: '1', name: 'Wine A', region: 'Region A', type: 'Red' }],
-        recommendationContext: { ingredients: ['beef'] },
+        wineName: 'Wine A',
+        ingredients: ['beef'],
+        preferences: {},
+        recommendationContext: {},
         userId: 'user123'
       };
       const message = createAgentMessage(
@@ -51,28 +55,42 @@ describe('ExplanationAgent', () => {
         'ExplanationAgent'
       );
 
-      (mockLLMService.sendPrompt as jest.Mock).mockResolvedValueOnce({
+      (mockPromptManager.getPrompt as jest.Mock).mockResolvedValueOnce({
         success: true,
-        data: 'This is a generated explanation.'
+        data: 'This is a generated explanation prompt.'
+      });
+
+      (mockLLMService.sendStructuredPrompt as jest.Mock).mockResolvedValueOnce({
+        success: true,
+        data: { explanation: 'This is a generated explanation.' }
       });
 
       const result = await agent.handleExplanationRequestInternal(message);
 
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(mockLLMService.sendPrompt).toHaveBeenCalledTimes(1);
-        expect(mockBus.sendResponse).toHaveBeenCalledTimes(1);
-        expect(mockBus.sendResponse).toHaveBeenCalledWith(
-          'source-agent',
+        expect(mockPromptManager.getPrompt).toHaveBeenCalledTimes(1);
+        expect(mockPromptManager.getPrompt).toHaveBeenCalledWith(
+          'explanation',
           expect.objectContaining({
-            type: 'explanation-response',
-            payload: expect.objectContaining({
-              explanation: 'This is a generated explanation.',
-              recommendedWines: messagePayload.recommendedWines,
-              userId: messagePayload.userId
-            })
+            wineName: messagePayload.wineName,
+            ingredients: messagePayload.ingredients,
+            preferences: messagePayload.preferences,
+            recommendationContext: messagePayload.recommendationContext,
           })
         );
+        expect(mockLLMService.sendStructuredPrompt).toHaveBeenCalledTimes(1);
+        expect(mockLLMService.sendStructuredPrompt).toHaveBeenCalledWith(
+          'explanation',
+          expect.objectContaining({
+            wineName: messagePayload.wineName,
+            ingredients: messagePayload.ingredients,
+            preferences: messagePayload.preferences,
+            recommendationContext: messagePayload.recommendationContext,
+          }),
+          expect.any(Object) // LogContext
+        );
+     
         expect(mockLogger.info).toHaveBeenCalledWith(
           expect.stringContaining('[ExplanationAgent] Handling explanation request'),
           expect.objectContaining({ correlationId: 'corr-123' })
@@ -110,8 +128,10 @@ describe('ExplanationAgent', () => {
 
     it('should handle LLM service failure gracefully', async () => {
       const messagePayload = {
-        recommendedWines: [{ id: '1', name: 'Wine A', region: 'Region A', type: 'Red' }],
-        recommendationContext: { ingredients: ['beef'] },
+        wineName: 'Wine A',
+        ingredients: ['beef'],
+        preferences: {},
+        recommendationContext: {},
         userId: 'user123'
       };
       const message = createAgentMessage(
@@ -123,7 +143,12 @@ describe('ExplanationAgent', () => {
         'ExplanationAgent'
       );
 
-      (mockLLMService.sendPrompt as jest.Mock).mockResolvedValueOnce({
+      (mockPromptManager.getPrompt as jest.Mock).mockResolvedValueOnce({
+        success: true,
+        data: 'This is a generated explanation prompt.'
+      });
+
+      (mockLLMService.sendStructuredPrompt as jest.Mock).mockResolvedValueOnce({
         success: false,
         error: new AgentError('LLM is down', 'LLM_DOWN', 'LLMService', 'corr-789')
       });
@@ -148,7 +173,8 @@ describe('ExplanationAgent', () => {
         'corr-unhandled',
         'ExplanationAgent',
         'NORMAL',
-        { sender: 'test-agent', traceId: 'test-trace-unhandled' }
+        undefined, // userId (optional, not used here)
+        { sender: 'test-agent', traceId: 'test-trace-unhandled' } // metadata
       );
 
       const response = await agent.handleMessage(message);
@@ -168,7 +194,9 @@ describe('ExplanationAgent', () => {
   describe('error handling', () => {
     it('should process errors and send error response', async () => {
       const messagePayload = {
-        recommendedWines: [],
+        wineName: null,
+        ingredients: [],
+        preferences: {},
         recommendationContext: {},
         userId: 'user123'
       };
@@ -185,18 +213,23 @@ describe('ExplanationAgent', () => {
       console.log = jest.fn();
 
       // Simulate an error during LLM processing that propagates to the top-level catch
-      (mockLLMService.sendPrompt as jest.Mock).mockRejectedValue(new Error('Test error'));
-const result = await agent.handleExplanationRequestInternal(message);
+      (mockPromptManager.getPrompt as jest.Mock).mockResolvedValueOnce({
+        success: true,
+        data: 'This is a generated explanation prompt.'
+      });
+
+      (mockLLMService.sendStructuredPrompt as jest.Mock).mockRejectedValue(new Error('Test error'));
+      const result = await agent.handleExplanationRequestInternal(message);
 
 expect(result.success).toBe(false);
 if (!result.success) {
   expect(result.error).toBeInstanceOf(AgentError);
-  expect(result.error.code).toBe('LLM_SERVICE_EXCEPTION'); // Updated to match new error code
+  expect(result.error.code).toBe('EXPLANATION_GENERATION_ERROR'); // Updated to match new error code
   expect(result.error.correlationId).toBe('corr-error');
 }
 
       // Verify debug logs were called with expected messages
-      expect(console.log).toHaveBeenCalledWith(expect.stringContaining('DEBUG: Raw error caught:'), expect.any(AgentError));
+      expect(console.log).toHaveBeenCalledWith(expect.stringContaining('DEBUG: Raw error caught:'), expect.any(Error)); // Changed to expect.any(Error)
       expect(console.log).toHaveBeenCalledWith(expect.stringContaining('DEBUG: Processed error:'));
 
       // Restore console.log
@@ -214,7 +247,7 @@ if (!result.success) {
         })
       );
       expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('[ExplanationAgent] Error handling explanation request: LLM service error: Test error'),
+        expect.stringContaining('[ExplanationAgent] Error handling explanation request: Error generating explanation: Test error'),
         expect.objectContaining({ correlationId: 'corr-error' })
       );
     });

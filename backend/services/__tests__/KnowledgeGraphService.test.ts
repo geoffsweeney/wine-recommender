@@ -116,11 +116,9 @@ describe('KnowledgeGraphService', () => {
         }
       }]);
       expect(mockNeo4j.executeQuery).toHaveBeenCalledWith(
-        `
-      MATCH (w:Wine {id: $wineId})-[:SIMILAR_TO]->(similar:Wine)
-      RETURN similar
-      LIMIT $limit
-    `,
+        `MATCH (w:Wine {id: $wineId})-[:SIMILAR_TO]->(similar:Wine)
+RETURN similar
+LIMIT $limit`,
         { wineId: 'w1', limit: 5 }
       );
     });
@@ -157,10 +155,8 @@ describe('KnowledgeGraphService', () => {
         }
       }]);
       expect(mockNeo4j.executeQuery).toHaveBeenCalledWith(
-        `
-      MATCH (w:Wine {id: $wineId})-[:PAIRS_WITH]->(pairing:Wine)
-      RETURN pairing
-    `,
+        `MATCH (w:Wine {id: $wineId})-[:PAIRS_WITH]->(pairing:Wine)
+RETURN pairing`,
         { wineId: 'w1' }
       );
     });
@@ -213,14 +209,12 @@ describe('KnowledgeGraphService', () => {
       
       expect(results).toEqual(mockResults);
       expect(mockNeo4j.executeQuery).toHaveBeenCalledWith(
-        `
-      MATCH (i:Ingredient)
-      WHERE i.name IN $ingredients
-      MATCH (i)-[:PAIRS_WITH]->(w:Wine)
-      WITH w, count(DISTINCT i) as ingredientCount
-      WHERE ingredientCount = size($ingredients)
-      RETURN w
-    `,
+        `MATCH (i:Ingredient)
+WHERE i.name IN $ingredients
+MATCH (i)-[:PAIRS_WITH]->(w:Wine)
+WITH w, count(DISTINCT i) as ingredientCount
+WHERE ingredientCount = size($ingredients)
+RETURN w`,
         { ingredients: ['grape', 'oak'] }
       );
     });
@@ -277,10 +271,8 @@ describe('KnowledgeGraphService', () => {
       
       expect(results).toEqual(mockResults);
       expect(mockNeo4j.executeQuery).toHaveBeenCalledWith(
-        `
-      MATCH (w:Wine {type: $wineType})
-      RETURN w
-    `,
+        `MATCH (w:Wine {type: $wineType})
+RETURN w`,
         { wineType: 'Red' }
       );
     });

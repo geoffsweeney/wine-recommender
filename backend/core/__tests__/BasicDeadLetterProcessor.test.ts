@@ -1,5 +1,5 @@
 import "reflect-metadata"; // Required for tsyringe decorators
-import { BasicDeadLetterProcessor, LoggingDeadLetterHandler } from '../BasicDeadLetterProcessor';
+import { BasicDeadLetterProcessor, LoggingDeadLetterHandler } from '../DeadLetterProcessor';
 import { InMemoryDeadLetterQueue } from '../InMemoryDeadLetterQueue';
 import { BasicRetryManager } from '../BasicRetryManager'; // Import BasicRetryManager
 import { RetryManager } from '../RetryManager'; // Import abstract RetryManager for mocking

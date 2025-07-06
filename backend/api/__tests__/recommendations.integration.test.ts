@@ -1,18 +1,17 @@
-import request from 'supertest';
 import { Express } from 'express';
 import { Server } from 'http';
+import request from 'supertest';
 import { DependencyContainer } from 'tsyringe';
-import { createServer } from '../../server';
-import { EnhancedAgentCommunicationBus } from '../../core/agents/communication/EnhancedAgentCommunicationBus';
-import { AgentMessage, createAgentMessage, MessageTypes } from '../../core/agents/communication/AgentMessage';
-import { TYPES } from '../../di/Types';
-import { SommelierCoordinator } from '../../core/agents/SommelierCoordinator';
 import { v4 as uuidv4 } from 'uuid';
-import { createTestContainer } from '../../test-setup';
+import { AgentError } from '../../core/agents/AgentError'; // Added
+import { AgentMessage, createAgentMessage, MessageTypes } from '../../core/agents/communication/AgentMessage';
+import { EnhancedAgentCommunicationBus } from '../../core/agents/communication/EnhancedAgentCommunicationBus';
+import { SommelierCoordinator } from '../../core/agents/SommelierCoordinator';
+import { TYPES } from '../../di/Types';
+import { createServer } from '../../server';
 import { LLMService } from '../../services/LLMService';
 import { Neo4jService } from '../../services/Neo4jService';
-import { mock } from 'jest-mock-extended';
-import { AgentError } from '../../core/agents/AgentError'; // Added
+import { createTestContainer } from '../../test-setup';
 
 describe('Recommendations API', () => {
   let app: Express;

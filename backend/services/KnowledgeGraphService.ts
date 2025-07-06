@@ -5,7 +5,6 @@ import { WineNode, PreferenceNode, UserPreferences } from '../types'; // Import 
 import { TYPES } from '../di/Types';
 import winston from 'winston';
 
-
 @injectable()
 export class KnowledgeGraphService {
   constructor(
@@ -14,22 +13,56 @@ export class KnowledgeGraphService {
   ) {
     this.logger.info('KnowledgeGraphService initialized');
   }
-  async createWineNode(wine: WineNode): Promise<void> {
+
+  /**
+   * Add or update a user preference node and relationship.
+   */
+  async addOrUpdatePreference(userId: string, preference: any): Promise<void> {
     await this.neo4j.executeQuery(`
-      MERGE (w:Wine {id: $id})
-      SET w += $properties
+      MERGE (u:User {id: $userId})
+      MERGE (p:Preference {type: $type, value: $value})
+      ON CREATE SET p.source = $source, p.confidence = $confidence, p.timestamp = $timestamp, p.active = $active
+      ON MATCH SET p.source = $source, p.confidence = $confidence, p.timestamp = $timestamp, p.active = $active
+      MERGE (u)-[:HAS_PREFERENCE]->(p)
     `, {
-      id: wine.id,
-      properties: {
-        name: wine.name,
-        type: wine.type,
-        region: wine.region,
-        vintage: wine.vintage,
-        price: wine.price,
-        rating: wine.rating
-      }
+      userId,
+      type: preference.type,
+      value: preference.value,
+      source: preference.source,
+      confidence: preference.confidence,
+      timestamp: preference.timestamp,
+      active: preference.active,
     });
   }
+
+  /**
+   * Get user preferences, optionally including inactive ones.
+   */
+  async getPreferences(userId: string, includeInactive = false): Promise<any[]> {
+    const query = includeInactive
+      ? `
+      MATCH (u:User {id: $userId})-[:HAS_PREFERENCE]->(p:Preference)
+     RETURN p`
+      : `
+      MATCH (u:User {id: $userId})-[:HAS_PREFERENCE]->(p:Preference)
+     WHERE p.active = true RETURN p`;
+    const results = await this.neo4j.executeQuery<any>(query, { userId });
+    // Map to preference node objects
+    return results.map((record: any) => record.p);
+  }
+
+  /**
+   * Delete a user preference by id.
+   */
+  async deletePreference(userId: string, preferenceId: string): Promise<void> {
+    await this.neo4j.executeQuery(`
+      MATCH (u:User {id: $userId})-[r:HAS_PREFERENCE]->(p:Preference)
+      WHERE p.id = $preferenceId
+      DELETE r, p
+    `, { userId, preferenceId });
+  }
+
+  // ...existing methods continue here (no duplicate class declaration)...
 
   async findSimilarWines(wineId: string, limit: number = 5): Promise<WineNode[]> {
     // Ensure limit is a non-negative integer for the query
@@ -40,14 +73,9 @@ export class KnowledgeGraphService {
        integerLimit = 5; // Set default to 5 if invalid
     }
 
-    const similarWines = await this.neo4j.executeQuery<WineNode>(`
-       MATCH (w:Wine {id: $wineId})-[:SIMILAR_TO]->(similar:Wine)
-       RETURN similar
-       LIMIT $limit
-     `, { wineId, limit: integerLimit });
-
+    const cypher = 'MATCH (w:Wine {id: $wineId})-[:SIMILAR_TO]->(similar:Wine)\nRETURN similar\nLIMIT $limit';
+    const similarWines = await this.neo4j.executeQuery<WineNode>(cypher, { wineId, limit: integerLimit });
     this.logger.debug('KnowledgeGraphService - similarWines after executeQuery:', similarWines);
-
     return similarWines;
   }
 
@@ -56,17 +84,9 @@ export class KnowledgeGraphService {
       return [];
     }
 
-    const wines = await this.neo4j.executeQuery<WineNode>(`
-       MATCH (i:Ingredient)
-       WHERE i.name IN $ingredients
-       MATCH (i)-[:PAIRS_WITH]->(w:Wine)
-       WITH w, count(DISTINCT i) as ingredientCount
-       WHERE ingredientCount = size($ingredients)
-       RETURN w
-     `, { ingredients });
-
+    const cypher = 'MATCH (i:Ingredient)\nWHERE i.name IN $ingredients\nMATCH (i)-[:PAIRS_WITH]->(w:Wine)\nWITH w, count(DISTINCT i) as ingredientCount\nWHERE ingredientCount = size($ingredients)\nRETURN w';
+    const wines = await this.neo4j.executeQuery<WineNode>(cypher, { ingredients });
     this.logger.debug('KnowledgeGraphService - findWinesByIngredients after executeQuery:', wines);
-
     return wines;
   }
 
@@ -224,13 +244,9 @@ async findWinesByCombinedCriteria(ingredients: string[], preferences: UserPrefer
       return [];
     }
 
-    const wines = await this.neo4j.executeQuery<WineNode>(`
-       MATCH (w:Wine {type: $wineType})
-       RETURN w
-     `, { wineType });
-
+    const cypher = 'MATCH (w:Wine {type: $wineType})\nRETURN w';
+    const wines = await this.neo4j.executeQuery<WineNode>(cypher, { wineType });
     this.logger.debug('KnowledgeGraphService - findWinesByType after executeQuery:', wines);
-
     return wines;
   }
 
@@ -249,10 +265,8 @@ async findWinesByCombinedCriteria(ingredients: string[], preferences: UserPrefer
   }
 
   async getWinePairings(wineId: string): Promise<WineNode[]> {
-    return this.neo4j.executeQuery<WineNode>(`
-       MATCH (w:Wine {id: $wineId})-[:PAIRS_WITH]->(pairing:Wine)
-       RETURN pairing
-     `, { wineId });
+    const cypher = 'MATCH (w:Wine {id: $wineId})-[:PAIRS_WITH]->(pairing:Wine)\nRETURN pairing';
+    return this.neo4j.executeQuery<WineNode>(cypher, { wineId });
   }
 
   async getWineById(wineId: string): Promise<WineNode | null> {
@@ -261,5 +275,23 @@ async findWinesByCombinedCriteria(ingredients: string[], preferences: UserPrefer
        RETURN w
      `, { wineId });
     return results[0] || null;
+  }
+  /**
+   * Create a new Wine node in the graph.
+   * @param wine The wine object to create (should match WineNode interface)
+   */
+  async createWineNode(wine: WineNode): Promise<void> {
+    // Defensive: ensure required fields exist
+    if (!wine.id || !wine.name) {
+      throw new Error('Wine must have at least an id and name');
+    }
+    // Separate id from other properties
+    const { id, ...properties } = wine;
+    const cypher = `
+      MERGE (w:Wine {id: $id})
+      SET w += $properties
+    `;
+    await this.neo4j.executeQuery(cypher, { id, properties });
+    this.logger.info(`Created or updated Wine node with id: ${wine.id}`);
   }
 }

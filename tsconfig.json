@@ -10,8 +10,9 @@
     "outDir": "./dist",
     "rootDir": "./",
     "baseUrl": "./",
-    "typeRoots": ["./node_modules/@types"],
+    "typeRoots": ["./node_modules/@types", "./backend/di"], // Add backend/di to typeRoots
     "paths": {
+      "@src/*": ["./backend/*"],
       "*": ["node_modules/*"]
     },
     "experimentalDecorators": true,

@@ -48,6 +48,27 @@ export interface PreferenceExtractionResultPayload {
     originalSourceAgent?: string;
 }
 
+import { z } from 'zod';
+
+export const PreferenceExtractionResultPayloadSchema = z.object({
+    isValid: z.boolean(),
+    preferences: z.object({
+        style: z.string().optional(),
+        color: z.string().optional(),
+        priceRange: z.tuple([z.number(), z.number()]).optional(),
+        ingredients: z.array(z.string()).optional(),
+        pairing: z.string().optional(),
+        cookingMethod: z.string().optional(),
+        suggestedPairings: z.array(z.string()).optional(),
+        pairingConfidence: z.number().optional(),
+    }).passthrough(), // Use passthrough to allow for additional properties not explicitly defined
+    ingredients: z.array(z.string()),
+    wineCharacteristics: z.record(z.array(z.string())).optional(),
+    pairingRecommendations: z.array(z.string()).optional(),
+    error: z.string().optional(),
+    originalSourceAgent: z.string().optional(),
+});
+
 /**
  * Represents the result of the ValueAnalysisAgent.
  */
@@ -55,6 +76,26 @@ export interface ValueAnalysisResult {
     // Define structure for value analysis outcome
     analysis?: any; // Placeholder for now, refine later
 }
+
+export const InputValidationSchema = z.object({
+    isValid: z.boolean(),
+    cleanedInput: z.object({
+      ingredients: z.array(z.string()).optional(),
+      budget: z.union([z.number(), z.null()]),
+      occasion: z.union([z.string(), z.null()]),
+    }).optional(),
+    extractedData: z.object({
+      standardizedIngredients: z.record(z.union([z.string(), z.array(z.string())])).optional(),
+      dietaryRestrictions: z.array(z.string()).optional(),
+      preferences: z.record(z.any()).optional(),
+    }).optional(),
+    errors: z.array(z.string()).optional(),
+});
+
+export const ExplanationConfidenceSchema = z.object({
+    explanation: z.string(),
+    confidence: z.number(),
+});
 
 /**
  * Represents the structured recommendation output from a Recommendation Agent.
@@ -69,6 +110,28 @@ export interface RecommendationResult {
     source?: 'knowledge_graph' | 'llm' | 'hybrid'; // Source of the recommendation
     error?: string; // Optional error message
 }
+
+export const RecommendationResultSchema = z.object({
+    recommendations: z.array(z.object({
+        name: z.string(),
+        grapeVarieties: z.array(z.object({
+            name: z.string(),
+            percentage: z.number().optional()
+        })).optional()
+    })),
+    reasoning: z.string().optional(),
+    confidence: z.number(),
+    pairingNotes: z.string().optional(),
+    alternatives: z.array(z.object({
+        name: z.string(),
+        grapeVarieties: z.array(z.object({
+            name: z.string(),
+            percentage: z.number().optional()
+        })).optional()
+    })).optional(),
+    source: z.union([z.literal('knowledge_graph'), z.literal('llm'), z.literal('hybrid')]).optional(),
+    error: z.string().optional(),
+});
 
 /**
  * Represents the result of the ExplanationAgent.

@@ -1,9 +1,9 @@
 module.exports = {
   displayName: 'frontend',
   testEnvironment: 'jsdom',
-  rootDir: './frontend/wine-recommender',
+  rootDir: '.',
   moduleNameMapper: {
-    '^@/(.*)$': '<rootDir>/$1',
+    '^@/(.*)$': '<rootDir>/src/$1', // Updated to point to src
     '\\.(css|less|scss|sass)$': 'identity-obj-proxy'
   },
   transform: {
@@ -13,14 +13,16 @@ module.exports = {
         '@babel/preset-typescript',
         '@babel/preset-react'
       ],
+      // Explicitly set tsconfig path relative to this jest config file
+      tsconfig: 'tsconfig.test.json' 
     }],
   },
   testMatch: [
-    '<rootDir>/**/__tests__/**/*.test.[jt]s?(x)',
-    '<rootDir>/**/?(*.)+(spec|test).[jt]s?(x)'
+    '<rootDir>/src/**/__tests__/**/*.test.[jt]s?(x)', // Updated to point to src
+    '<rootDir>/src/**/?(*.)+(spec|test).[jt]s?(x)' // Updated to point to src
   ],
   testPathIgnorePatterns: ['<rootDir>/e2e/'],
-  setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
+  // Removed setupFilesAfterEnv as jest.setup.ts is missing
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   transformIgnorePatterns: [
     '/node_modules/(?!@swc/helpers|@babel/runtime)/'

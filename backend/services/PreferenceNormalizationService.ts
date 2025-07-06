@@ -1,9 +1,9 @@
-import { injectable, inject } from 'tsyringe'; // Import injectable and inject
-import { TYPES } from '../di/Types'; // Import TYPES
-import { ILogger, LLMService } from './LLMService'; // Import ILogger and LLMService
-import { PreferenceNode } from '../types';
+import { inject, injectable } from 'tsyringe'; // Import injectable and inject
 import { z } from 'zod'; // Import Zod for schema definition
 import { AgentError } from '../core/agents/AgentError'; // Import AgentError
+import { ILogger, TYPES } from '../di/Types'; // Import TYPES
+import { PreferenceNode } from '../types';
+import { LLMService } from './LLMService'; // Import LLMService
 
 @injectable()
 export class PreferenceNormalizationService {
@@ -71,8 +71,8 @@ export class PreferenceNormalizationService {
 
   // Define the Zod schema for the LLM's synonym resolution output
   private readonly SynonymResolutionSchema = z.object({
-    canonicalTerm: z.string().optional().describe("The canonical, normalized term for the given input synonym."),
-  }).describe("Schema for resolving a synonym to its canonical term using an LLM.");
+    canonicalTerm: z.string().optional(),
+  });
 
   /**
    * Resolves a given synonym to its canonical term using an LLM.
@@ -87,23 +87,27 @@ export class PreferenceNormalizationService {
       return ''; // Return empty string directly if synonym is empty
     }
     this.logger.info(`Attempting to resolve synonym "${synonym}" for type "${type}" with LLM.`);
-    const prompt = `Given the preference type "${type}" and the user's input "${synonym}", identify the most appropriate canonical term. The canonical term should be a standardized, widely recognized term within the wine domain for this preference. If the input is already a canonical term or cannot be mapped, return the input as is.
-
-    Examples:
-    - type: "wineType", input: "reds" -> canonicalTerm: "red"
-    - type: "wineType", input: "shiraz" -> canonicalTerm: "syrah"
-    - type: "sweetness", input: "bone dry" -> canonicalTerm: "dry"
-    - type: "region", input: "california" -> canonicalTerm: "USA"
-    - type: "wineType", input: "merlot" -> canonicalTerm: "merlot"
-
-    Your response MUST be a JSON object matching the following schema:
-    ${JSON.stringify(this.SynonymResolutionSchema.parse({}), null, 2)}
-    `;
+    const examples = `
+- type: "wineType", input: "reds" -> canonicalTerm: "red"
+- type: "wineType", input: "shiraz" -> canonicalTerm: "syrah"
+- type: "sweetness", input: "bone dry" -> canonicalTerm: "dry"
+- type: "region", input: "california" -> canonicalTerm: "USA"
+- type: "wineType", input: "merlot" -> canonicalTerm: "merlot"
+`;
 
     try {
-      const result = await this.llmService.sendStructuredPrompt<z.infer<typeof this.SynonymResolutionSchema>>(
-        prompt,
-        this.SynonymResolutionSchema
+      const result = await this.llmService.sendStructuredPrompt<
+        'resolveSynonym',
+        z.infer<typeof this.SynonymResolutionSchema>
+      >(
+        'resolveSynonym',
+        {
+          type: type,
+          synonym: synonym,
+          examples: examples,
+          schema: JSON.stringify(this.SynonymResolutionSchema.parse({}), null, 2)
+        },
+        { correlationId: `synonym-resolution-${type}-${synonym}` } // Add a log context
       );
 
       if (result.success) {

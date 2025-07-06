@@ -1,9 +1,7 @@
-import { UserPreferenceController } from '../../controllers/UserPreferenceController';
 import { Request, Response } from 'express';
-import { TYPES } from '../../../di/Types';
-import { createTestContainer } from '../../../test-setup'; // Import the test container factory
 import { DependencyContainer } from 'tsyringe';
-import { mock } from 'jest-mock-extended'; // Import mock for comprehensive mocking
+import { createTestContainer } from '../../../test-setup'; // Import the test container factory
+import { UserPreferenceController } from '../../controllers/UserPreferenceController';
 
 describe('UserPreferenceController', () => {
   let controller: UserPreferenceController;
@@ -24,9 +22,11 @@ describe('UserPreferenceController', () => {
     // Mock Request and Response objects
     jsonSpy = jest.fn();
     statusSpy = jest.fn().mockReturnValue({ json: jsonSpy });
+    const sendStatusSpy = jest.fn(); // Mock sendStatus
     mockResponse = {
       status: statusSpy,
       json: jsonSpy, // Also mock json directly for cases without status chaining
+      sendStatus: sendStatusSpy, // Add sendStatus to mockResponse
     };
     mockRequest = {
       params: {},
@@ -49,7 +49,7 @@ describe('UserPreferenceController', () => {
       await controller.execute(mockRequest as Request, mockResponse as Response);
 
       expect(statusSpy).toHaveBeenCalledWith(200); // Should set status 200 for successful response
-      expect(jsonSpy).toHaveBeenCalledWith([]); // Expect an empty array as per controller logic
+      expect(jsonSpy).toHaveBeenCalledWith({}); // Expect an empty object as per controller logic
     });
 
     it('should return 400 if user ID is missing', async () => {

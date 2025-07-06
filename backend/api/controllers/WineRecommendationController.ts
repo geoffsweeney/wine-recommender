@@ -14,7 +14,7 @@ import { ISearchStrategy } from '../../services/interfaces/ISearchStrategy';
 import { LLMService } from '../../services/LLMService';
 import { RecommendationRequest } from '../dtos/RecommendationRequest.dto';
 import { SearchRequest } from '../dtos/SearchRequest.dto';
-import { ILogger } from '../../services/LLMService';
+import { ILogger } from '../../di/Types';
 
 @injectable()
 export class WineRecommendationController extends BaseController {
@@ -27,7 +27,7 @@ export class WineRecommendationController extends BaseController {
     super();
   }
 
-  protected async executeImpl(req: ValidatedRequest, res: Response): Promise<void> { // Cast req to ValidatedRequest
+  public async executeImpl(req: ValidatedRequest, res: Response): Promise<void> { // Cast req to ValidatedRequest
     const { method } = req;
     this.logger.info(`Received wine recommendation request [${method}]`, { body: req.body, query: req.query });
     this.logger.info(`Validated body: ${JSON.stringify(req.validatedBody)}`);

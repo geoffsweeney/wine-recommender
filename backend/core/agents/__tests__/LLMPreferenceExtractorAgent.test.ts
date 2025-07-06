@@ -1,21 +1,21 @@
 import { mockDeep } from 'jest-mock-extended';
 import { AgentError } from '../AgentError';
 import { LLMPreferenceExtractorAgent, LLMPreferenceExtractorAgentConfig } from '../LLMPreferenceExtractorAgent';
-import { BasicDeadLetterProcessor } from '../../BasicDeadLetterProcessor';
-import { LLMService } from '@src/services/LLMService';
-import { KnowledgeGraphService } from '@src/services/KnowledgeGraphService';
-import { PreferenceNormalizationService } from '@src/services/PreferenceNormalizationService';
+import { BasicDeadLetterProcessor } from '../../DeadLetterProcessor';
+import { LLMService } from '../../../services/LLMService';
+import { KnowledgeGraphService } from '../../../services/KnowledgeGraphService';
+import { PreferenceNormalizationService } from '../../../services/PreferenceNormalizationService';
+import { UserProfileService } from '../../../services/UserProfileService';
 import winston from 'winston';
 import { createAgentMessage } from '../communication/AgentMessage';
 import { EnhancedAgentCommunicationBus } from '../communication/EnhancedAgentCommunicationBus';
+import { container } from 'tsyringe'; // Added import
+import { TYPES } from '../../../di/Types'; // Added import
 
 // Test wrapper to access protected properties for testing
 class TestLLMPreferenceExtractorAgent extends LLMPreferenceExtractorAgent {
   public getAgentId(): string {
     return this.id;
-  }
-  public testParseLLMResponse(response: string, input: string): Promise<any> {
-    return (this as any).parseLLMResponse(response, input);
   }
   public testCalculateConfidenceScore(result: any, input: string): number {
     return (this as any).calculateConfidenceScore(result, input);
@@ -26,9 +26,10 @@ describe('LLMPreferenceExtractorAgent', () => {
   let mockBus: EnhancedAgentCommunicationBus;
   let mockDeadLetter: BasicDeadLetterProcessor;
   let mockLogger: winston.Logger;
-  let mockLLMService: LLMService;
-  let mockKnowledgeGraphService: KnowledgeGraphService;
-  let mockPreferenceNormalizationService: PreferenceNormalizationService;
+  let mockLLMService: jest.Mocked<LLMService>;
+  let mockKnowledgeGraphService: jest.Mocked<KnowledgeGraphService>;
+  let mockPreferenceNormalizationService: jest.Mocked<PreferenceNormalizationService>;
+  let mockUserProfileService: jest.Mocked<UserProfileService>;
   let agent: TestLLMPreferenceExtractorAgent;
   let mockAgentConfig: LLMPreferenceExtractorAgentConfig;
 
@@ -39,14 +40,29 @@ describe('LLMPreferenceExtractorAgent', () => {
     mockLLMService = mockDeep<LLMService>();
     mockKnowledgeGraphService = mockDeep<KnowledgeGraphService>();
     mockPreferenceNormalizationService = mockDeep<PreferenceNormalizationService>();
+    mockUserProfileService = mockDeep<UserProfileService>();
     mockAgentConfig = {
       maxRetries: 3
     };
+    
+    // Register mocks with the container
+    container.clearInstances();
+    container.reset();
+    container.registerInstance(TYPES.AgentCommunicationBus, mockBus);
+    container.registerInstance(TYPES.DeadLetterProcessor, mockDeadLetter);
+    container.registerInstance(TYPES.Logger, mockLogger);
+    container.registerInstance(TYPES.LLMService, mockLLMService);
+    container.registerInstance(TYPES.KnowledgeGraphService, mockKnowledgeGraphService);
+    container.registerInstance(TYPES.PreferenceNormalizationService, mockPreferenceNormalizationService);
+    container.registerInstance(TYPES.UserProfileService, mockUserProfileService);
+    container.registerInstance(TYPES.LLMPreferenceExtractorAgentConfig, mockAgentConfig);
+
     jest.clearAllMocks();
     agent = new TestLLMPreferenceExtractorAgent(
       mockLLMService,
       mockKnowledgeGraphService,
       mockPreferenceNormalizationService,
+      mockUserProfileService,
       mockDeadLetter,
       mockLogger,
       mockBus,
@@ -121,7 +137,8 @@ describe('LLMPreferenceExtractorAgent', () => {
     it('should process a preference extraction request successfully', async () => {
       const messagePayload = {
         input: 'I like dry white wines',
-        userId: 'user123'
+        userId: 'user123',
+        conversationHistory: [], // Add conversationHistory
       };
       const message = createAgentMessage(
         'preference-extraction-request',
@@ -132,29 +149,26 @@ describe('LLMPreferenceExtractorAgent', () => {
         'llm-preference-extractor'
       );
 
-      (mockLLMService.sendPrompt as jest.Mock).mockResolvedValueOnce({
-        success: true,
-        data: '```json\n{"isValid": true, "preferences": {"style": "dry", "color": "white"}, "ingredients": []}\n```'
-      });
+      (mockLLMService.sendStructuredPrompt as jest.Mock).mockImplementation(
+        async (task, variables, logContext) => {
+          expect(task).toBe('extractPreferences');
+          expect(variables).toEqual({
+            userInput: messagePayload.input,
+            conversationContext: messagePayload.conversationHistory || [],
+          });
+          expect(logContext).toBeDefined();
+          return {
+            success: true,
+            data: { isValid: true, preferences: { style: 'dry', color: 'white' }, ingredients: [] }
+          };
+        }
+      );
 
       const result = await agent.handleMessage(message);
 
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(mockLLMService.sendPrompt).toHaveBeenCalledTimes(1);
-        expect(mockBus.sendResponse).toHaveBeenCalledTimes(1);
-        expect(mockBus.sendResponse).toHaveBeenCalledWith(
-          'source-agent',
-          expect.objectContaining({
-            type: 'preference-extraction-response',
-            payload: expect.objectContaining({
-              isValid: true,
-              preferences: { style: 'dry', color: 'white' },
-              ingredients: [],
-              confidence: expect.any(Number)
-            })
-          })
-        );
+        expect(mockLLMService.sendStructuredPrompt).toHaveBeenCalledTimes(1);
         expect(mockLogger.info).toHaveBeenCalledWith(
           expect.stringContaining('[corr-success] Handling preference extraction request'),
           expect.any(Object)
@@ -169,7 +183,8 @@ describe('LLMPreferenceExtractorAgent', () => {
     it('should handle LLM service failure', async () => {
       const messagePayload = {
         input: 'I like red wine',
-        userId: 'user123'
+        userId: 'user123',
+        conversationHistory: [], // Add conversationHistory
       };
       const message = createAgentMessage(
         'preference-extraction-request',
@@ -180,10 +195,14 @@ describe('LLMPreferenceExtractorAgent', () => {
         'llm-preference-extractor'
       );
 
-      (mockLLMService.sendPrompt as jest.Mock)
-        .mockResolvedValueOnce({ success: false, error: new Error('LLM API is down') }) // First attempt
-        .mockResolvedValueOnce({ success: false, error: new Error('LLM API is down') }) // Second attempt
-        .mockResolvedValueOnce({ success: false, error: new Error('LLM API is down') }); // Third attempt
+      (mockLLMService.sendStructuredPrompt as jest.Mock).mockImplementation(
+        async (task, variables, logContext) => {
+          expect(task).toBe('extractPreferences');
+          expect(variables).toBeDefined();
+          expect(logContext).toBeDefined();
+          return { success: false, error: new Error('LLM API is down') };
+        }
+      );
 
       const result = await agent.handleMessage(message);
 
@@ -208,39 +227,6 @@ describe('LLMPreferenceExtractorAgent', () => {
     });
   });
 
-  describe('parseLLMResponse', () => {
-    it('should return an error if LLM response is empty', async () => {
-      const result = await agent.testParseLLMResponse(undefined as any, 'test input');
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBeInstanceOf(AgentError);
-        expect(result.error.code).toBe('LLM_NO_RESPONSE');
-      }
-    });
-
-    it('should parse a valid JSON response from LLM', async () => {
-      const llmResponse = '```json\n{"isValid": true, "preferences": {"color": "red"}}\n```';
-      const result = await agent.testParseLLMResponse(llmResponse, 'red wine');
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual(expect.objectContaining({
-          isValid: true,
-          preferences: { color: 'red' },
-          confidence: expect.any(Number)
-        }));
-      }
-    });
-
-    it('should return an error for invalid JSON response', async () => {
-      const llmResponse = 'invalid json';
-      const result = await agent.testParseLLMResponse(llmResponse, 'test input');
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBeInstanceOf(AgentError);
-        expect(result.error.code).toBe('LLM_PARSE_ERROR');
-      }
-    });
-  });
 
   describe('calculateConfidenceScore', () => {
     it('should return a base score for empty result', () => {

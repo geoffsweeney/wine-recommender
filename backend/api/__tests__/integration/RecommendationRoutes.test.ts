@@ -1,12 +1,12 @@
-import request from 'supertest';
 import express, { Express } from 'express';
-import { container, DependencyContainer } from 'tsyringe';
-import { TYPES } from '../../../di/Types';
-import createRouter from '../../routes'; // Import createRouter function
+import { mock } from 'jest-mock-extended';
+import request from 'supertest';
+import { container } from 'tsyringe';
+import { AgentMessage, MessageTypes } from '../../../core/agents/communication/AgentMessage';
 import { EnhancedAgentCommunicationBus } from '../../../core/agents/communication/EnhancedAgentCommunicationBus';
 import { SommelierCoordinator } from '../../../core/agents/SommelierCoordinator'; // Import SommelierCoordinator
-import { mock } from 'jest-mock-extended';
-import { AgentMessage, MessageTypes } from '../../../core/agents/communication/AgentMessage';
+import { TYPES } from '../../../di/Types';
+import createRouter from '../../routes'; // Import createRouter function
 
 describe('RecommendationRoutes', () => {
   let app: Express;
@@ -75,10 +75,15 @@ describe('RecommendationRoutes', () => {
         'sommelier-coordinator',
         expect.objectContaining({
           type: MessageTypes.ORCHESTRATE_RECOMMENDATION_REQUEST,
-          payload: {
-            userId: 'test-user-123',
-            input: { preferences: { wineType: 'red' }, recommendationSource: 'knowledgeGraph' },
-          },
+          payload: expect.objectContaining({
+            userInput: expect.objectContaining({
+              userId: 'test-user-123',
+              input: expect.objectContaining({ preferences: { wineType: 'red' }, recommendationSource: 'knowledgeGraph' }),
+            }),
+            conversationId: expect.any(String),
+            correlationId: expect.any(String),
+            sourceAgent: 'api',
+          }),
           targetAgent: 'sommelier-coordinator',
         })
       );
@@ -204,10 +209,15 @@ describe('RecommendationRoutes', () => {
         'sommelier-coordinator',
         expect.objectContaining({
           type: MessageTypes.ORCHESTRATE_RECOMMENDATION_REQUEST,
-          payload: {
-            userId: 'test-user-fp',
-            input: { preferences: { foodPairing: 'steak', wineType: 'red' }, recommendationSource: 'knowledgeGraph' },
-          },
+          payload: expect.objectContaining({
+            userInput: expect.objectContaining({
+              userId: 'test-user-fp',
+              input: expect.objectContaining({ preferences: { foodPairing: 'steak', wineType: 'red' }, recommendationSource: 'knowledgeGraph' }),
+            }),
+            conversationId: expect.any(String),
+            correlationId: expect.any(String),
+            sourceAgent: 'api',
+          }),
           targetAgent: 'sommelier-coordinator',
         })
       );
@@ -245,10 +255,15 @@ describe('RecommendationRoutes', () => {
         'sommelier-coordinator',
         expect.objectContaining({
           type: MessageTypes.ORCHESTRATE_RECOMMENDATION_REQUEST,
-          payload: {
-            userId: 'test-user-ing',
-            input: { ingredients: ['chicken', 'mushrooms'], recommendationSource: 'knowledgeGraph' },
-          },
+          payload: expect.objectContaining({
+            userInput: expect.objectContaining({
+              userId: 'test-user-ing',
+              input: expect.objectContaining({ ingredients: ['chicken', 'mushrooms'], recommendationSource: 'knowledgeGraph' }),
+            }),
+            conversationId: expect.any(String),
+            correlationId: expect.any(String),
+            sourceAgent: 'api',
+          }),
           targetAgent: 'sommelier-coordinator',
         })
       );
@@ -290,14 +305,19 @@ describe('RecommendationRoutes', () => {
         'sommelier-coordinator',
         expect.objectContaining({
           type: MessageTypes.ORCHESTRATE_RECOMMENDATION_REQUEST,
-          payload: {
-            userId: 'test-user-conv',
-            input: { message: 'I like light-bodied red wines.', recommendationSource: 'knowledgeGraph' },
-            conversationHistory: [
-              { role: 'user', content: 'Hi, I need a wine recommendation.' },
-              { role: 'assistant', content: 'Sure, what are you looking for?' },
-            ],
-          },
+          payload: expect.objectContaining({
+            userInput: expect.objectContaining({
+              userId: 'test-user-conv',
+              input: expect.objectContaining({ message: 'I like light-bodied red wines.', recommendationSource: 'knowledgeGraph' }),
+              conversationHistory: expect.arrayContaining([
+                expect.objectContaining({ role: 'user', content: 'Hi, I need a wine recommendation.' }),
+                expect.objectContaining({ role: 'assistant', content: 'Sure, what are you looking for?' }),
+              ]),
+            }),
+            conversationId: expect.any(String),
+            correlationId: expect.any(String),
+            sourceAgent: 'api',
+          }),
           targetAgent: 'sommelier-coordinator',
         })
       );

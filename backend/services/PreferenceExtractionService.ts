@@ -1,11 +1,11 @@
 import { injectable, inject } from 'tsyringe';
 import { TYPES } from '../di/Types';
-import { ILogger, LLMService } from './LLMService';
+import { LLMService } from './LLMService';
+import { ILogger } from '../di/Types';
 import { Result } from '../core/types/Result';
 import { AgentError } from '../core/agents/AgentError';
 import { ConversationTurn } from '../core/ConversationHistoryService';
-import { PreferenceExtractionSchema } from '../core/agents/LLMPreferenceExtractorAgent';
-import { PreferenceExtractionResultPayload } from '../types/agent-outputs';
+import { PreferenceExtractionResultPayload, PreferenceExtractionResultPayloadSchema } from '../types/agent-outputs';
 import { z } from 'zod';
 
 // Enhanced interface for HTTP client
@@ -284,6 +284,8 @@ export class PreferenceExtractionService {
 
   private extractFoodWinePairings(userInput: string): Result<{ [key: string]: any } | null, Error> {
     const lowerInput = userInput.toLowerCase();
+    // Reverted console.log to logger.info
+    this.logger.info(`extractFoodWinePairings: Processing input: "${lowerInput}"`);
     const detectedFoods: string[] = [];
     const pairingPreferences: { [key: string]: any } = {};
 
@@ -420,54 +422,20 @@ export class PreferenceExtractionService {
       operation: 'extractPreferencesWithLLM' 
     });
 
-    const enhancedExamples = [
-      'Example 1:',
-      'Input: "I prefer bold red wines under $30"',
-      'Output: { "isValid": true, "preferences": { "style": "bold", "color": "red", "priceRange": [0,30] }, "ingredients": [], "pairingRecommendations": [] }',
-      
-      '\nExample 2:',
-      'Input: "Looking for a wine to pair with grilled chicken and mushrooms"',
-      'Output: { "isValid": true, "ingredients": ["chicken", "mushrooms"], "preferences": { "cookingMethod": "grilled", "suggestedPairings": ["chardonnay", "pinot noir"] }, "pairingRecommendations": ["Medium-bodied white wine with good acidity", "Light red wine with low tannins"] }',
-      
-      '\nExample 3:',
-      'Input: "I am having a juicy grilled ribeye steak tonight with blue cheese. What wine should I drink?"',
-      'Output: { "isValid": true, "ingredients": ["beef", "blue cheese"], "preferences": { "pairing": "beef", "cookingMethod": "grilled", "bodyWeight": "full-bodied", "color": "red" }, "pairingRecommendations": ["Bold Cabernet Sauvignon", "Full-bodied Malbec", "Rich Bordeaux blend"] }',
-      
-      '\nExample 4:',
-      'Input: "Something crisp and refreshing for a summer seafood lunch"',
-      'Output: { "isValid": true, "ingredients": ["seafood"], "preferences": { "style": "crisp", "occasion": "lunch", "season": "summer", "color": "white", "acidity": "high" }, "pairingRecommendations": ["Sauvignon Blanc", "Pinot Grigio", "Albariño"] }'
-    ].join('\n');
-
-    const enhancedPrompt = `You are an expert sommelier. Analyze this wine request and extract structured preferences with food pairing insights:
-
-${enhancedExamples}
-
-Current request: "${userInput}"
-
-Extract *only* new or updated preferences from this current request. Use the conversation context to understand the overall user intent, but do not re-extract preferences already present in the conversation history unless they are explicitly modified or contradicted by the current request.
-
-${conversationHistory ? 'Conversation context:\n' + conversationHistory.map(turn => `${turn.role}: ${turn.content}`).join('\n') + '\n' : ''}
-
-Consider:
-- Food ingredients and cooking methods
-- Wine style, body, acidity, tannins
-- Occasion and setting
-- Price considerations
-- Regional preferences
-- Pairing principles (complement vs contrast)
-
-Output JSON matching the examples exactly with enhanced pairing recommendations:`;
 
     try {
-      const llmResponseResult = await this.llmService.sendStructuredPrompt<PreferenceExtractionResultPayload>(
-        enhancedPrompt,
-        PreferenceExtractionSchema,
-        null,
-        { 
-          temperature: 0.3, // Lower temperature for more consistent extraction
-          num_predict: 1000  // Increased for detailed pairing recommendations
+      const llmResponseResult = await this.llmService.sendStructuredPrompt<
+        'extractPreferences',
+        PreferenceExtractionResultPayload
+      >(
+        'extractPreferences',
+        {
+          userInput: userInput,
+          conversationContext: conversationHistory ?? [], // Map conversationHistory to conversationContext, provide empty array if undefined
         },
-        correlationId
+        {
+          correlationId: correlationId // Pass logContext here
+        }
       );
 
       if (!llmResponseResult.success) {
@@ -522,11 +490,12 @@ Output JSON matching the examples exactly with enhanced pairing recommendations:
       }
 
       const extractedData = llmResponseResult.data;
-      if (!extractedData || extractedData.isValid === false) { // Only fail if isValid is explicitly false
+      // The extractedData is now guaranteed to be of type PreferenceExtractionResultPayload due to Zod validation in LLMService
+      if (!extractedData.isValid) { // Only fail if isValid is explicitly false
         return {
           success: false,
           error: new AgentError(
-            extractedData?.error || 'LLM returned invalid preference data (isValid was false)',
+            extractedData.error || 'LLM returned invalid preference data (isValid was false)',
             'LLM_INVALID_RESPONSE',
             'PreferenceExtractionService',
             correlationId ?? '',

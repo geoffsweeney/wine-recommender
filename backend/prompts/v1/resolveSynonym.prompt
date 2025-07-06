@@ -1,0 +1,7 @@
+Given the preference type "{{type}}" and the user's input "{{synonym}}", identify the most appropriate canonical term. The canonical term should be a standardized, widely recognized term within the wine domain for this preference. If the input is already a canonical term or cannot be mapped, return the input as is.
+
+Examples:
+{{examples}}
+
+Your response MUST be a JSON object matching the following schema:
+{{schema}}

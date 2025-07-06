@@ -1,17 +1,18 @@
-import request from 'supertest';
 import express, { Express } from 'express';
-import { container, DependencyContainer } from 'tsyringe';
-import { TYPES } from '../../../di/Types';
-import createWineRecommendationRouter from '../../wineRecommendationRoutes';
+import { mock } from 'jest-mock-extended';
+import request from 'supertest';
+import { container } from 'tsyringe';
+import { ILogger, TYPES } from '../../../di/Types';
 import { IRecommendationStrategy } from '../../../services/interfaces/IRecommendationStrategy';
 import { ISearchStrategy } from '../../../services/interfaces/ISearchStrategy';
 import { LLMService } from '../../../services/LLMService';
-import { mock } from 'jest-mock-extended';
-import { ILogger } from '../../../services/LLMService'; // Assuming ILogger is defined here or similar
 import { WineNode } from '../../../types'; // Corrected import path for WineNode
+import { WineRecommendationController } from '../../controllers/WineRecommendationController'; // Add this import
+import createWineRecommendationRouter from '../../wineRecommendationRoutes';
 
 describe('WineRecommendationController', () => {
   let app: Express;
+  let wineRecommendationController: WineRecommendationController; // Declare here
   const mockRecommendationStrategy = mock<IRecommendationStrategy>();
   const mockSearchStrategy = mock<ISearchStrategy>();
   const mockLLMService = mock<LLMService>();
@@ -34,7 +35,13 @@ describe('WineRecommendationController', () => {
 
     app = express();
     app.use(express.json());
-    app.use(createWineRecommendationRouter(container));
+    // wineRecommendationController = container.resolve(WineRecommendationController); // Removed useless assignment
+    app.use('/api', createWineRecommendationRouter(container));
+
+    // Add a simple test route to verify Express setup
+    app.get('/test', (req, res) => {
+      res.status(200).send('Test route works!');
+    });
   });
 
   beforeEach(() => {
@@ -56,7 +63,7 @@ describe('WineRecommendationController', () => {
       };
 
       const response = await request(app)
-        .post('/wine-recommendations')
+        .post('/api/wine-recommendations') // Added /api prefix
         .send(requestBody);
 
       expect(response.status).toBe(200);
@@ -79,7 +86,7 @@ describe('WineRecommendationController', () => {
       };
 
       const response = await request(app)
-        .post('/wine-recommendations')
+        .post('/api/wine-recommendations') // Added /api prefix
         .send(invalidRequestBody);
 
       expect(response.status).toBe(400);
@@ -96,7 +103,7 @@ describe('WineRecommendationController', () => {
       };
 
       const response = await request(app)
-        .post('/wine-recommendations')
+        .post('/api/wine-recommendations') // Added /api prefix
         .send(requestBody);
 
       expect(response.status).toBe(500);
@@ -112,7 +119,7 @@ describe('WineRecommendationController', () => {
       const queryParams = { query: 'test', limit: '10' }; // Send limit as string
 
       const response = await request(app)
-        .get('/wine-recommendations')
+        .get('/api/wine-recommendations') // Added /api prefix
         .query(queryParams);
 
       expect(response.status).toBe(200);
@@ -129,7 +136,7 @@ describe('WineRecommendationController', () => {
       const invalidQueryParams = { invalidParam: 'value' }; // Invalid query
 
       const response = await request(app)
-        .get('/wine-recommendations')
+        .get('/api/wine-recommendations') // Added /api prefix
         .query(invalidQueryParams);
 
       expect(response.status).toBe(400);
@@ -143,11 +150,17 @@ describe('WineRecommendationController', () => {
       const queryParams = { query: 'test', limit: 10 };
 
       const response = await request(app)
-        .get('/wine-recommendations')
+        .get('/api/wine-recommendations') // Added /api prefix
         .query(queryParams);
 
       expect(response.status).toBe(500);
       expect(response.body).toEqual({ message: 'Search error' }); // Expect the specific error message
     });
+  });
+
+  it('should return 200 for the /test route', async () => {
+    const response = await request(app).get('/test');
+    expect(response.status).toBe(200);
+    expect(response.text).toBe('Test route works!');
   });
 });

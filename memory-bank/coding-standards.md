@@ -82,6 +82,18 @@ export interface UserPreferences {
 }
 ```
 
++#### Jest Testing Best Practices (MANDATORY)
++Adherence to these Jest testing best practices is crucial for maintaining test reliability, readability, and preventing common pitfalls.
++
++*   **`jest.mock` Placement:** All `jest.mock` calls **MUST** be placed at the top level of the test file, outside of any `describe` or `beforeEach` blocks. `jest.mock` calls are hoisted and processed before test execution, and placing them inside blocks can lead to unexpected behavior, re-mocking, or issues with mock resolution.
++
++*   **Avoiding Duplicate `describe` and `beforeEach` Blocks:** Test files **MUST NOT** contain duplicate `describe` or `beforeEach` blocks for the same test suite. Consolidate test setup and execution into a single, coherent structure to avoid variable re-declarations, unpredictable test execution, and maintain readability.
++
++*   **Explicit Jest Configuration:** When running specific test files or encountering `rootDir` errors, always explicitly specify the Jest configuration file using the `--config` flag (e.g., `npx jest --config jest.config.backend.js <test_file_path>`). This ensures the correct configuration is used and prevents conflicts with other potential Jest configurations or default behaviors.
++
++**Example: PromptManager and Zod Validation**
++The `PromptManager` (see `backend/services/PromptManager.ts`) serves as an excellent example of adhering to these principles. It utilizes `zod` schemas to enforce strict type validation for variables passed to LLM prompt templates, significantly enhancing type safety and data integrity beyond basic TypeScript interfaces. This pattern is highly recommended for any data structures interacting with external or untyped inputs.
++
 #### Error Handling Pattern (MANDATORY)
 ```typescript
 // Every async function (including service methods) MUST use this exact pattern.

@@ -1,26 +1,24 @@
+import { mock } from 'jest-mock-extended';
 import "reflect-metadata";
 import { container, DependencyContainer } from 'tsyringe';
-import winston from 'winston';
+import { ConversationHistoryService } from './core/ConversationHistoryService';
+import { AgentError } from './core/agents/AgentError';
+import { SommelierCoordinator } from './core/agents/SommelierCoordinator'; // Added
+import { AgentMessage, createAgentMessage, MessageTypes } from './core/agents/communication/AgentMessage'; // Added AgentMessage import
+import { EnhancedAgentCommunicationBus } from './core/agents/communication/EnhancedAgentCommunicationBus';
+import { Result } from './core/types/Result';
 import { TYPES } from './di/Types';
+import { MCPClient } from './mcp/mcpClient';
 import { KnowledgeGraphService } from './services/KnowledgeGraphService';
-import { Neo4jCircuitWrapper } from './services/Neo4jCircuitWrapper';
 import { LLMService } from './services/LLMService';
 import { Neo4jService } from './services/Neo4jService';
-import { logger as appLogger } from './utils/logger';
 import { PreferenceExtractionService } from './services/PreferenceExtractionService';
 import { PreferenceNormalizationService } from './services/PreferenceNormalizationService';
+import { PromptManager } from './services/PromptManager'; // Import PromptManager
 import { UserProfileService } from './services/UserProfileService';
-import { ConversationHistoryService } from './core/ConversationHistoryService';
-import { BasicDeadLetterProcessor } from './core/BasicDeadLetterProcessor';
-import { EnhancedAgentCommunicationBus } from './core/agents/communication/EnhancedAgentCommunicationBus';
-import { AgentMessage, createAgentMessage, MessageTypes } from './core/agents/communication/AgentMessage'; // Added AgentMessage import
-import { MCPClient } from './mcp/mcpClient';
-import { Result } from './core/types/Result';
-import { AgentError } from './core/agents/AgentError';
-import { mock } from 'jest-mock-extended';
-import { v4 as uuidv4 } from 'uuid'; // Added
-import { RecommendationRequest } from './api/dtos/RecommendationRequest.dto'; // Added
-import { SommelierCoordinator } from './core/agents/SommelierCoordinator'; // Added
+
+jest.unmock('zod'); // Unmock zod globally for tests
+jest.unmock('zod-to-json-schema'); // Unmock zod-to-json-schema globally for tests
 
 // Define a test container factory function for proper test isolation
 export const createTestContainer = (): { container: DependencyContainer; resetMocks: () => void } => {
@@ -73,6 +71,10 @@ export const createTestContainer = (): { container: DependencyContainer; resetMo
   const mockLlmService = mock<LLMService>();
   mockLlmService.sendPrompt.mockResolvedValue({ success: true, data: 'mock-llm-response' });
   container.registerInstance(TYPES.LLMService, mockLlmService);
+
+  // Register PromptManager
+  const mockPromptManager = mock<PromptManager>();
+  container.registerInstance(TYPES.PromptManager, mockPromptManager);
 
   // Mock LLMRecommendationAgentConfig
   const llmRecommendationAgentConfig = {
@@ -249,11 +251,12 @@ export const createTestContainer = (): { container: DependencyContainer; resetMo
 
   // Mock User Profile Service
   const mockUserProfileService = mock<UserProfileService>();
-  container.registerInstance(UserProfileService, mockUserProfileService);
+  mockUserProfileService.getPreferences.mockResolvedValue({}); // Mock getPreferences to return an empty object
+  container.registerInstance(TYPES.UserProfileService, mockUserProfileService);
 
   // Mock Conversation History Service
   const mockConversationHistoryService = mock<ConversationHistoryService>();
-  container.registerInstance(ConversationHistoryService, mockConversationHistoryService);
+  container.registerInstance(TYPES.ConversationHistoryService, mockConversationHistoryService);
 
   // Mock PreferenceExtractionService
   const mockPreferenceExtractionService = mock<PreferenceExtractionService>();

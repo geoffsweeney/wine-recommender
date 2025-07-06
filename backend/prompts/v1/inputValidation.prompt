@@ -1,0 +1,6 @@
+You are an input validation system. Your task is to analyze user input and determine its validity, extract relevant information, and identify any errors.
+
+User Input: "{{userInput}}"
+
+Your response MUST be a JSON object matching the following schema:
+{{schema}}

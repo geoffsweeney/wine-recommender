@@ -1,19 +1,17 @@
-import { WineRecommendationOutput } from './LLMRecommendationAgent';
 import { inject, injectable } from 'tsyringe';
-import { CommunicatingAgent, CommunicatingAgentDependencies } from './CommunicatingAgent';
-import { EnhancedAgentCommunicationBus } from './communication/EnhancedAgentCommunicationBus';
-import { AgentMessage, createAgentMessage, MessageTypes } from './communication/AgentMessage';
-import { LLMService } from '../../services/LLMService';
-import { KnowledgeGraphService } from '../../services/KnowledgeGraphService';
-import { DeadLetterProcessor } from '../DeadLetterProcessor';
-import { TYPES } from '../../di/Types';
 import winston from 'winston';
+import { z } from 'zod';
+import { TYPES } from '../../di/Types';
+import { KnowledgeGraphService } from '../../services/KnowledgeGraphService';
+import { LLMService } from '../../services/LLMService';
+import { WineNode } from '../../types';
+import { ExplanationConfidenceSchema, RecommendationResult } from '../../types/agent-outputs';
+import { DeadLetterProcessor } from '../DeadLetterProcessor';
 import { Result } from '../types/Result';
 import { AgentError } from './AgentError';
-import { LogContext } from '../../types/LogContext';
-import { z } from 'zod';
-import { WineNode } from '../../types';
-import { RecommendationResult } from '../../types/agent-outputs';
+import { CommunicatingAgent, CommunicatingAgentDependencies } from './CommunicatingAgent';
+import { AgentMessage, createAgentMessage, MessageTypes } from './communication/AgentMessage';
+import { EnhancedAgentCommunicationBus } from './communication/EnhancedAgentCommunicationBus';
 
 interface Wine extends WineNode {}
 
@@ -213,6 +211,15 @@ export class RecommendationAgent extends CommunicatingAgent {
         return await this.handleNoRecommendations(message, correlationId);
       }
 
+      // Implement iterative self-improvement if confidence is below threshold
+      if (recommendationResult.confidence < this.agentConfig.confidenceThreshold) {
+        this.logger.info(`[${correlationId}] Initial recommendation confidence (${recommendationResult.confidence}) below threshold (${this.agentConfig.confidenceThreshold}). Attempting refinement.`, {
+          agentId: this.id,
+          operation: 'handleRecommendationRequest'
+        });
+        recommendationResult = await this.refineRecommendations(recommendationResult, payload, correlationId);
+      }
+
       // Send successful response
       const responseMessage = createAgentMessage(
         'recommendation-response',
@@ -386,29 +393,17 @@ export class RecommendationAgent extends CommunicatingAgent {
     const wineList = wineNames.map(name => `- ${name}`).join('\n');
     const contextInfo = this.buildContextForEnhancement(payload);
     
-    const enhancementPrompt = `You are enhancing wine recommendations from our database. 
-    
-Context: ${contextInfo}
- 
-Available wines from our database:
-${wineList}
- 
-Provide a brief, engaging explanation (2-3 sentences) for why these wines are recommended for this request. Focus on the characteristics that make them suitable.
- 
-Respond with JSON: {"explanation": "your explanation here", "confidence": 0.8}`;
- 
-    const enhancementSchema = z.object({
-      explanation: z.string(),
-      confidence: z.number().min(0).max(1)
-    });
- 
     try {
-      const enhancementResult = await this.llmService.sendStructuredPrompt<{ explanation: string; confidence: number }>(
-        enhancementPrompt, 
-        enhancementSchema, 
-        null, 
-        {}, // Pass empty llmOptions as per previous instruction
-        correlationId
+      const enhancementResult = await this.llmService.sendStructuredPrompt<
+        'enhanceKnowledgeGraph', // New prompt task name
+        z.infer<typeof ExplanationConfidenceSchema>
+      >(
+        'enhanceKnowledgeGraph', // New prompt task name
+        {
+          wineList: wineList,
+          contextInfo: contextInfo
+        },
+        { correlationId: correlationId } // Pass logContext
       );
  
       if (enhancementResult.success && enhancementResult.data) {
@@ -446,26 +441,38 @@ Respond with JSON: {"explanation": "your explanation here", "confidence": 0.8}`;
     return parts.join('. ') || 'General wine recommendation request';
   }
  
-  private async handleNoRecommendations(message: AgentMessage<unknown>, correlationId: string): Promise<Result<AgentMessage | null, AgentError>> {
+  protected async handleNoRecommendations(message: AgentMessage<unknown>, correlationId: string): Promise<Result<AgentMessage | null, AgentError>> {
+    const responsePayload = {
+      recommendations: [],
+      reasoning: 'Sorry, no suitable wine recommendations could be generated for your request.',
+      confidence: 0.0,
+      error: 'No recommendations could be generated'
+    };
+
     const responseMessage = createAgentMessage(
       'recommendation-response',
-      {
-        recommendations: [],
-        reasoning: 'Unfortunately, no suitable wine recommendations could be generated for your request. Please try refining your preferences or providing more details.',
-        confidence: 0.0,
-        error: 'No recommendations could be generated'
-      },
-      this.id,
+      responsePayload,
+      this.id, // sourceAgent
       message.conversationId,
       correlationId,
-      message.sourceAgent
+      message.sourceAgent // targetAgent
     );
- 
-    this.logger.warn(`[${message.correlationId}] No recommendations could be generated`, { // Use message.correlationId here
-      agentId: this.id,
-      operation: 'handleNoRecommendations'
-    });
- 
+
+    // Send the response to the source agent
+    this.communicationBus.sendResponse( // Removed await and sendResult check
+      message.sourceAgent,
+      responseMessage
+    );
+
+    // Cast message.payload to RecommendationMessagePayload for safe access
+    const requestPayload = message.payload as RecommendationMessagePayload;
+
+    // Log a warning with the expected message
+    this.logger.warn(
+      `[${correlationId}] No recommendations could be generated`,
+      { userId: requestPayload.userId, input: requestPayload.input } // Access properties safely
+    );
+
     return { success: true, data: responseMessage };
   }
  
@@ -494,4 +501,59 @@ Respond with JSON: {"explanation": "your explanation here", "confidence": 0.8}`;
  
     return { success: false, error: agentError };
   }
+  private async refineRecommendations(
+    currentRecommendations: RecommendationResult,
+    payload: RecommendationMessagePayload,
+    correlationId: string
+  ): Promise<RecommendationResult> {
+    this.logger.info(`[${correlationId}] Attempting to refine recommendations`, {
+      agentId: this.id,
+      operation: 'refineRecommendations'
+    });
+
+    try {
+      const llmVariables = {
+        currentRecommendations: currentRecommendations.recommendations,
+        reasoning: currentRecommendations.reasoning,
+        userInput: payload.input.message,
+        conversationHistory: payload.conversationHistory,
+        preferences: payload.input.preferences,
+        ingredients: payload.input.ingredients
+      };
+
+      const refinementResult = await this.llmService.sendStructuredPrompt<
+        'refineSuggestions', // Corrected prompt task name
+        RecommendationResult
+      >(
+        'refineSuggestions', // Corrected prompt task name
+        llmVariables,
+        { correlationId: correlationId } // Pass logContext
+      );
+
+      if (refinementResult.success) {
+        this.logger.info(`[${correlationId}] Recommendations refined successfully`, {
+          agentId: this.id,
+          operation: 'refineRecommendations'
+        });
+        return refinementResult.data;
+      } else {
+        const errorMessage = refinementResult.error?.message || 'Unknown error';
+        this.logger.warn(`[${correlationId}] Failed to refine recommendations: ${errorMessage}`, {
+          agentId: this.id,
+          operation: 'refineRecommendations',
+          error: errorMessage
+        });
+        return currentRecommendations; // Return original if refinement fails
+      }
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.error(`[${correlationId}] Error during recommendation refinement: ${errorMessage}`, {
+        agentId: this.id,
+        operation: 'refineRecommendations',
+        originalError: errorMessage
+      });
+      return currentRecommendations; // Return original on error
+    }
+  }
+  
 }

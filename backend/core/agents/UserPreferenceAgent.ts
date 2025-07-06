@@ -194,6 +194,7 @@ export class UserPreferenceAgent extends CommunicatingAgent {
           message.sourceAgent, // targetAgent
           message.userId // userId
         );
+        this.communicationBus.sendResponse(message.sourceAgent, responseMessage); // Explicitly send response
         this.logger.info(`[${correlationId}] Preference request processed successfully (fast extraction)`, { agentId: this.id, operation: 'handlePreferenceRequest' });
         return { success: true, data: responseMessage };
       } else {
@@ -201,8 +202,13 @@ export class UserPreferenceAgent extends CommunicatingAgent {
         this.logger.info(`[${correlationId}] Fast extraction failed or returned no data. Attempting LLM extraction.`, { agentId: this.id, operation: 'handlePreferenceRequest' });
         const llmExtractionResult = await this.preferenceExtractionService.extractPreferencesWithLLM(input, conversationHistory, userId, correlationId);
 
+        let responseSuccess = true;
+        let responsePreferences: PreferenceNode[] = [];
+        let responseError: AgentError | undefined;
+
         if (!llmExtractionResult.success) {
-          const error = new AgentError(
+          responseSuccess = false;
+          responseError = new AgentError(
             `LLM preference extraction failed: ${llmExtractionResult.error?.message}`,
             'LLM_EXTRACTION_FAILED',
             this.id,
@@ -210,12 +216,11 @@ export class UserPreferenceAgent extends CommunicatingAgent {
             true,
             { originalError: llmExtractionResult.error?.message }
           );
-          await this.deadLetterProcessor.process(message.payload, error, { source: this.id, stage: 'llm-extraction-failure', correlationId });
-          return { success: false, error };
-        }
-
-        const llmExtractedData = llmExtractionResult.data;
-        const extractedPreferences: PreferenceNode[] = [];
+          await this.deadLetterProcessor.process(message.payload, responseError, { source: this.id, stage: 'llm-extraction-failure', correlationId });
+          this.logger.error(`[${correlationId}] LLM preference extraction failed: ${responseError.message}`, { agentId: this.id, operation: 'handlePreferenceRequest', originalError: responseError.message });
+        } else {
+          const llmExtractedData = llmExtractionResult.data;
+          const extractedPreferences: PreferenceNode[] = [];
 
         // Process preferences from llmExtractedData.preferences
         if (llmExtractedData.preferences) {
@@ -267,13 +272,31 @@ export class UserPreferenceAgent extends CommunicatingAgent {
         }
 
         const normalizedExtractedPreferences = await this.preferenceNormalizationService.normalizePreferences(extractedPreferences);
-        const mergedPreferences = this.mergePreferences(persistedPreferences, normalizedExtractedPreferences);
+        responsePreferences = this.mergePreferences(persistedPreferences, normalizedExtractedPreferences);
+        }
+
+        // Broadcast updated preferences to all interested agents
+        const broadcastMessage = createAgentMessage(
+          MessageTypes.PREFERENCE_UPDATE, // Use the new message type
+          {
+            userId: currentUserId,
+            preferences: responsePreferences,
+            context: 'from-preference-agent' // More specific context
+          },
+          this.id,
+          message.conversationId, // conversationId
+          this.generateCorrelationId(), // Generate a new correlationId for this broadcast
+          '*', // Broadcast to all
+          message.userId // userId
+        );
+        this.broadcast(broadcastMessage.type, broadcastMessage.payload, broadcastMessage.correlationId);
 
         const responseMessage = createAgentMessage(
           'preference-update-result',
           {
-            success: true,
-            preferences: mergedPreferences
+            success: responseSuccess,
+            preferences: responsePreferences,
+            error: responseError ? { code: responseError.code, message: responseError.message } : undefined
           },
           this.id,
           message.conversationId,
@@ -281,15 +304,31 @@ export class UserPreferenceAgent extends CommunicatingAgent {
           message.sourceAgent,
           message.userId
         );
+        this.communicationBus.sendResponse(message.sourceAgent, responseMessage); // Explicitly send response
         this.logger.info(`[${correlationId}] Preference request processed successfully (LLM extraction)`, { agentId: this.id, operation: 'handlePreferenceRequest' });
-        return { success: true, data: responseMessage };
+        return { success: true, data: responseMessage }; // Always return success for the agent's processing of the request
       }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       const agentError = error instanceof AgentError ? error : new AgentError(errorMessage, 'PREFERENCE_PROCESSING_ERROR', this.id, correlationId, true, { originalError: errorMessage });
       await this.deadLetterProcessor.process(message.payload, agentError, { source: this.id, stage: 'PreferenceProcessing', correlationId });
       this.logger.error(`[${correlationId}] Error processing preference request: ${errorMessage}`, { agentId: this.id, operation: 'handlePreferenceRequest', originalError: errorMessage });
-      return { success: false, error: agentError };
+      // When a general exception occurs, the agent should return success: false
+      const responseMessage = createAgentMessage(
+        'preference-update-result',
+        {
+          success: false,
+          preferences: [],
+          error: { code: agentError.code, message: agentError.message }
+        },
+        this.id,
+        message.conversationId,
+        message.correlationId,
+        message.sourceAgent,
+        message.userId
+      );
+      this.communicationBus.sendResponse(message.sourceAgent, responseMessage);
+      return { success: false, error: agentError }; // Return success: false for general exceptions
     }
   }
 

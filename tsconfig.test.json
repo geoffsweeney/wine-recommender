@@ -8,8 +8,10 @@
     "experimentalDecorators": true
   },
   "include": [
-    "src/**/*",
-    "src/__tests__/**/*",
+    "backend/**/*",
+    "backend/__tests__/**/*",
+    "frontend/with-typescript-app/src/**/*",
+    "frontend/with-typescript-app/src/__tests__/**/*",
     "backend/types/**/*.d.ts" // Include custom declaration files
   ],
   "files": [

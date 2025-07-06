@@ -1,10 +1,35 @@
-// You can include shared interfaces/types in a separate file
-// and then use them in any component by importing them. For
-// example, to import the interface below do:
-//
-// import { User } from 'path/to/interfaces';
+// Shared interfaces/types for the frontend application
 
 export type User = {
   id: number;
   name: string;
 };
+
+export interface GrapeVariety {
+  name: string;
+  percentage?: number;
+}
+
+export interface WineRecommendationOutput {
+  name: string;
+  grapeVarieties?: GrapeVariety[];
+}
+
+export interface RecommendationResult {
+  recommendations: WineRecommendationOutput[];
+  reasoning?: string;
+  confidence: number;
+  pairingNotes?: string;
+  alternatives?: WineRecommendationOutput[];
+  source?: 'knowledge_graph' | 'llm' | 'hybrid';
+  error?: string;
+}
+
+export interface FinalRecommendationPayload {
+  primaryRecommendation: WineRecommendationOutput | null;
+  alternatives: WineRecommendationOutput[];
+  explanation: string;
+  confidence: number;
+  conversationId: string;
+  canRefine: boolean;
+}

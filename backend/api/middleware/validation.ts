@@ -9,13 +9,13 @@ interface ValidatedRequest extends Request {
 }
 
 export const validateRequest = (schema: any, source: 'body' | 'query' | 'params'): RequestHandler => {
-  return (req: ValidatedRequest, res: Response, next: NextFunction): void => { // Cast req to ValidatedRequest
+  return async (req: ValidatedRequest, res: Response, next: NextFunction): Promise<void> => { // Make async and return Promise<void>
     console.log('Validating:', req[source]); // Log the incoming request body or query
     try {
       const result = schema.safeParse(req[source]);
       if (!result.success) {
         console.error('Validation errors:', result.error.errors); // Log validation errors
-        res.status(400).json({
+        await res.status(400).json({ // Await the response
           message: 'Validation failed',
           errors: result.error.errors
         });

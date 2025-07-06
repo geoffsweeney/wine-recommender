@@ -2,7 +2,7 @@ import neo4j, { Driver, int as neo4jInt, Session } from "neo4j-driver";
 import { injectable, inject } from "tsyringe";
 import { INeo4jCircuitWrapper } from "./Neo4jCircuitWrapper";
 import { TYPES } from '../di/Types';
-import { ILogger } from './LLMService';
+import { ILogger } from '../di/Types';
 import { Result } from '../core/types/Result'; // Import Result
 import { AgentError } from '../core/agents/AgentError'; // Import AgentError
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Box, VStack, HStack, Input, Button, Text, Flex, Spinner, Center } from '@chakra-ui/react';
 import { v4 as uuidv4 } from 'uuid'; // For generating unique user IDs
+import { FinalRecommendationPayload, WineRecommendationOutput, GrapeVariety } from '../interfaces'; // Import new interfaces
 
 interface Message {
   id: string; // Changed to string for UUID
@@ -104,33 +105,33 @@ const Chatbot: React.FC = () => {
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-
-      const data = await response.json();
-      
-      // The backend returns the recommendation directly in the data object
-      let botResponseText = 'No specific recommendation found.';
-      if (data.explanation) {
-        botResponseText = data.explanation;
-      }
-
-      if (data.primaryRecommendation && data.primaryRecommendation.name) {
-        botResponseText += `\n\nPrimary Recommendation: ${data.primaryRecommendation.name}`;
-        if (data.primaryRecommendation.grapeVarieties && data.primaryRecommendation.grapeVarieties.length > 0) {
-          const grapes = data.primaryRecommendation.grapeVarieties.map((g: any) => `${g.name} (${g.percentage}%)`).join(', ');
-          botResponseText += ` (${grapes})`;
-        }
-      }
-
-      if (data.alternatives && data.alternatives.length > 0) {
-        botResponseText += '\n\nAlternatives:';
-        data.alternatives.forEach((alt: any) => {
-          botResponseText += `\n- ${alt.name}`;
-          if (alt.grapeVarieties && alt.grapeVarieties.length > 0) {
-            const grapes = alt.grapeVarieties.map((g: any) => `${g.name} (${g.percentage}%)`).join(', ');
-            botResponseText += ` (${grapes})`;
-          }
-        });
-      }
+ 
+       const data: FinalRecommendationPayload = await response.json();
+       
+       // The backend returns the recommendation directly in the data object
+       let botResponseText = 'No specific recommendation found.';
+       if (data.explanation) {
+         botResponseText = data.explanation;
+       }
+ 
+       if (data.primaryRecommendation && data.primaryRecommendation.name) {
+         botResponseText += `\n\nPrimary Recommendation: ${data.primaryRecommendation.name}`;
+         if (data.primaryRecommendation.grapeVarieties && data.primaryRecommendation.grapeVarieties.length > 0) {
+           const grapes = data.primaryRecommendation.grapeVarieties.map((g: GrapeVariety) => `${g.name} (${g.percentage}%)`).join(', ');
+           botResponseText += ` (${grapes})`;
+         }
+       }
+ 
+       if (data.alternatives && data.alternatives.length > 0) {
+         botResponseText += '\n\nAlternatives:';
+         data.alternatives.forEach((alt: WineRecommendationOutput) => {
+           botResponseText += `\n- ${alt.name}`;
+           if (alt.grapeVarieties && alt.grapeVarieties.length > 0) {
+             const grapes = alt.grapeVarieties.map((g: GrapeVariety) => `${g.name} (${g.percentage}%)`).join(', ');
+             botResponseText += ` (${grapes})`;
+           }
+         });
+       }
 
       const botMessage: Message = {
         id: uuidv4(),

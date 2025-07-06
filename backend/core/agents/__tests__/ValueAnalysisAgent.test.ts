@@ -1,7 +1,7 @@
 import { mockDeep } from 'jest-mock-extended';
 import { AgentError } from '../AgentError';
 import { ValueAnalysisAgent, ValueAnalysisAgentConfig, ValueAnalysisRequest } from '../ValueAnalysisAgent';
-import { BasicDeadLetterProcessor } from '../../BasicDeadLetterProcessor';
+import { BasicDeadLetterProcessor } from '../../DeadLetterProcessor';
 import { EnhancedAgentCommunicationBus } from '../communication/EnhancedAgentCommunicationBus';
 import winston from 'winston';
 import { createAgentMessage } from '../communication/AgentMessage';

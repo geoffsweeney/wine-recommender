@@ -3,27 +3,17 @@ import { TYPES } from '../../di/Types';
 import { CommunicatingAgent, CommunicatingAgentDependencies } from './CommunicatingAgent';
 import { EnhancedAgentCommunicationBus } from './communication/EnhancedAgentCommunicationBus';
 import { AgentMessage, createAgentMessage, MessageTypes } from './communication/AgentMessage'; // Added MessageTypes
-import { BasicDeadLetterProcessor } from '../BasicDeadLetterProcessor';
+import { BasicDeadLetterProcessor } from '../DeadLetterProcessor';
 import { Result } from '../types/Result';
 import { AgentError } from './AgentError';
 import winston from 'winston';
-import { UserPreferences, PreferenceNode } from '../../types'; // Import UserPreferences, PreferenceNode
-import { LLMService } from '../../services/LLMService'; // Import LLMService
+import { UserPreferences, PreferenceNode } from '../../types';
+import { InputValidationSchema } from '../../types/agent-outputs';
+import { z } from 'zod';
+import { LLMService } from '../../services/LLMService'; // Keep LLMService import
+import { PromptManager } from '../../services/PromptManager'; // Import PromptManager
 
-export interface ValidationResult {
-  isValid: boolean;
-  errors?: string[];
-  cleanedInput?: { // Renamed from sanitizedInput
-    ingredients: string[];
-    budget: number;
-    occasion?: string;
-  };
-  extractedData?: { // Renamed from processedInput
-    preferences?: UserPreferences;
-    dietaryRestrictions?: string[];
-    standardizedIngredients?: Record<string, string>;
-  };
-}
+export interface ValidationResult extends z.infer<typeof InputValidationSchema> {}
 
 // Define the configuration interface for InputValidationAgent
 export interface InputValidationAgentConfig {
@@ -39,19 +29,19 @@ export class InputValidationAgent extends CommunicatingAgent {
     @inject(EnhancedAgentCommunicationBus) private readonly injectedCommunicationBus: EnhancedAgentCommunicationBus,
     @inject(TYPES.DeadLetterProcessor) private readonly deadLetterProcessor: BasicDeadLetterProcessor,
     @inject(TYPES.Logger) protected readonly logger: winston.Logger,
-    @inject(TYPES.InputValidationAgentConfig) private readonly agentConfig: InputValidationAgentConfig, // Inject the specific agent config
-    @inject(LLMService) private readonly llmService: LLMService // Inject LLMService
+    @inject(TYPES.InputValidationAgentConfig) private readonly agentConfig: InputValidationAgentConfig,
+    @inject(TYPES.LLMService) private readonly llmService: LLMService,
+    @inject(TYPES.PromptManager) private readonly promptManager: PromptManager
   ) {
     const id = 'input-validation-agent';
-    // Pass the injected agentConfig to the super constructor as the agent's config
     const dependencies: CommunicatingAgentDependencies = {
       communicationBus: injectedCommunicationBus,
       logger: logger,
-      messageQueue: {} as any, // Placeholder for IMessageQueue
-      stateManager: {} as any, // Placeholder for IStateManager
-      config: agentConfig as any // Use the injected config
+      messageQueue: {} as any,
+      stateManager: {} as any,
+      config: agentConfig as any
     };
-    super(id, agentConfig, dependencies); // Pass agentConfig as the config for BaseAgent
+    super(id, agentConfig, dependencies);
     this.registerHandlers();
     this.logger.info(`[${this.id}] InputValidationAgent initialized`, { agentId: this.id, operation: 'initialization' });
   }
@@ -75,10 +65,11 @@ export class InputValidationAgent extends CommunicatingAgent {
     );
   }
 
-  async handleValidationRequest(message: AgentMessage<{ message: string; recommendationSource: string }>): Promise<Result<AgentMessage | null, AgentError>> {
+  async handleValidationRequest(message: AgentMessage<{ userInput: string; recommendationSource: string }>): Promise<Result<AgentMessage | null, AgentError>> {
     const correlationId = message.correlationId;
+    this.logger.debug(`[${correlationId}] InputValidationAgent: Received validation request. Payload: ${JSON.stringify(message.payload)}`);
     try {
-      const inputMessage = message.payload.message;
+      const inputMessage = message.payload.userInput;
       const validationResult = await this.validateInput(inputMessage, message.correlationId);
       
       if (!validationResult.success) {
@@ -185,8 +176,20 @@ export class InputValidationAgent extends CommunicatingAgent {
 
   protected async validateInput(inputMessage: string, correlationId: string = ''): Promise<Result<ValidationResult, AgentError>> {
     try {
-      const prompt = this.buildValidationPrompt(inputMessage);
-      const llmResponseResult = await this.llmService.sendStructuredPrompt<ValidationResult>(prompt, InputValidationSchema, null, {}, correlationId);
+      const promptVariables = { userInput: inputMessage };
+      this.logger.debug(`[${correlationId}] InputValidationAgent: Preparing variables for LLMService.sendStructuredPrompt: ${JSON.stringify(promptVariables)}`);
+
+      const llmResponseResult = await this.llmService.sendStructuredPrompt<
+        'inputValidation',
+        ValidationResult
+      >(
+        'inputValidation',
+        promptVariables,
+        { correlationId: correlationId }
+      );
+      // The existing log was already moved to the correct place in the previous step.
+      // This line is now redundant as the new log above serves the same purpose.
+      // this.logger.debug(`[${correlationId}] InputValidationAgent: Variables sent to LLMService.sendStructuredPrompt: ${JSON.stringify(promptVariables)}`);
 
       if (!llmResponseResult.success) {
         return { success: false, error: llmResponseResult.error };
@@ -194,13 +197,11 @@ export class InputValidationAgent extends CommunicatingAgent {
 
       const parsedResponse = llmResponseResult.data;
 
-      // Basic structural validation of the parsed response (redundant if Zod is used, but good for safety)
-      const isValid = typeof parsedResponse.isValid === 'boolean' ? parsedResponse.isValid : false;
-      if (typeof parsedResponse.isValid !== 'boolean') {
-        this.logger.warn(`[${correlationId}] LLM response missing or invalid 'isValid' field. Defaulting to ${isValid}.`, { agentId: this.id, operation: 'validateInput' });
-      }
+      // The parsedResponse is now guaranteed to be of type InputValidationResult due to Zod validation in LLMService
+      const isValid = parsedResponse.isValid;
+      // No need for typeof check, as Zod ensures it's boolean
 
-      const cleanedInput = parsedResponse.cleanedInput || { ingredients: [], budget: 0, occasion: undefined };
+      const cleanedInput = parsedResponse.cleanedInput || { ingredients: [], budget: null, occasion: null };
       const extractedData = parsedResponse.extractedData || { standardizedIngredients: {}, dietaryRestrictions: [], preferences: {} };
       const errors = parsedResponse.errors || [];
 
@@ -224,68 +225,8 @@ export class InputValidationAgent extends CommunicatingAgent {
   }
 
   private buildValidationPrompt(inputMessage: string): string {
-    // The schema is now passed directly to sendStructuredPrompt, so we just need the prompt text
-    return `Analyze the following user input for wine pairing.
-    
-Examples:
-Input: "I am having a juicy grilled ribeye steak tonight. What wine should I drink?"
-Output: { "isValid": true, "errors": [], "cleanedInput": { "ingredients": ["beef"], "budget": 0 }, "extractedData": { "standardizedIngredients": { "ribeye steak": "beef" }, "dietaryRestrictions": [], "preferences": { "pairing": "beef" } } }
-
-User Input: "${inputMessage}"
-
-Tasks:
-1. Extract ingredients, budget, and occasion from the user input.
-2. Validate if the extracted ingredients are food items.
-3. Standardize ingredient names (e.g., "salmon" -> "fish").
-4. Check for dietary restrictions mentioned.
-5. Return ONLY the JSON object, with no additional text or markdown formatting.`;
+    // This method is no longer needed as the prompt is managed by PromptManager
+    // and passed via LLMService.sendStructuredPrompt
+    throw new Error("buildValidationPrompt should not be called. Prompts are managed by PromptManager.");
   }
 }
-
-export const InputValidationSchema = {
-  type: "object",
-  properties: {
-    isValid: { type: "boolean" },
-    errors: {
-      type: "array",
-      items: { type: "string" }
-    },
-    cleanedInput: {
-      type: "object",
-      properties: {
-        ingredients: {
-          type: "array",
-          items: { type: "string" }
-        },
-        budget: { type: "number", nullable: true },
-        occasion: { type: "string", nullable: true }
-      },
-      required: ["ingredients", "budget"]
-    },
-    extractedData: {
-      type: "object",
-      properties: {
-        standardizedIngredients: {
-          type: "object",
-          additionalProperties: { type: "string" }
-        },
-        dietaryRestrictions: {
-          type: "array",
-          items: { type: "string" }
-        },
-        preferences: {
-          type: "object",
-          properties: {
-            wineType: { type: "string" },
-            body: { type: "string" },
-            flavorProfile: { type: "string" },
-            pairing: { type: "string" }
-          },
-          required: []
-        }
-      },
-      required: ["standardizedIngredients", "dietaryRestrictions", "preferences"]
-    }
-  },
-  required: ["isValid", "errors", "cleanedInput", "extractedData"]
-};

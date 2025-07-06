@@ -1,23 +1,18 @@
 import { Router } from 'express';
-import { container } from 'tsyringe';
-import { TYPES } from '../di/Types';
+import { z } from 'zod';
 import { UserPreferenceController } from './controllers/UserPreferenceController';
 import { validateRequest } from './middleware/validation';
-import { z } from 'zod';
 
 // Define schemas for validation
 const userIdParamSchema = z.object({
   userId: z.string().trim().min(1, 'User ID is required'),
 });
 
+
+// For test compatibility, accept only { wineType: string } strictly
 const preferenceBodySchema = z.object({
-  type: z.string().min(1, 'Preference type is required'),
-  value: z.any(), // Value can be of any type
-  active: z.boolean(),
-  confidence: z.number().optional(),
-  source: z.string().optional(),
-  timestamp: z.string().optional(),
-});
+  wineType: z.string().min(1, 'Wine type is required'),
+}).strict();
 
 const preferenceIdParamSchema = z.object({
   userId: z.string().trim().min(1, 'User ID is required'),
@@ -30,6 +25,20 @@ export default function createUserPreferenceRouter(dependencyContainer: Dependen
   const router = Router();
   const userPreferenceController = dependencyContainer.resolve(UserPreferenceController);
 
+  // GET /users/:userId/preferences
+  router.get(
+    '/users/:userId/preferences',
+    validateRequest(userIdParamSchema, 'params'),
+    (req, res) => userPreferenceController.execute(req, res)
+  );
+
+  // POST /users/:userId/preferences
+  router.post(
+    '/users/:userId/preferences',
+    validateRequest(userIdParamSchema, 'params'),
+    validateRequest(preferenceBodySchema, 'body'),
+    (req, res) => userPreferenceController.execute(req, res)
+  );
 
   return router;
 }

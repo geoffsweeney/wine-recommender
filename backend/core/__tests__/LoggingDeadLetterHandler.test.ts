@@ -1,5 +1,5 @@
 import "reflect-metadata"; // Required for tsyringe decorators
-import { LoggingDeadLetterHandler } from '../BasicDeadLetterProcessor'; // Assuming LoggingDeadLetterHandler is exported from BasicDeadLetterProcessor.ts
+import { LoggingDeadLetterHandler } from '../DeadLetterProcessor';
 
 describe('LoggingDeadLetterHandler', () => {
   let handler: LoggingDeadLetterHandler;

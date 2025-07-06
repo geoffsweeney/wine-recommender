@@ -94,6 +94,13 @@
         // mockLlmService.sendPrompt.mockResolvedValue('mock-llm-response');
         ```
 
++6.  **Jest Mocking and Configuration Best Practices**:
++    *   **`jest.mock` Placement:** Always place `jest.mock` calls at the top level of the test file, outside of any `describe` or `beforeEach` blocks. This ensures mocks are correctly applied before test execution.
++    *   **Explicit Jest Configuration:** When running specific test files or encountering `rootDir` errors, explicitly specify the Jest configuration file using the `--config` flag (e.g., `npx jest --config jest.config.backend.js <test_file_path>`). This ensures the correct configuration is used and prevents conflicts with other potential Jest configurations or default behaviors.
++
++**Example: PromptManager Adherence**
++The `PromptManager` (see `backend/services/PromptManager.ts`) is a prime example of a service designed with these DI and testing principles in mind. It is `@injectable()`, uses `TYPES` symbols for its own registration, and its methods return `Result` types, making it easily mockable and testable within the `tsyringe` ecosystem.
+
 ## Common DI Issues (Expanded)
 
 *   **Missing dependency registration (No provider found errors)**: Often caused by not registering *all* required dependencies, or by using an incorrect injection token (see "Matching Injection Tokens" above).
