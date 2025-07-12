@@ -241,7 +241,7 @@ describe('InputValidationAgent', () => {
         { sender: 'test-agent', traceId: 'test-trace-123' } // metadata
       );
 
-      const response = await agent.handleValidationRequest({ ...message, payload: { userInput: 'test input', recommendationSource: 'test' } }); // Use handleValidationRequest with correct payload
+      const response = await agent.handleValidationRequest({ ...message, payload: { userInput: { message: 'test input', recommendationSource: 'test' } } }); // Use handleValidationRequest with correct payload
       expect(response.success).toBe(false);
       if (!response.success) { // Narrow the type for error access
         expect(response.error).toBeInstanceOf(AgentError);

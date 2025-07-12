@@ -93,48 +93,41 @@ describe('Neo4jCircuitWrapper', () => {
   describe('executeQuery', () => {
     it('should execute query and return results', async () => {
       mockDriver.session.mockReturnValue(mockSession);
-      const mockRecord1 = {
+      const mockRecord = {
         keys: ['n'],
         length: 1,
         _fields: [{}],
         _fieldLookup: { n: 0 },
-        get: jest.fn(),
+        get: jest.fn((key: string) => {
+          if (key === 'n') {
+            return {
+              properties: { id: 1, name: 'Node 1' },
+              elementId: 'element-1'
+            };
+          }
+          return undefined;
+        }),
         has: jest.fn(),
         forEach: jest.fn(),
         map: jest.fn(),
         slice: jest.fn(),
         toArray: jest.fn(),
-        toObject: jest.fn(() => ({ id: 1 })),
+        toObject: jest.fn(() => ({ n: { id: 1, name: 'Node 1' } })),
         getIdentity: jest.fn()
       } as unknown as Record;
-      
-      const mockRecord2 = {
-        keys: ['id'],
-        length: 1,
-        _fields: [{}],
-        _fieldLookup: { id: 0 },
-        get: jest.fn(),
-        has: jest.fn(),
-        forEach: jest.fn(),
-        map: jest.fn(),
-        slice: jest.fn(),
-        toArray: jest.fn(),
-        toObject: jest.fn(() => ({ id: 2 })),
-        getIdentity: jest.fn()
-      } as unknown as Record;
-
+ 
       mockSession.run.mockResolvedValue({
-        records: [mockRecord1, mockRecord2],
+        records: [mockRecord],
         summary: {} as any
       });
-
+ 
       jest.spyOn(wrapper['circuit'], 'execute').mockImplementation(async (fn) => fn());
-
+ 
       const results = await wrapper.executeQuery('MATCH (n) RETURN n');
       
       expect(results.success).toBe(true);
       if (results.success) { // Type guard
-        expect(results.data).toEqual([{ id: 1 }, { id: 2 }]);
+        expect(results.data).toEqual([{ n: { id: 'element-1', name: 'Node 1' } }]);
       }
       expect(mockSession.run).toHaveBeenCalledWith('MATCH (n) RETURN n', {});
       expect(mockSession.close).toHaveBeenCalled();

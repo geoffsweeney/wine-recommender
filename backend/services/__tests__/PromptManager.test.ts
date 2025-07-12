@@ -1,28 +1,40 @@
-import 'reflect-metadata';
-import { z } from 'zod';
-import { container } from 'tsyringe';
-import { PromptManager } from '../PromptManager';
-import * as fs from 'fs';
+// Mock the entire 'fs' module to control its behavior in tests
+jest.mock('fs', () => ({
+  // Mock fs.watch to prevent ENOENT errors in tests
+  watch: jest.fn(() => ({
+    close: jest.fn(), // Mock the close method
+  })),
+  // Mock fs.promises directly
+  promises: {
+    readdir: jest.fn(),
+    readFile: jest.fn(),
+    stat: jest.fn(),
+  },
+}));
+
+import * as fs from 'fs'; // Keep this import for type safety, though its methods are mocked
+import { promises as fsPromises } from 'fs'; // Keep this import for type safety
 import * as path from 'path';
-import { promises as fsPromises } from 'fs';
+import 'reflect-metadata';
+import { container } from 'tsyringe';
 import { TYPES } from '../../di/Types';
-import { MockZodType, createMockZodType } from '../../__mocks__/zod';
-import { Result } from '../../core/types/Result';
-import { success, failure } from '../../utils/result-utils';
-import { ILogger } from '../../types/ILogger';
 import { IFileSystem } from '../../types/IFileSystem';
+import { ILogger } from '../../types/ILogger';
 import { IPath } from '../../types/IPath';
+import { PromptManager } from '../PromptManager';
 
 // Create mock implementations
-const mockFileSystem: jest.Mocked<{
-  readdir: (path: string) => Promise<string[]>;
-  readFile: (path: string, encoding: string) => Promise<string>;
-  stat: (path: string) => Promise<{ isDirectory: () => boolean }>;
-}> = {
-  readdir: jest.fn(),
-  readFile: jest.fn(),
-  stat: jest.fn(), // Initialize stat as a jest.fn() here
-};
+// The mockFileSystem object is no longer needed as fs.promises is mocked directly
+// Remove this block:
+// const mockFileSystem: jest.Mocked<{
+//   readdir: (path: string) => Promise<string[]>;
+//   readFile: (path: string, encoding: string) => Promise<string>;
+//   stat: (path: string) => Promise<{ isDirectory: () => boolean }>;
+// }> = {
+//   readdir: jest.fn(),
+//   readFile: jest.fn(),
+//   stat: jest.fn(), // Initialize stat as a jest.fn() here
+// };
 
 const mockPath: jest.Mocked<typeof path> = {
   basename: jest.fn(),
@@ -36,9 +48,12 @@ describe('PromptManager', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    // Clear the mock for fs.watch specifically
+    (fs.watch as jest.Mock).mockClear();
     
     // Register mock services in DI container
-    container.register(TYPES.FileSystem, { useValue: mockFileSystem });
+    // Use the mocked fs.promises directly for FileSystem
+    container.register(TYPES.FileSystem, { useValue: fsPromises });
     container.register(TYPES.Path, { useValue: mockPath });
     mockLogger = { // Mock logger
       info: jest.fn(),
@@ -48,14 +63,13 @@ describe('PromptManager', () => {
     };
     container.register(TYPES.Logger, { useValue: mockLogger });
 
-    // Mock readdir and readFile for the initial load in constructor
     // Set mock implementation for stat inside beforeEach
-    mockFileSystem.stat.mockResolvedValue({
+    (fsPromises.stat as jest.Mock).mockResolvedValue({
       isDirectory: () => true,
     });
 
     // Mock readdir using mockImplementation for a more robust mock that works for reloads
-    mockFileSystem.readdir.mockImplementation(async (dirPath: string) => {
+    (fsPromises.readdir as jest.Mock).mockImplementation(async (dirPath: string) => {
       if (dirPath === mockPromptsDir) {
         return ['v1'];
       } else if (dirPath === `${mockPromptsDir}/v1`) {
@@ -71,7 +85,7 @@ describe('PromptManager', () => {
       throw new Error(`Unknown directory: ${dirPath}`);
     });
 
-    mockFileSystem.readFile.mockImplementation((filePath: any) => {
+    (fsPromises.readFile as jest.Mock).mockImplementation((filePath: any) => {
       const fileName = mockPath.basename(filePath.toString());
       
       let content;
@@ -161,7 +175,7 @@ Explain wine: {{wineName}} for {{ingredients}}`;
         const logger = c.resolve<ILogger>(TYPES.Logger);
         const fileSystem = c.resolve<IFileSystem>(TYPES.FileSystem);
         const pathService = c.resolve<IPath>(TYPES.Path);
-        return new PromptManager(logger, fileSystem, pathService, { baseDir: mockPromptsDir }); // Pass mockPromptsDir as baseDir
+        return new PromptManager(logger, fileSystem, pathService, { baseDir: mockPromptsDir, watchForChanges: false }); // Pass mockPromptsDir as baseDir and disable watchers
       }
     });
     promptManager = container.resolve(PromptManager);
@@ -223,14 +237,14 @@ Explain wine: {{wineName}} for {{ingredients}}`;
     // First call, should read from file
     const firstResult = await promptManager.getPrompt('recommendWines', { wineType: 'white' });
     expect(firstResult.success).toBe(true);
-    expect(mockFileSystem.readFile).toHaveBeenCalledTimes(6); // Initial load of all 6 prompts
+    expect(fsPromises.readFile).toHaveBeenCalledTimes(6); // Initial load of all 6 prompts
 
-    mockFileSystem.readFile.mockClear(); // Clear calls after initial load
+    (fsPromises.readFile as jest.Mock).mockClear(); // Clear calls after initial load
 
     // Second call with same variables, should use cache
     const secondResult = await promptManager.getPrompt('recommendWines', { wineType: 'white' });
     expect(secondResult.success).toBe(true);
-    expect(mockFileSystem.readFile).toHaveBeenCalledTimes(0); // Should be from cache
+    expect(fsPromises.readFile).toHaveBeenCalledTimes(0); // Should be from cache
   });
 
   it('should clear cache on reloadPrompts', async () => {
@@ -241,16 +255,16 @@ Explain wine: {{wineName}} for {{ingredients}}`;
     // Reload prompts
     const reloadResult = await promptManager.reloadPrompts();
     expect(reloadResult.success).toBe(true);
-    expect(mockFileSystem.readdir).toHaveBeenCalledTimes(4); // 2 for initial, 2 for reload
-    expect(mockFileSystem.readFile).toHaveBeenCalledTimes(12); // 6 for initial, 6 for reload
+    expect(fsPromises.readdir).toHaveBeenCalledTimes(4); // 2 for initial, 2 for reload
+    expect(fsPromises.readFile).toHaveBeenCalledTimes(12); // 6 for initial, 6 for reload
 
     // Clear readFile calls after reload to test cache hit
-    mockFileSystem.readFile.mockClear();
+    (fsPromises.readFile as jest.Mock).mockClear();
 
     // After reload, subsequent calls should use cache
     const afterReloadResult = await promptManager.getPrompt('recommendWines', { wineType: 'red' });
     expect(afterReloadResult.success).toBe(true);
-    expect(mockFileSystem.readFile).toHaveBeenCalledTimes(0); // Should be from cache
+    expect(fsPromises.readFile).toHaveBeenCalledTimes(0); // Should be from cache
   });
 
   it('should retrieve prompt metadata', async () => {
@@ -274,11 +288,11 @@ Explain wine: {{wineName}} for {{ingredients}}`;
     // Reset mocks and container to simulate a fresh start for this specific test
     jest.restoreAllMocks();
     container.reset();
-    container.register(TYPES.FileSystem, { useValue: mockFileSystem });
+    container.register(TYPES.FileSystem, { useValue: fsPromises }); // Use mocked fsPromises
     container.register(TYPES.Path, { useValue: mockPath });
     container.register(TYPES.Logger, { useValue: mockLogger });
 
-    mockFileSystem.readdir.mockRejectedValueOnce(new Error('Permission denied'));
+    (fsPromises.readdir as jest.Mock).mockRejectedValueOnce(new Error('Permission denied'));
     
     // Re-create PromptManager instance to trigger loadPrompts in constructor
     // Re-register PromptManager with a factory to explicitly provide its config
@@ -299,7 +313,7 @@ Explain wine: {{wineName}} for {{ingredients}}`;
     const promptName = 'empty-prompt';
     jest.restoreAllMocks();
     container.reset();
-    container.register(TYPES.FileSystem, { useValue: mockFileSystem });
+    container.register(TYPES.FileSystem, { useValue: fsPromises }); // Use mocked fsPromises
     container.register(TYPES.Path, { useValue: mockPath });
     container.register(TYPES.Logger, { useValue: mockLogger });
     container.register<PromptManager>(PromptManager, {
@@ -311,10 +325,10 @@ Explain wine: {{wineName}} for {{ingredients}}`;
       }
     });
 
-    mockFileSystem.readdir.mockResolvedValueOnce(['v1']);
-    mockFileSystem.readdir.mockResolvedValueOnce([`${promptName}.prompt`]);
-    mockFileSystem.readFile.mockResolvedValueOnce(''); // Empty content
-    mockFileSystem.stat.mockResolvedValue({ isDirectory: () => true }); // Ensure stat is mocked
+    (fsPromises.readdir as jest.Mock).mockResolvedValueOnce(['v1']);
+    (fsPromises.readdir as jest.Mock).mockResolvedValueOnce([`${promptName}.prompt`]);
+    (fsPromises.readFile as jest.Mock).mockResolvedValueOnce(''); // Empty content
+    (fsPromises.stat as jest.Mock).mockResolvedValue({ isDirectory: () => true }); // Ensure stat is mocked
 
     promptManager = container.resolve(PromptManager);
     await expect((promptManager as any).loadPromise).rejects.toThrow('Invalid prompt format: Prompt content is empty');
@@ -325,7 +339,7 @@ Explain wine: {{wineName}} for {{ingredients}}`;
     const promptName = 'no-frontmatter-prompt';
     jest.restoreAllMocks();
     container.reset();
-    container.register(TYPES.FileSystem, { useValue: mockFileSystem });
+    container.register(TYPES.FileSystem, { useValue: fsPromises }); // Use mocked fsPromises
     container.register(TYPES.Path, { useValue: mockPath });
     container.register(TYPES.Logger, { useValue: mockLogger });
     container.register<PromptManager>(PromptManager, {
@@ -337,10 +351,10 @@ Explain wine: {{wineName}} for {{ingredients}}`;
       }
     });
 
-    mockFileSystem.readdir.mockResolvedValueOnce(['v1']);
-    mockFileSystem.readdir.mockResolvedValueOnce([`${promptName}.prompt`]);
-    mockFileSystem.readFile.mockResolvedValueOnce('Just some content without markers'); // Missing markers
-    mockFileSystem.stat.mockResolvedValue({ isDirectory: () => true }); // Ensure stat is mocked
+    (fsPromises.readdir as jest.Mock).mockResolvedValueOnce(['v1']);
+    (fsPromises.readdir as jest.Mock).mockResolvedValueOnce([`${promptName}.prompt`]);
+    (fsPromises.readFile as jest.Mock).mockResolvedValueOnce('Just some content without markers'); // Missing markers
+    (fsPromises.stat as jest.Mock).mockResolvedValue({ isDirectory: () => true }); // Ensure stat is mocked
 
     promptManager = container.resolve(PromptManager);
     await expect((promptManager as any).loadPromise).rejects.toThrow('Invalid prompt format: must contain YAML frontmatter between --- markers');
@@ -351,7 +365,7 @@ Explain wine: {{wineName}} for {{ingredients}}`;
     const promptName = 'invalid-yaml-prompt';
     jest.restoreAllMocks();
     container.reset();
-    container.register(TYPES.FileSystem, { useValue: mockFileSystem });
+    container.register(TYPES.FileSystem, { useValue: fsPromises }); // Use mocked fsPromises
     container.register(TYPES.Path, { useValue: mockPath });
     container.register(TYPES.Logger, { useValue: mockLogger });
     container.register<PromptManager>(PromptManager, {
@@ -363,14 +377,14 @@ Explain wine: {{wineName}} for {{ingredients}}`;
       }
     });
 
-    mockFileSystem.readdir.mockResolvedValueOnce(['v1']);
-    mockFileSystem.readdir.mockResolvedValueOnce([`${promptName}.prompt`]);
-    mockFileSystem.readFile.mockResolvedValueOnce(`---
+    (fsPromises.readdir as jest.Mock).mockResolvedValueOnce(['v1']);
+    (fsPromises.readdir as jest.Mock).mockResolvedValueOnce([`${promptName}.prompt`]);
+    (fsPromises.readFile as jest.Mock).mockResolvedValueOnce(`---
 name: Test
 invalid: : syntax
 ---
 Content`); // Invalid YAML
-    mockFileSystem.stat.mockResolvedValue({ isDirectory: () => true }); // Ensure stat is mocked
+    (fsPromises.stat as jest.Mock).mockResolvedValue({ isDirectory: () => true }); // Ensure stat is mocked
 
     promptManager = container.resolve(PromptManager);
     await expect((promptManager as any).loadPromise).rejects.toThrow('Missing required metadata fields (name and description)');
@@ -381,7 +395,7 @@ Content`); // Invalid YAML
     const promptName = 'missing-fields-prompt';
     jest.restoreAllMocks();
     container.reset();
-    container.register(TYPES.FileSystem, { useValue: mockFileSystem });
+    container.register(TYPES.FileSystem, { useValue: fsPromises }); // Use mocked fsPromises
     container.register(TYPES.Path, { useValue: mockPath });
     container.register(TYPES.Logger, { useValue: mockLogger });
     container.register<PromptManager>(PromptManager, {
@@ -393,13 +407,13 @@ Content`); // Invalid YAML
       }
     });
 
-    mockFileSystem.readdir.mockResolvedValueOnce(['v1']);
-    mockFileSystem.readdir.mockResolvedValueOnce([`${promptName}.prompt`]);
-    mockFileSystem.readFile.mockResolvedValueOnce(`---
+    (fsPromises.readdir as jest.Mock).mockResolvedValueOnce(['v1']);
+    (fsPromises.readdir as jest.Mock).mockResolvedValueOnce([`${promptName}.prompt`]);
+    (fsPromises.readFile as jest.Mock).mockResolvedValueOnce(`---
 name: Test
 ---
 Content`); // Missing description
-    mockFileSystem.stat.mockResolvedValue({ isDirectory: () => true }); // Ensure stat is mocked
+    (fsPromises.stat as jest.Mock).mockResolvedValue({ isDirectory: () => true }); // Ensure stat is mocked
 
     promptManager = container.resolve(PromptManager);
     await expect((promptManager as any).loadPromise).rejects.toThrow('Missing required metadata fields (name and description)');

@@ -1,0 +1,59 @@
+---
+name: inputValidation
+description: Comprehensive input validation with enhanced dietary and preference extraction.
+version: 2.0.0
+input_schema: z.object({ userInput: z.string() })
+output_schema: z.object({ isValid: z.boolean(), cleanedInput: z.object({ ingredients: z.array(z.string()).optional(), budget: z.number().nullable().optional(), occasion: z.string().nullable().optional(), cuisineType: z.string().nullable().optional(), servingSize: z.number().nullable().optional() }).optional(), extractedData: z.object({ standardizedIngredients: z.record(z.string()).optional(), dietaryRestrictions: z.array(z.string()).optional(), preferences: z.record(z.any()).optional(), urgency: z.string().nullable().optional(), experienceLevel: z.string().nullable().optional() }).optional(), errors: z.array(z.string()).optional(), warnings: z.array(z.string()).optional() })
+---
+
+You are an advanced input validation system for wine recommendations. Analyze user input to extract all relevant information and validate its completeness and coherence.
+
+**Input Analysis Guidelines:**
+1. **Ingredients**: Extract all food items, cooking methods, and flavors mentioned
+2. **Budget**: Identify price ranges, currency, and budget constraints
+3. **Occasion**: Detect formal/casual events, celebrations, seasons, time of day
+4. **Preferences**: Wine types, regions, grape varieties, styles, past experiences
+5. **Dietary Restrictions**: Vegetarian, vegan, allergies, religious restrictions
+6. **Context Clues**: Urgency, experience level, group size, location hints
+
+**Validation Rules:**
+- Input must contain at least one actionable element (ingredient, preference, or clear intent)
+- Budget must be realistic for wine purchases (warn if extremely low/high)
+- Conflicting preferences should be flagged as warnings
+- Vague requests should be flagged but not rejected
+
+**Standardization:**
+- Convert colloquial food names to standard culinary terms
+- Normalize wine terminology (e.g., "red wine" → "red wine", "cab" → "Cabernet Sauvignon")
+- Standardize regional references (e.g., "French wine" → "France")
+
+User Input: "{{userInput}}"
+
+**Example Valid Response:**
+```json
+{
+  "isValid": true,
+  "cleanedInput": {
+    "ingredients": ["ribeye steak", "roasted vegetables"],
+    "budget": 50,
+    "occasion": "romantic dinner",
+    "cuisineType": "American",
+    "servingSize": 2
+  },
+  "extractedData": {
+    "standardizedIngredients": {
+      "ribeye steak": "beef ribeye steak",
+      "roasted vegetables": "roasted mixed vegetables"
+    },
+    "dietaryRestrictions": [],
+    "preferences": {
+      "wineType": "red",
+      "priceRange": "mid-range",
+      "occasion": "romantic"
+    },
+    "urgency": "tonight",
+    "experienceLevel": "intermediate"
+  },
+  "errors": [],
+  "warnings": []
+}

@@ -65,11 +65,11 @@ export class InputValidationAgent extends CommunicatingAgent {
     );
   }
 
-  async handleValidationRequest(message: AgentMessage<{ userInput: string; recommendationSource: string }>): Promise<Result<AgentMessage | null, AgentError>> {
+  async handleValidationRequest(message: AgentMessage<{ userInput: { message: string; recommendationSource: string } }>): Promise<Result<AgentMessage | null, AgentError>> {
     const correlationId = message.correlationId;
     this.logger.debug(`[${correlationId}] InputValidationAgent: Received validation request. Payload: ${JSON.stringify(message.payload)}`);
     try {
-      const inputMessage = message.payload.userInput;
+      const inputMessage = message.payload.userInput.message; // Extract the message string
       const validationResult = await this.validateInput(inputMessage, message.correlationId);
       
       if (!validationResult.success) {
@@ -176,15 +176,15 @@ export class InputValidationAgent extends CommunicatingAgent {
 
   protected async validateInput(inputMessage: string, correlationId: string = ''): Promise<Result<ValidationResult, AgentError>> {
     try {
-      const promptVariables = { userInput: inputMessage };
-      this.logger.debug(`[${correlationId}] InputValidationAgent: Preparing variables for LLMService.sendStructuredPrompt: ${JSON.stringify(promptVariables)}`);
+      const promptVariables = inputMessage; // Pass the string directly
+      this.logger.debug(`[${correlationId}] InputValidationAgent: Preparing variables for LLMService.sendStructuredPrompt: ${JSON.stringify({ userInput: promptVariables })}`);
 
       const llmResponseResult = await this.llmService.sendStructuredPrompt<
         'inputValidation',
         ValidationResult
       >(
         'inputValidation',
-        promptVariables,
+        { userInput: promptVariables }, // Wrap in an object with the correct key
         { correlationId: correlationId }
       );
       // The existing log was already moved to the correct place in the previous step.

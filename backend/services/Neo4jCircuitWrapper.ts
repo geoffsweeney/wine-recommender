@@ -56,24 +56,32 @@ export class Neo4jCircuitWrapper implements INeo4jCircuitWrapper<Driver> {
           return result.records.map((record: Record) => {
             this.logger.debug('Processing Neo4j record:', { recordKeys: record.keys, recordValues: record.toObject() });
             try {
-              // Attempt to extract properties from a node, regardless of its alias
-              for (const key of record.keys) {
+              const extractedData: { [key: string]: any } = {};
+              record.keys.forEach(key => {
+                const stringKey = key.toString(); // Convert symbol keys to string representation
                 const value = record.get(key);
-                this.logger.debug(`Checking key: ${String(key)}, value: ${JSON.stringify(value)}`);
-                if (value && value.properties) {
-                  this.logger.debug(`Found node properties for key ${String(key)}: ${JSON.stringify(value.properties)}`);
-                  return value.properties as T;
+                if (value && typeof value === 'object' && value.properties) {
+                  // If the value is a Neo4j Node or Relationship, extract its properties
+                  extractedData[stringKey] = { ...value.properties };
+                  if (value.elementId) {
+                    extractedData[stringKey].id = value.elementId; // Add elementId as 'id' to the extracted object
+                  }
+                } else if (value && typeof value === 'object' && value.low !== undefined && value.high !== undefined) {
+                  // Handle Neo4j Integer type
+                  extractedData[stringKey] = value.toNumber();
+                } else {
+                  // For other direct values or non-node/relationship objects
+                  extractedData[stringKey] = value;
                 }
-              }
-              // If no node with properties is found, return the whole object
-              this.logger.debug('No node properties found, returning full object.');
-              return record.toObject() as T;
+              });
+              return extractedData as T;
             } catch (parseError) {
               this.logger.error('Failed to parse Neo4j record', {
                 error: parseError,
-                recordKeys: record.keys
+                recordKeys: record.keys,
+                recordObject: record.toObject()
               });
-              return record.toObject() as T;
+              return record.toObject() as T; // Fallback to original toObject
             }
           });
         } finally {

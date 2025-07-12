@@ -1,13 +1,55 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="jest tests" tests="352" failures="36" errors="0" time="11.889">
-  <testsuite name="AgentCommunicationBus" errors="0" failures="0" skipped="0" timestamp="2025-07-06T07:46:53" time="6.241" tests="10">
-    <testcase classname="AgentCommunicationBus should register agents" name="AgentCommunicationBus should register agents" time="0.006">
+<testsuites name="jest tests" tests="409" failures="36" errors="0" time="9.135">
+  <testsuite name="LLMRecommendationAgent" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:45" time="5.347" tests="10">
+    <testcase classname="LLMRecommendationAgent should initialize correctly" name="LLMRecommendationAgent should initialize correctly" time="0.009">
     </testcase>
-    <testcase classname="AgentCommunicationBus should publish and receive messages" name="AgentCommunicationBus should publish and receive messages" time="0.036">
+    <testcase classname="LLMRecommendationAgent handleMessage should return an error for unhandled message types" name="LLMRecommendationAgent handleMessage should return an error for unhandled message types" time="0.003">
     </testcase>
-    <testcase classname="AgentCommunicationBus should allow unsubscribing" name="AgentCommunicationBus should allow unsubscribing" time="0.001">
+    <testcase classname="LLMRecommendationAgent handleMessage should process a recommendation request successfully" name="LLMRecommendationAgent handleMessage should process a recommendation request successfully" time="0.006">
     </testcase>
-    <testcase classname="AgentCommunicationBus should list all registered agents" name="AgentCommunicationBus should list all registered agents" time="0">
+    <testcase classname="LLMRecommendationAgent handleMessage should return an error if payload is missing" name="LLMRecommendationAgent handleMessage should return an error if payload is missing" time="0.003">
+    </testcase>
+    <testcase classname="LLMRecommendationAgent handleMessage should return an error if insufficient information for recommendation" name="LLMRecommendationAgent handleMessage should return an error if insufficient information for recommendation" time="0.011">
+    </testcase>
+    <testcase classname="LLMRecommendationAgent handleMessage should handle simulated LLM error" name="LLMRecommendationAgent handleMessage should handle simulated LLM error" time="0.002">
+    </testcase>
+    <testcase classname="LLMRecommendationAgent handleMessage should handle LLM service failure" name="LLMRecommendationAgent handleMessage should handle LLM service failure" time="0.002">
+    </testcase>
+    <testcase classname="LLMRecommendationAgent handleMessage should handle general exceptions during processing" name="LLMRecommendationAgent handleMessage should handle general exceptions during processing" time="0.002">
+    </testcase>
+    <testcase classname="LLMRecommendationAgent handleMessage should handle LLM response with malformed JSON" name="LLMRecommendationAgent handleMessage should handle LLM response with malformed JSON" time="0.013">
+    </testcase>
+    <testcase classname="LLMRecommendationAgent handleMessage should handle LLM response with valid JSON but incorrect RecommendationResult structure" name="LLMRecommendationAgent handleMessage should handle LLM response with valid JSON but incorrect RecommendationResult structure" time="0.002">
+    </testcase>
+  </testsuite>
+  <testsuite name="FallbackAgent" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:45" time="5.451" tests="9">
+    <testcase classname="FallbackAgent should initialize correctly" name="FallbackAgent should initialize correctly" time="0.008">
+    </testcase>
+    <testcase classname="FallbackAgent handleMessage should return an error for unhandled message types" name="FallbackAgent handleMessage should return an error for unhandled message types" time="0.003">
+    </testcase>
+    <testcase classname="FallbackAgent handleFallbackRequest should return an error if payload is missing" name="FallbackAgent handleFallbackRequest should return an error if payload is missing" time="0.002">
+    </testcase>
+    <testcase classname="FallbackAgent handleFallbackRequest should process a fallback request successfully with LLM response" name="FallbackAgent handleFallbackRequest should process a fallback request successfully with LLM response" time="0.004">
+    </testcase>
+    <testcase classname="FallbackAgent handleFallbackRequest should process a fallback request with default response if LLM fails" name="FallbackAgent handleFallbackRequest should process a fallback request with default response if LLM fails" time="0.012">
+    </testcase>
+    <testcase classname="FallbackAgent handleFallbackRequest should handle general exceptions during processing" name="FallbackAgent handleFallbackRequest should handle general exceptions during processing" time="0.002">
+    </testcase>
+    <testcase classname="FallbackAgent generateFallbackResponse should generate a fallback response using LLM" name="FallbackAgent generateFallbackResponse should generate a fallback response using LLM" time="0.001">
+    </testcase>
+    <testcase classname="FallbackAgent generateFallbackResponse should return default fallback response if LLM service fails" name="FallbackAgent generateFallbackResponse should return default fallback response if LLM service fails" time="0.002">
+    </testcase>
+    <testcase classname="FallbackAgent generateFallbackResponse should return LLM_FALLBACK_ERROR for general exceptions during generation" name="FallbackAgent generateFallbackResponse should return LLM_FALLBACK_ERROR for general exceptions during generation" time="0.002">
+    </testcase>
+  </testsuite>
+  <testsuite name="AgentCommunicationBus" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:45" time="5.439" tests="10">
+    <testcase classname="AgentCommunicationBus should register agents" name="AgentCommunicationBus should register agents" time="0.005">
+    </testcase>
+    <testcase classname="AgentCommunicationBus should publish and receive messages" name="AgentCommunicationBus should publish and receive messages" time="0.054">
+    </testcase>
+    <testcase classname="AgentCommunicationBus should allow unsubscribing" name="AgentCommunicationBus should allow unsubscribing" time="0.016">
+    </testcase>
+    <testcase classname="AgentCommunicationBus should list all registered agents" name="AgentCommunicationBus should list all registered agents" time="0.001">
     </testcase>
     <testcase classname="AgentCommunicationBus should handle topic-based subscriptions" name="AgentCommunicationBus should handle topic-based subscriptions" time="0.001">
     </testcase>
@@ -22,16 +64,102 @@
     <testcase classname="AgentCommunicationBus should broadcast context to all agents" name="AgentCommunicationBus should broadcast context to all agents" time="0.001">
     </testcase>
   </testsuite>
-  <testsuite name="ValueAnalysisAgent" errors="0" failures="0" skipped="0" timestamp="2025-07-06T07:46:53" time="6.359" tests="14">
-    <testcase classname="ValueAnalysisAgent should initialize correctly" name="ValueAnalysisAgent should initialize correctly" time="0.012">
+  <testsuite name="UserPreferenceAgent" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:45" time="5.432" tests="9">
+    <testcase classname="UserPreferenceAgent should initialize correctly" name="UserPreferenceAgent should initialize correctly" time="0.026">
     </testcase>
-    <testcase classname="ValueAnalysisAgent handleMessage should return an error for unhandled message types" name="ValueAnalysisAgent handleMessage should return an error for unhandled message types" time="0.011">
+    <testcase classname="UserPreferenceAgent handleMessage should return an error for unhandled message types" name="UserPreferenceAgent handleMessage should return an error for unhandled message types" time="0.002">
     </testcase>
-    <testcase classname="ValueAnalysisAgent handleValueAnalysisRequest should return an error if payload is invalid" name="ValueAnalysisAgent handleValueAnalysisRequest should return an error if payload is invalid" time="0.005">
+    <testcase classname="UserPreferenceAgent handlePreferenceRequest should return an error if payload is missing or invalid" name="UserPreferenceAgent handlePreferenceRequest should return an error if payload is missing or invalid" time="0.003">
     </testcase>
-    <testcase classname="ValueAnalysisAgent handleValueAnalysisRequest should process a value analysis request successfully" name="ValueAnalysisAgent handleValueAnalysisRequest should process a value analysis request successfully" time="0.004">
+    <testcase classname="UserPreferenceAgent handlePreferenceRequest should process a preference request with fast extraction success" name="UserPreferenceAgent handlePreferenceRequest should process a preference request with fast extraction success" time="0.011">
     </testcase>
-    <testcase classname="ValueAnalysisAgent handleValueAnalysisRequest should handle general exceptions during processing" name="ValueAnalysisAgent handleValueAnalysisRequest should handle general exceptions during processing" time="0.007">
+    <testcase classname="UserPreferenceAgent handlePreferenceRequest should queue async LLM extraction if fast extraction fails or returns no data" name="UserPreferenceAgent handlePreferenceRequest should queue async LLM extraction if fast extraction fails or returns no data" time="0.01">
+    </testcase>
+    <testcase classname="UserPreferenceAgent handlePreferenceRequest should handle general exceptions during processing" name="UserPreferenceAgent handlePreferenceRequest should handle general exceptions during processing" time="0.002">
+    </testcase>
+    <testcase classname="UserPreferenceAgent mergePreferences should merge preferences, with incoming overriding existing" name="UserPreferenceAgent mergePreferences should merge preferences, with incoming overriding existing" time="0.001">
+    </testcase>
+    <testcase classname="UserPreferenceAgent mergePreferences should handle empty existing preferences" name="UserPreferenceAgent mergePreferences should handle empty existing preferences" time="0.001">
+    </testcase>
+    <testcase classname="UserPreferenceAgent mergePreferences should handle empty incoming preferences" name="UserPreferenceAgent mergePreferences should handle empty incoming preferences" time="0.001">
+    </testcase>
+  </testsuite>
+  <testsuite name="RecommendationAgent" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:45" time="5.485" tests="14">
+    <testcase classname="RecommendationAgent should initialize correctly" name="RecommendationAgent should initialize correctly" time="0.009">
+    </testcase>
+    <testcase classname="RecommendationAgent handleMessage should return an error for unhandled message types" name="RecommendationAgent handleMessage should return an error for unhandled message types" time="0.002">
+    </testcase>
+    <testcase classname="RecommendationAgent handleRecommendationRequest should return an error if payload input is missing" name="RecommendationAgent handleRecommendationRequest should return an error if payload input is missing" time="0.002">
+    </testcase>
+    <testcase classname="RecommendationAgent handleRecommendationRequest should process an ingredient-based recommendation request successfully" name="RecommendationAgent handleRecommendationRequest should process an ingredient-based recommendation request successfully" time="0.03">
+    </testcase>
+    <testcase classname="RecommendationAgent handleRecommendationRequest should process a preference-based recommendation request successfully" name="RecommendationAgent handleRecommendationRequest should process a preference-based recommendation request successfully" time="0.009">
+    </testcase>
+    <testcase classname="RecommendationAgent handleRecommendationRequest should handle no wines found and send appropriate response" name="RecommendationAgent handleRecommendationRequest should handle no wines found and send appropriate response" time="0.002">
+    </testcase>
+    <testcase classname="RecommendationAgent handleRecommendationRequest should handle general exceptions during processing" name="RecommendationAgent handleRecommendationRequest should handle general exceptions during processing" time="0.002">
+    </testcase>
+    <testcase classname="RecommendationAgent handlePreferenceUpdate should log debug message for successful preference update" name="RecommendationAgent handlePreferenceUpdate should log debug message for successful preference update" time="0.001">
+    </testcase>
+    <testcase classname="RecommendationAgent handlePreferenceUpdate should return error for failed preference update" name="RecommendationAgent handlePreferenceUpdate should return error for failed preference update" time="0.002">
+    </testcase>
+    <testcase classname="RecommendationAgent enhanceKnowledgeGraphResults should enhance recommendations with LLM response" name="RecommendationAgent enhanceKnowledgeGraphResults should enhance recommendations with LLM response" time="0.002">
+    </testcase>
+    <testcase classname="RecommendationAgent enhanceKnowledgeGraphResults should return original recommendations if LLM service fails" name="RecommendationAgent enhanceKnowledgeGraphResults should return original recommendations if LLM service fails" time="0.001">
+    </testcase>
+    <testcase classname="RecommendationAgent enhanceKnowledgeGraphResults should return original recommendations if LLM response format is invalid" name="RecommendationAgent enhanceKnowledgeGraphResults should return original recommendations if LLM response format is invalid" time="0.002">
+    </testcase>
+    <testcase classname="RecommendationAgent enhanceKnowledgeGraphResults should return original recommendations for general exceptions" name="RecommendationAgent enhanceKnowledgeGraphResults should return original recommendations for general exceptions" time="0.002">
+    </testcase>
+    <testcase classname="RecommendationAgent handleNoRecommendations should send a recommendation-response with no wines and an error message" name="RecommendationAgent handleNoRecommendations should send a recommendation-response with no wines and an error message" time="0.001">
+    </testcase>
+  </testsuite>
+  <testsuite name="Agent Message Handlers" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:45" time="5.496" tests="4">
+    <testcase classname="Agent Message Handlers InputValidationAgent should validate input and return success for valid input" name="Agent Message Handlers InputValidationAgent should validate input and return success for valid input" time="0.007">
+    </testcase>
+    <testcase classname="Agent Message Handlers InputValidationAgent should handle invalid input" name="Agent Message Handlers InputValidationAgent should handle invalid input" time="0.002">
+    </testcase>
+    <testcase classname="Agent Message Handlers InputValidationAgent should handle LLM service failures" name="Agent Message Handlers InputValidationAgent should handle LLM service failures" time="0.002">
+    </testcase>
+    <testcase classname="Agent Message Handlers InputValidationAgent should forward user preferences when found" name="Agent Message Handlers InputValidationAgent should forward user preferences when found" time="0.001">
+    </testcase>
+  </testsuite>
+  <testsuite name="MCPAdapterAgent" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:45" time="5.574" tests="6">
+    <testcase classname="MCPAdapterAgent should initialize correctly" name="MCPAdapterAgent should initialize correctly" time="0.01">
+    </testcase>
+    <testcase classname="MCPAdapterAgent handleMessage should return an error for unhandled message types" name="MCPAdapterAgent handleMessage should return an error for unhandled message types" time="0.002">
+    </testcase>
+    <testcase classname="MCPAdapterAgent handleToolRequest should return an error if payload is missing or invalid" name="MCPAdapterAgent handleToolRequest should return an error if payload is missing or invalid" time="0.002">
+    </testcase>
+    <testcase classname="MCPAdapterAgent handleToolRequest should process a successful MCP tool request" name="MCPAdapterAgent handleToolRequest should process a successful MCP tool request" time="0.003">
+    </testcase>
+    <testcase classname="MCPAdapterAgent handleToolRequest should handle MCP tool call failure" name="MCPAdapterAgent handleToolRequest should handle MCP tool call failure" time="0.011">
+    </testcase>
+    <testcase classname="MCPAdapterAgent handleToolRequest should handle general exceptions during processing" name="MCPAdapterAgent handleToolRequest should handle general exceptions during processing" time="0.001">
+    </testcase>
+  </testsuite>
+  <testsuite name="ExplanationAgent" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:45" time="5.665" tests="5">
+    <testcase classname="ExplanationAgent handleExplanationRequestInternal should generate and send an explanation for valid request" name="ExplanationAgent handleExplanationRequestInternal should generate and send an explanation for valid request" time="0.012">
+    </testcase>
+    <testcase classname="ExplanationAgent handleExplanationRequestInternal should return an error if payload is missing or invalid" name="ExplanationAgent handleExplanationRequestInternal should return an error if payload is missing or invalid" time="0.001">
+    </testcase>
+    <testcase classname="ExplanationAgent handleExplanationRequestInternal should handle LLM service failure gracefully" name="ExplanationAgent handleExplanationRequestInternal should handle LLM service failure gracefully" time="0.065">
+    </testcase>
+    <testcase classname="ExplanationAgent handleMessage (fallback) should return an error for unhandled message types" name="ExplanationAgent handleMessage (fallback) should return an error for unhandled message types" time="0.002">
+    </testcase>
+    <testcase classname="ExplanationAgent error handling should process errors and send error response" name="ExplanationAgent error handling should process errors and send error response" time="0.004">
+    </testcase>
+  </testsuite>
+  <testsuite name="ValueAnalysisAgent" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:45" time="5.76" tests="14">
+    <testcase classname="ValueAnalysisAgent should initialize correctly" name="ValueAnalysisAgent should initialize correctly" time="0.008">
+    </testcase>
+    <testcase classname="ValueAnalysisAgent handleMessage should return an error for unhandled message types" name="ValueAnalysisAgent handleMessage should return an error for unhandled message types" time="0.002">
+    </testcase>
+    <testcase classname="ValueAnalysisAgent handleValueAnalysisRequest should return an error if payload is invalid" name="ValueAnalysisAgent handleValueAnalysisRequest should return an error if payload is invalid" time="0.002">
+    </testcase>
+    <testcase classname="ValueAnalysisAgent handleValueAnalysisRequest should process a value analysis request successfully" name="ValueAnalysisAgent handleValueAnalysisRequest should process a value analysis request successfully" time="0.002">
+    </testcase>
+    <testcase classname="ValueAnalysisAgent handleValueAnalysisRequest should handle general exceptions during processing" name="ValueAnalysisAgent handleValueAnalysisRequest should handle general exceptions during processing" time="0.004">
     </testcase>
     <testcase classname="ValueAnalysisAgent isValueAnalysisRequest should return true for a valid ValueAnalysisRequest" name="ValueAnalysisAgent isValueAnalysisRequest should return true for a valid ValueAnalysisRequest" time="0.001">
     </testcase>
@@ -41,67 +169,159 @@
     </testcase>
     <testcase classname="ValueAnalysisAgent isValueAnalysisRequest should return false if region is missing" name="ValueAnalysisAgent isValueAnalysisRequest should return false if region is missing" time="0.001">
     </testcase>
-    <testcase classname="ValueAnalysisAgent isValueAnalysisRequest should return false if vintage is missing" name="ValueAnalysisAgent isValueAnalysisRequest should return false if vintage is missing" time="0.001">
+    <testcase classname="ValueAnalysisAgent isValueAnalysisRequest should return false if vintage is missing" name="ValueAnalysisAgent isValueAnalysisRequest should return false if vintage is missing" time="0">
     </testcase>
-    <testcase classname="ValueAnalysisAgent isValueAnalysisRequest should return false for non-object input" name="ValueAnalysisAgent isValueAnalysisRequest should return false for non-object input" time="0">
+    <testcase classname="ValueAnalysisAgent isValueAnalysisRequest should return false for non-object input" name="ValueAnalysisAgent isValueAnalysisRequest should return false for non-object input" time="0.001">
     </testcase>
     <testcase classname="ValueAnalysisAgent processValueAnalysis should return LLM_SERVICE_ERROR if LLM service fails" name="ValueAnalysisAgent processValueAnalysis should return LLM_SERVICE_ERROR if LLM service fails" time="0.001">
     </testcase>
-    <testcase classname="ValueAnalysisAgent processValueAnalysis should return LLM_NO_RESPONSE if LLM returns no data" name="ValueAnalysisAgent processValueAnalysis should return LLM_NO_RESPONSE if LLM returns no data" time="0.002">
+    <testcase classname="ValueAnalysisAgent processValueAnalysis should return LLM_NO_RESPONSE if LLM returns no data" name="ValueAnalysisAgent processValueAnalysis should return LLM_NO_RESPONSE if LLM returns no data" time="0.001">
     </testcase>
-    <testcase classname="ValueAnalysisAgent processValueAnalysis should return VALUE_ANALYSIS_PROCESSING_ERROR for general exceptions" name="ValueAnalysisAgent processValueAnalysis should return VALUE_ANALYSIS_PROCESSING_ERROR for general exceptions" time="0.001">
-    </testcase>
-  </testsuite>
-  <testsuite name="RecommendationRequest DTO" errors="0" failures="0" skipped="0" timestamp="2025-07-06T07:46:53" time="6.514" tests="5">
-    <testcase classname="RecommendationRequest DTO should validate a request with conversation history" name="RecommendationRequest DTO should validate a request with conversation history" time="0.007">
-    </testcase>
-    <testcase classname="RecommendationRequest DTO should validate a request without conversation history" name="RecommendationRequest DTO should validate a request without conversation history" time="0.001">
-    </testcase>
-    <testcase classname="RecommendationRequest DTO should reject a request with invalid conversation history format" name="RecommendationRequest DTO should reject a request with invalid conversation history format" time="0.002">
-    </testcase>
-    <testcase classname="RecommendationRequest DTO should reject a request with invalid role in conversation history" name="RecommendationRequest DTO should reject a request with invalid role in conversation history" time="0.001">
-    </testcase>
-    <testcase classname="RecommendationRequest DTO should reject a request with missing content in conversation history turn" name="RecommendationRequest DTO should reject a request with missing content in conversation history turn" time="0.001">
+    <testcase classname="ValueAnalysisAgent processValueAnalysis should return VALUE_ANALYSIS_PROCESSING_ERROR for general exceptions" name="ValueAnalysisAgent processValueAnalysis should return VALUE_ANALYSIS_PROCESSING_ERROR for general exceptions" time="0.002">
     </testcase>
   </testsuite>
-  <testsuite name="LLMService" errors="0" failures="0" skipped="0" timestamp="2025-07-06T07:46:59" time="0.28" tests="9">
-    <testcase classname="LLMService sendPrompt should send a prompt to Ollama and return success" name="LLMService sendPrompt should send a prompt to Ollama and return success" time="0.005">
+  <testsuite name="Agent Capabilities" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:45" time="5.906" tests="8">
+    <testcase classname="Agent Capabilities should return correct capabilities for InputValidationAgent" name="Agent Capabilities should return correct capabilities for InputValidationAgent" time="0.012">
     </testcase>
-    <testcase classname="LLMService sendPrompt should return failure if PromptManager.getPrompt fails" name="LLMService sendPrompt should return failure if PromptManager.getPrompt fails" time="0.002">
+    <testcase classname="Agent Capabilities should return correct capabilities for LLMRecommendationAgent" name="Agent Capabilities should return correct capabilities for LLMRecommendationAgent" time="0.002">
     </testcase>
-    <testcase classname="LLMService sendPrompt should return failure if Ollama API call fails" name="LLMService sendPrompt should return failure if Ollama API call fails" time="0.057">
+    <testcase classname="Agent Capabilities should return correct capabilities for MCPAdapterAgent" name="Agent Capabilities should return correct capabilities for MCPAdapterAgent" time="0.002">
     </testcase>
-    <testcase classname="LLMService sendPrompt should return failure if fetch throws an error" name="LLMService sendPrompt should return failure if fetch throws an error" time="0.011">
+    <testcase classname="Agent Capabilities should return correct capabilities for ValueAnalysisAgent" name="Agent Capabilities should return correct capabilities for ValueAnalysisAgent" time="0.002">
     </testcase>
-    <testcase classname="LLMService sendStructuredPrompt should send a structured prompt to Ollama and return success" name="LLMService sendStructuredPrompt should send a structured prompt to Ollama and return success" time="0.006">
+    <testcase classname="Agent Capabilities should return correct capabilities for UserPreferenceAgent" name="Agent Capabilities should return correct capabilities for UserPreferenceAgent" time="0.001">
     </testcase>
-    <testcase classname="LLMService sendStructuredPrompt should return failure if PromptManager.getPrompt fails" name="LLMService sendStructuredPrompt should return failure if PromptManager.getPrompt fails" time="0.001">
+    <testcase classname="Agent Capabilities should return correct capabilities for ExplanationAgent" name="Agent Capabilities should return correct capabilities for ExplanationAgent" time="0.001">
     </testcase>
-    <testcase classname="LLMService sendStructuredPrompt should return failure if Ollama API call fails" name="LLMService sendStructuredPrompt should return failure if Ollama API call fails" time="0.001">
+    <testcase classname="Agent Capabilities should return correct capabilities for FallbackAgent" name="Agent Capabilities should return correct capabilities for FallbackAgent" time="0.001">
     </testcase>
-    <testcase classname="LLMService sendStructuredPrompt should return failure if fetch throws an error" name="LLMService sendStructuredPrompt should return failure if fetch throws an error" time="0.002">
-    </testcase>
-    <testcase classname="LLMService sendStructuredPrompt should return failure if Ollama response is not valid JSON" name="LLMService sendStructuredPrompt should return failure if Ollama response is not valid JSON" time="0.005">
+    <testcase classname="Agent Capabilities AgentRegistry Integration should register all agents with their capabilities" name="Agent Capabilities AgentRegistry Integration should register all agents with their capabilities" time="0.005">
     </testcase>
   </testsuite>
-  <testsuite name="SommelierCoordinator Integration" errors="0" failures="0" skipped="0" timestamp="2025-07-06T07:46:53" time="6.661" tests="3">
-    <testcase classname="SommelierCoordinator Integration handleRecommendationRequest should successfully orchestrate knowledge graph recommendation flow with traceId" name="SommelierCoordinator Integration handleRecommendationRequest should successfully orchestrate knowledge graph recommendation flow with traceId" time="0.011">
+  <testsuite name="Neo4jCircuitWrapper" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:50" time="0.506" tests="11">
+    <testcase classname="Neo4jCircuitWrapper constructor should initialize with provided options" name="Neo4jCircuitWrapper constructor should initialize with provided options" time="0.003">
     </testcase>
-    <testcase classname="SommelierCoordinator Integration dead letter queue handling should route failed messages to DLQ with traceId when recommendation fails" name="SommelierCoordinator Integration dead letter queue handling should route failed messages to DLQ with traceId when recommendation fails" time="0.001">
+    <testcase classname="Neo4jCircuitWrapper execute should execute function through circuit breaker" name="Neo4jCircuitWrapper execute should execute function through circuit breaker" time="0.001">
     </testcase>
-    <testcase classname="SommelierCoordinator Integration should log DLQ processing failures with traceId" name="SommelierCoordinator Integration should log DLQ processing failures with traceId" time="0.014">
+    <testcase classname="Neo4jCircuitWrapper execute should propagate circuit breaker errors" name="Neo4jCircuitWrapper execute should propagate circuit breaker errors" time="0.019">
+    </testcase>
+    <testcase classname="Neo4jCircuitWrapper executeQuery should execute query and return results" name="Neo4jCircuitWrapper executeQuery should execute query and return results" time="0.002">
+    </testcase>
+    <testcase classname="Neo4jCircuitWrapper executeQuery should handle empty results" name="Neo4jCircuitWrapper executeQuery should handle empty results" time="0.002">
+    </testcase>
+    <testcase classname="Neo4jCircuitWrapper executeQuery should close session on error" name="Neo4jCircuitWrapper executeQuery should close session on error" time="0.002">
+    </testcase>
+    <testcase classname="Neo4jCircuitWrapper verifyConnection should return true for successful connection" name="Neo4jCircuitWrapper verifyConnection should return true for successful connection" time="0.002">
+    </testcase>
+    <testcase classname="Neo4jCircuitWrapper verifyConnection should return false for failed connection" name="Neo4jCircuitWrapper verifyConnection should return false for failed connection" time="0.001">
+    </testcase>
+    <testcase classname="Neo4jCircuitWrapper close should close driver successfully" name="Neo4jCircuitWrapper close should close driver successfully" time="0.005">
+    </testcase>
+    <testcase classname="Neo4jCircuitWrapper close should handle close errors" name="Neo4jCircuitWrapper close should handle close errors" time="0.001">
+    </testcase>
+    <testcase classname="Neo4jCircuitWrapper getCircuitState should return circuit state" name="Neo4jCircuitWrapper getCircuitState should return circuit state" time="0">
     </testcase>
   </testsuite>
-  <testsuite name="undefined" errors="0" failures="0" skipped="0" timestamp="2025-07-06T07:46:53" time="6.919" tests="1">
-    <testcase classname=" should return 400 for invalid body" name=" should return 400 for invalid body" time="0.034">
+  <testsuite name="UserPreferenceRoutes" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:51" time="0.44" tests="4">
+    <testcase classname="UserPreferenceRoutes GET /users/:userId/preferences should return 200 with user preferences" name="UserPreferenceRoutes GET /users/:userId/preferences should return 200 with user preferences" time="0.038">
+    </testcase>
+    <testcase classname="UserPreferenceRoutes GET /users/:userId/preferences should return 400 if userId is invalid" name="UserPreferenceRoutes GET /users/:userId/preferences should return 400 if userId is invalid" time="0.008">
+    </testcase>
+    <testcase classname="UserPreferenceRoutes POST /users/:userId/preferences should return 200 on successful preference addition/update" name="UserPreferenceRoutes POST /users/:userId/preferences should return 200 on successful preference addition/update" time="0.022">
+    </testcase>
+    <testcase classname="UserPreferenceRoutes POST /users/:userId/preferences should return 400 for invalid preference data" name="UserPreferenceRoutes POST /users/:userId/preferences should return 400 for invalid preference data" time="0.009">
     </testcase>
   </testsuite>
-  <testsuite name="End-to-End Live Recommendation API" errors="0" failures="36" skipped="0" timestamp="2025-07-06T07:46:53" time="6.924" tests="36">
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Classic Food &amp; Wine Pairings should recommend Cabernet Sauvignon or Malbec for grilled steak" name="End-to-End Live Recommendation API POST /recommendations - Classic Food &amp; Wine Pairings should recommend Cabernet Sauvignon or Malbec for grilled steak" time="0.044">
+  <testsuite name="RecommendationRoutes" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:45" time="6.032" tests="9">
+    <testcase classname="RecommendationRoutes POST /recommendations should return 200 with recommendations when communication bus returns success" name="RecommendationRoutes POST /recommendations should return 200 with recommendations when communication bus returns success" time="0.071">
+    </testcase>
+    <testcase classname="RecommendationRoutes POST /recommendations should return 400 when communication bus returns an error" name="RecommendationRoutes POST /recommendations should return 400 when communication bus returns an error" time="0.007">
+    </testcase>
+    <testcase classname="RecommendationRoutes POST /recommendations should return 404 when communication bus returns null data" name="RecommendationRoutes POST /recommendations should return 404 when communication bus returns null data" time="0.009">
+    </testcase>
+    <testcase classname="RecommendationRoutes POST /recommendations should return 500 on unexpected errors" name="RecommendationRoutes POST /recommendations should return 500 on unexpected errors" time="0.013">
+    </testcase>
+    <testcase classname="RecommendationRoutes POST /recommendations should return 400 for invalid input (e.g., missing userId)" name="RecommendationRoutes POST /recommendations should return 400 for invalid input (e.g., missing userId)" time="0.01">
+    </testcase>
+    <testcase classname="RecommendationRoutes POST /recommendations should return 400 for an empty request body" name="RecommendationRoutes POST /recommendations should return 400 for an empty request body" time="0.007">
+    </testcase>
+    <testcase classname="RecommendationRoutes POST /recommendations should return 200 with recommendations for food pairing input" name="RecommendationRoutes POST /recommendations should return 200 with recommendations for food pairing input" time="0.007">
+    </testcase>
+    <testcase classname="RecommendationRoutes POST /recommendations should return 200 with recommendations for ingredients input" name="RecommendationRoutes POST /recommendations should return 200 with recommendations for ingredients input" time="0.006">
+    </testcase>
+    <testcase classname="RecommendationRoutes POST /recommendations should return 200 with recommendations for conversation history input" name="RecommendationRoutes POST /recommendations should return 200 with recommendations for conversation history input" time="0.009">
+    </testcase>
+  </testsuite>
+  <testsuite name="WineRecommendationController" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:51" time="0.551" tests="7">
+    <testcase classname="WineRecommendationController POST /wine-recommendations should return 200 with recommendations" name="WineRecommendationController POST /wine-recommendations should return 200 with recommendations" time="0.06">
+    </testcase>
+    <testcase classname="WineRecommendationController POST /wine-recommendations should return 400 for invalid recommendation request" name="WineRecommendationController POST /wine-recommendations should return 400 for invalid recommendation request" time="0.008">
+    </testcase>
+    <testcase classname="WineRecommendationController POST /wine-recommendations should return 500 on recommendation strategy error" name="WineRecommendationController POST /wine-recommendations should return 500 on recommendation strategy error" time="0.007">
+    </testcase>
+    <testcase classname="WineRecommendationController GET /wine-recommendations should return 200 with search results" name="WineRecommendationController GET /wine-recommendations should return 200 with search results" time="0.008">
+    </testcase>
+    <testcase classname="WineRecommendationController GET /wine-recommendations should return 400 for invalid search request" name="WineRecommendationController GET /wine-recommendations should return 400 for invalid search request" time="0.014">
+    </testcase>
+    <testcase classname="WineRecommendationController GET /wine-recommendations should return 500 on search strategy error" name="WineRecommendationController GET /wine-recommendations should return 500 on search strategy error" time="0.007">
+    </testcase>
+    <testcase classname="WineRecommendationController should return 200 for the /test route" name="WineRecommendationController should return 200 for the /test route" time="0.006">
+    </testcase>
+  </testsuite>
+  <testsuite name="AgentRegistry Integration" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:45" time="6.181" tests="2">
+    <testcase classname="AgentRegistry Integration should register all agents with their capabilities" name="AgentRegistry Integration should register all agents with their capabilities" time="0.046">
+    </testcase>
+    <testcase classname="AgentRegistry Integration should retrieve agents by name with correct capabilities" name="AgentRegistry Integration should retrieve agents by name with correct capabilities" time="0.004">
+    </testcase>
+  </testsuite>
+  <testsuite name="undefined" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:51" time="0.508" tests="8">
+    <testcase classname=" should execute strategies and return combined and ranked recommendations" name=" should execute strategies and return combined and ranked recommendations" time="0.003">
+    </testcase>
+    <testcase classname=" should handle empty recommendation request by throwing an error" name=" should handle empty recommendation request by throwing an error" time="0.024">
+    </testcase>
+    <testcase classname=" should handle errors in strategies by re-throwing the error" name=" should handle errors in strategies by re-throwing the error" time="0.001">
+    </testcase>
+    <testcase classname=" should search wines with valid parameters by calling Neo4jService" name=" should search wines with valid parameters by calling Neo4jService" time="0.002">
+    </testcase>
+    <testcase classname=" should handle errors during wine search by re-throwing the error" name=" should handle errors during wine search by re-throwing the error" time="0.001">
+    </testcase>
+    <testcase classname="rankRecommendations should rank wines by frequency" name="rankRecommendations should rank wines by frequency" time="0.001">
+    </testcase>
+    <testcase classname="rankRecommendations should enhance scores based on similar and pairing relationships" name="rankRecommendations should enhance scores based on similar and pairing relationships" time="0.019">
+    </testcase>
+    <testcase classname="rankRecommendations should handle errors during score enhancement" name="rankRecommendations should handle errors during score enhancement" time="0.001">
+    </testcase>
+  </testsuite>
+  <testsuite name="Neo4jService" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:50" time="0.72" tests="11">
+    <testcase classname="Neo4jService executeQuery should execute query and return node properties" name="Neo4jService executeQuery should execute query and return node properties" time="0.005">
+    </testcase>
+    <testcase classname="Neo4jService executeQuery should convert parameters to Neo4j types" name="Neo4jService executeQuery should convert parameters to Neo4j types" time="0">
+    </testcase>
+    <testcase classname="Neo4jService executeQuery should handle empty results" name="Neo4jService executeQuery should handle empty results" time="0.001">
+    </testcase>
+    <testcase classname="Neo4jService executeQuery should handle query errors" name="Neo4jService executeQuery should handle query errors" time="0.019">
+    </testcase>
+    <testcase classname="Neo4jService verifyConnection should return true when connection is verified" name="Neo4jService verifyConnection should return true when connection is verified" time="0.002">
+    </testcase>
+    <testcase classname="Neo4jService verifyConnection should return false when connection fails" name="Neo4jService verifyConnection should return false when connection fails" time="0.001">
+    </testcase>
+    <testcase classname="Neo4jService healthCheck should return healthy status when conditions are met" name="Neo4jService healthCheck should return healthy status when conditions are met" time="0.003">
+    </testcase>
+    <testcase classname="Neo4jService healthCheck should return unhealthy status when circuit is open" name="Neo4jService healthCheck should return unhealthy status when circuit is open" time="0.002">
+    </testcase>
+    <testcase classname="Neo4jService healthCheck should return unhealthy status when connection fails" name="Neo4jService healthCheck should return unhealthy status when connection fails" time="0.001">
+    </testcase>
+    <testcase classname="Neo4jService close should close circuit and driver successfully" name="Neo4jService close should close circuit and driver successfully" time="0.002">
+    </testcase>
+    <testcase classname="Neo4jService close should handle close errors" name="Neo4jService close should handle close errors" time="0.003">
+    </testcase>
+  </testsuite>
+  <testsuite name="End-to-End Live Recommendation API" errors="0" failures="36" skipped="0" timestamp="2025-07-12T06:27:45" time="6.253" tests="36">
+    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Classic Food &amp; Wine Pairings should recommend Cabernet Sauvignon or Malbec for grilled steak" name="End-to-End Live Recommendation API POST /recommendations - Classic Food &amp; Wine Pairings should recommend Cabernet Sauvignon or Malbec for grilled steak" time="0.028">
       <failure>Error: connect ECONNREFUSED 127.0.0.1:3001
     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16)</failure>
     </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Classic Food &amp; Wine Pairings should recommend Pinot Grigio or Sauvignon Blanc for grilled fish" name="End-to-End Live Recommendation API POST /recommendations - Classic Food &amp; Wine Pairings should recommend Pinot Grigio or Sauvignon Blanc for grilled fish" time="0.012">
+    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Classic Food &amp; Wine Pairings should recommend Pinot Grigio or Sauvignon Blanc for grilled fish" name="End-to-End Live Recommendation API POST /recommendations - Classic Food &amp; Wine Pairings should recommend Pinot Grigio or Sauvignon Blanc for grilled fish" time="0.007">
       <failure>Error: connect ECONNREFUSED 127.0.0.1:3001
     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16)</failure>
     </testcase>
@@ -109,15 +329,15 @@
       <failure>Error: connect ECONNREFUSED 127.0.0.1:3001
     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16)</failure>
     </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Classic Food &amp; Wine Pairings should recommend Champagne or Prosecco for oysters" name="End-to-End Live Recommendation API POST /recommendations - Classic Food &amp; Wine Pairings should recommend Champagne or Prosecco for oysters" time="0.003">
+    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Classic Food &amp; Wine Pairings should recommend Champagne or Prosecco for oysters" name="End-to-End Live Recommendation API POST /recommendations - Classic Food &amp; Wine Pairings should recommend Champagne or Prosecco for oysters" time="0.002">
       <failure>Error: connect ECONNREFUSED 127.0.0.1:3001
     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16)</failure>
     </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Pasta &amp; Italian Food Pairings should recommend Chianti or Sangiovese for tomato-based pasta" name="End-to-End Live Recommendation API POST /recommendations - Pasta &amp; Italian Food Pairings should recommend Chianti or Sangiovese for tomato-based pasta" time="0.004">
+    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Pasta &amp; Italian Food Pairings should recommend Chianti or Sangiovese for tomato-based pasta" name="End-to-End Live Recommendation API POST /recommendations - Pasta &amp; Italian Food Pairings should recommend Chianti or Sangiovese for tomato-based pasta" time="0.002">
       <failure>Error: connect ECONNREFUSED 127.0.0.1:3001
     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16)</failure>
     </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Pasta &amp; Italian Food Pairings should recommend Pinot Grigio or Vermentino for seafood pasta" name="End-to-End Live Recommendation API POST /recommendations - Pasta &amp; Italian Food Pairings should recommend Pinot Grigio or Vermentino for seafood pasta" time="0.003">
+    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Pasta &amp; Italian Food Pairings should recommend Pinot Grigio or Vermentino for seafood pasta" name="End-to-End Live Recommendation API POST /recommendations - Pasta &amp; Italian Food Pairings should recommend Pinot Grigio or Vermentino for seafood pasta" time="0.002">
       <failure>Error: connect ECONNREFUSED 127.0.0.1:3001
     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16)</failure>
     </testcase>
@@ -129,11 +349,11 @@
       <failure>Error: connect ECONNREFUSED 127.0.0.1:3001
     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16)</failure>
     </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Dessert Pairings should recommend Moscato or Riesling for fruit desserts" name="End-to-End Live Recommendation API POST /recommendations - Dessert Pairings should recommend Moscato or Riesling for fruit desserts" time="0.003">
+    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Dessert Pairings should recommend Moscato or Riesling for fruit desserts" name="End-to-End Live Recommendation API POST /recommendations - Dessert Pairings should recommend Moscato or Riesling for fruit desserts" time="0.005">
       <failure>Error: connect ECONNREFUSED 127.0.0.1:3001
     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16)</failure>
     </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Dessert Pairings should recommend Port or Madeira for chocolate desserts" name="End-to-End Live Recommendation API POST /recommendations - Dessert Pairings should recommend Port or Madeira for chocolate desserts" time="0.002">
+    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Dessert Pairings should recommend Port or Madeira for chocolate desserts" name="End-to-End Live Recommendation API POST /recommendations - Dessert Pairings should recommend Port or Madeira for chocolate desserts" time="0.004">
       <failure>Error: connect ECONNREFUSED 127.0.0.1:3001
     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16)</failure>
     </testcase>
@@ -145,19 +365,19 @@
       <failure>Error: connect ECONNREFUSED 127.0.0.1:3001
     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16)</failure>
     </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Validation and Error Cases should return 400 for missing userId" name="End-to-End Live Recommendation API POST /recommendations - Validation and Error Cases should return 400 for missing userId" time="0.005">
+    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Validation and Error Cases should return 400 for missing userId" name="End-to-End Live Recommendation API POST /recommendations - Validation and Error Cases should return 400 for missing userId" time="0.003">
       <failure>Error: connect ECONNREFUSED 127.0.0.1:3001
     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16)</failure>
     </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Validation and Error Cases should return 400 for missing input object" name="End-to-End Live Recommendation API POST /recommendations - Validation and Error Cases should return 400 for missing input object" time="0.002">
+    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Validation and Error Cases should return 400 for missing input object" name="End-to-End Live Recommendation API POST /recommendations - Validation and Error Cases should return 400 for missing input object" time="0.001">
       <failure>Error: connect ECONNREFUSED 127.0.0.1:3001
     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16)</failure>
     </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Validation and Error Cases should return 400 for empty message" name="End-to-End Live Recommendation API POST /recommendations - Validation and Error Cases should return 400 for empty message" time="0.006">
+    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Validation and Error Cases should return 400 for empty message" name="End-to-End Live Recommendation API POST /recommendations - Validation and Error Cases should return 400 for empty message" time="0.001">
       <failure>Error: connect ECONNREFUSED 127.0.0.1:3001
     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16)</failure>
     </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Validation and Error Cases should return 400 for null or undefined message" name="End-to-End Live Recommendation API POST /recommendations - Validation and Error Cases should return 400 for null or undefined message" time="0.001">
+    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Validation and Error Cases should return 400 for null or undefined message" name="End-to-End Live Recommendation API POST /recommendations - Validation and Error Cases should return 400 for null or undefined message" time="0.004">
       <failure>Error: connect ECONNREFUSED 127.0.0.1:3001
     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16)</failure>
     </testcase>
@@ -165,15 +385,15 @@
       <failure>Error: connect ECONNREFUSED 127.0.0.1:3001
     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16)</failure>
     </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Edge Cases and Challenging Requests should handle conflicting preferences intelligently" name="End-to-End Live Recommendation API POST /recommendations - Edge Cases and Challenging Requests should handle conflicting preferences intelligently" time="0.001">
+    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Edge Cases and Challenging Requests should handle conflicting preferences intelligently" name="End-to-End Live Recommendation API POST /recommendations - Edge Cases and Challenging Requests should handle conflicting preferences intelligently" time="0.002">
       <failure>Error: connect ECONNREFUSED 127.0.0.1:3001
     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16)</failure>
     </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Edge Cases and Challenging Requests should provide response for unusual food combinations" name="End-to-End Live Recommendation API POST /recommendations - Edge Cases and Challenging Requests should provide response for unusual food combinations" time="0.002">
+    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Edge Cases and Challenging Requests should provide response for unusual food combinations" name="End-to-End Live Recommendation API POST /recommendations - Edge Cases and Challenging Requests should provide response for unusual food combinations" time="0.001">
       <failure>Error: connect ECONNREFUSED 127.0.0.1:3001
     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16)</failure>
     </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Edge Cases and Challenging Requests should handle budget constraints appropriately" name="End-to-End Live Recommendation API POST /recommendations - Edge Cases and Challenging Requests should handle budget constraints appropriately" time="0.006">
+    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Edge Cases and Challenging Requests should handle budget constraints appropriately" name="End-to-End Live Recommendation API POST /recommendations - Edge Cases and Challenging Requests should handle budget constraints appropriately" time="0.001">
       <failure>Error: connect ECONNREFUSED 127.0.0.1:3001
     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16)</failure>
     </testcase>
@@ -181,19 +401,19 @@
       <failure>Error: connect ECONNREFUSED 127.0.0.1:3001
     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16)</failure>
     </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Edge Cases and Challenging Requests should respond appropriately to impossible wine requests" name="End-to-End Live Recommendation API POST /recommendations - Edge Cases and Challenging Requests should respond appropriately to impossible wine requests" time="0.001">
+    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Edge Cases and Challenging Requests should respond appropriately to impossible wine requests" name="End-to-End Live Recommendation API POST /recommendations - Edge Cases and Challenging Requests should respond appropriately to impossible wine requests" time="0.003">
       <failure>Error: connect ECONNREFUSED 127.0.0.1:3001
     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16)</failure>
     </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Edge Cases and Challenging Requests should handle occasion-based requests" name="End-to-End Live Recommendation API POST /recommendations - Edge Cases and Challenging Requests should handle occasion-based requests" time="0.002">
+    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Edge Cases and Challenging Requests should handle occasion-based requests" name="End-to-End Live Recommendation API POST /recommendations - Edge Cases and Challenging Requests should handle occasion-based requests" time="0.001">
       <failure>Error: connect ECONNREFUSED 127.0.0.1:3001
     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16)</failure>
     </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Edge Cases and Challenging Requests should handle regional cuisine expertise requests" name="End-to-End Live Recommendation API POST /recommendations - Edge Cases and Challenging Requests should handle regional cuisine expertise requests" time="0.001">
+    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Edge Cases and Challenging Requests should handle regional cuisine expertise requests" name="End-to-End Live Recommendation API POST /recommendations - Edge Cases and Challenging Requests should handle regional cuisine expertise requests" time="0.002">
       <failure>Error: connect ECONNREFUSED 127.0.0.1:3001
     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16)</failure>
     </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Wine Style and Varietal Specific Tests should recommend appropriate wine for barbecue ribs" name="End-to-End Live Recommendation API POST /recommendations - Wine Style and Varietal Specific Tests should recommend appropriate wine for barbecue ribs" time="0.005">
+    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Wine Style and Varietal Specific Tests should recommend appropriate wine for barbecue ribs" name="End-to-End Live Recommendation API POST /recommendations - Wine Style and Varietal Specific Tests should recommend appropriate wine for barbecue ribs" time="0.001">
       <failure>Error: connect ECONNREFUSED 127.0.0.1:3001
     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16)</failure>
     </testcase>
@@ -213,15 +433,15 @@
       <failure>Error: connect ECONNREFUSED 127.0.0.1:3001
     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16)</failure>
     </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Australian Wine Pairings should recommend Australian Pinot Noir for duck or poultry" name="End-to-End Live Recommendation API POST /recommendations - Australian Wine Pairings should recommend Australian Pinot Noir for duck or poultry" time="0.001">
+    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Australian Wine Pairings should recommend Australian Pinot Noir for duck or poultry" name="End-to-End Live Recommendation API POST /recommendations - Australian Wine Pairings should recommend Australian Pinot Noir for duck or poultry" time="0.002">
       <failure>Error: connect ECONNREFUSED 127.0.0.1:3001
     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16)</failure>
     </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Australian Wine Pairings should recommend Australian Grenache for Mediterranean-style dishes" name="End-to-End Live Recommendation API POST /recommendations - Australian Wine Pairings should recommend Australian Grenache for Mediterranean-style dishes" time="0.001">
+    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Australian Wine Pairings should recommend Australian Grenache for Mediterranean-style dishes" name="End-to-End Live Recommendation API POST /recommendations - Australian Wine Pairings should recommend Australian Grenache for Mediterranean-style dishes" time="0.002">
       <failure>Error: connect ECONNREFUSED 127.0.0.1:3001
     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16)</failure>
     </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Australian Wine Pairings should recommend Australian Semillon for lighter dishes" name="End-to-End Live Recommendation API POST /recommendations - Australian Wine Pairings should recommend Australian Semillon for lighter dishes" time="0.001">
+    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Australian Wine Pairings should recommend Australian Semillon for lighter dishes" name="End-to-End Live Recommendation API POST /recommendations - Australian Wine Pairings should recommend Australian Semillon for lighter dishes" time="0.002">
       <failure>Error: connect ECONNREFUSED 127.0.0.1:3001
     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16)</failure>
     </testcase>
@@ -229,209 +449,127 @@
       <failure>Error: connect ECONNREFUSED 127.0.0.1:3001
     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16)</failure>
     </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Australian Wine Pairings should recommend Australian sparkling wine for celebrations" name="End-to-End Live Recommendation API POST /recommendations - Australian Wine Pairings should recommend Australian sparkling wine for celebrations" time="0.001">
+    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Australian Wine Pairings should recommend Australian sparkling wine for celebrations" name="End-to-End Live Recommendation API POST /recommendations - Australian Wine Pairings should recommend Australian sparkling wine for celebrations" time="0.002">
       <failure>Error: connect ECONNREFUSED 127.0.0.1:3001
     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16)</failure>
     </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Australian Wine Pairings should recommend cool-climate Australian wines for delicate dishes" name="End-to-End Live Recommendation API POST /recommendations - Australian Wine Pairings should recommend cool-climate Australian wines for delicate dishes" time="0.002">
+    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Australian Wine Pairings should recommend cool-climate Australian wines for delicate dishes" name="End-to-End Live Recommendation API POST /recommendations - Australian Wine Pairings should recommend cool-climate Australian wines for delicate dishes" time="0.001">
       <failure>Error: connect ECONNREFUSED 127.0.0.1:3001
     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16)</failure>
     </testcase>
-    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Australian Wine Pairings should recommend fortified Australian wines for rich desserts" name="End-to-End Live Recommendation API POST /recommendations - Australian Wine Pairings should recommend fortified Australian wines for rich desserts" time="0.001">
+    <testcase classname="End-to-End Live Recommendation API POST /recommendations - Australian Wine Pairings should recommend fortified Australian wines for rich desserts" name="End-to-End Live Recommendation API POST /recommendations - Australian Wine Pairings should recommend fortified Australian wines for rich desserts" time="0.005">
       <failure>Error: connect ECONNREFUSED 127.0.0.1:3001
     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16)</failure>
     </testcase>
   </testsuite>
-  <testsuite name="Rate Limiter Middleware" errors="0" failures="0" skipped="0" timestamp="2025-07-06T07:46:53" time="7.1" tests="1">
-    <testcase classname="Rate Limiter Middleware should allow requests up to the limit" name="Rate Limiter Middleware should allow requests up to the limit" time="0.522">
+  <testsuite name="Rate Limiter Middleware" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:50" time="0.712" tests="1">
+    <testcase classname="Rate Limiter Middleware should allow requests up to the limit" name="Rate Limiter Middleware should allow requests up to the limit" time="0.355">
     </testcase>
   </testsuite>
-  <testsuite name="WineRecommendationController" errors="0" failures="0" skipped="0" timestamp="2025-07-06T07:47:00" time="0.565" tests="7">
-    <testcase classname="WineRecommendationController POST /wine-recommendations should return 200 with recommendations" name="WineRecommendationController POST /wine-recommendations should return 200 with recommendations" time="0.036">
+  <testsuite name="Recommendations API" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:50" time="0.875" tests="5">
+    <testcase classname="Recommendations API should return recommendation for valid input" name="Recommendations API should return recommendation for valid input" time="0.086">
     </testcase>
-    <testcase classname="WineRecommendationController POST /wine-recommendations should return 400 for invalid recommendation request" name="WineRecommendationController POST /wine-recommendations should return 400 for invalid recommendation request" time="0.009">
+    <testcase classname="Recommendations API should return 400 if communicationBus.sendMessageAndWaitForResponse returns failure" name="Recommendations API should return 400 if communicationBus.sendMessageAndWaitForResponse returns failure" time="0.009">
     </testcase>
-    <testcase classname="WineRecommendationController POST /wine-recommendations should return 500 on recommendation strategy error" name="WineRecommendationController POST /wine-recommendations should return 500 on recommendation strategy error" time="0.008">
+    <testcase classname="Recommendations API should return 404 if communicationBus.sendMessageAndWaitForResponse returns null data" name="Recommendations API should return 404 if communicationBus.sendMessageAndWaitForResponse returns null data" time="0.009">
     </testcase>
-    <testcase classname="WineRecommendationController GET /wine-recommendations should return 200 with search results" name="WineRecommendationController GET /wine-recommendations should return 200 with search results" time="0.012">
+    <testcase classname="Recommendations API should return 500 for unexpected errors" name="Recommendations API should return 500 for unexpected errors" time="0.019">
     </testcase>
-    <testcase classname="WineRecommendationController GET /wine-recommendations should return 400 for invalid search request" name="WineRecommendationController GET /wine-recommendations should return 400 for invalid search request" time="0.014">
-    </testcase>
-    <testcase classname="WineRecommendationController GET /wine-recommendations should return 500 on search strategy error" name="WineRecommendationController GET /wine-recommendations should return 500 on search strategy error" time="0.008">
-    </testcase>
-    <testcase classname="WineRecommendationController should return 200 for the /test route" name="WineRecommendationController should return 200 for the /test route" time="0.008">
+    <testcase classname="Recommendations API should return 400 for invalid input" name="Recommendations API should return 400 for invalid input" time="0.012">
     </testcase>
   </testsuite>
-  <testsuite name="undefined" errors="0" failures="0" skipped="0" timestamp="2025-07-06T07:46:53" time="7.112" tests="8">
-    <testcase classname=" should execute strategies and return combined and ranked recommendations" name=" should execute strategies and return combined and ranked recommendations" time="0.015">
+  <testsuite name="End-to-End Recommendation API" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:45" time="6.284" tests="9">
+    <testcase classname="End-to-End Recommendation API POST /recommendations - Positive Cases (Known Good Pairings) should recommend Cabernet Sauvignon or Malbec for Steak" name="End-to-End Recommendation API POST /recommendations - Positive Cases (Known Good Pairings) should recommend Cabernet Sauvignon or Malbec for Steak" time="0.078">
     </testcase>
-    <testcase classname=" should handle empty recommendation request by throwing an error" name=" should handle empty recommendation request by throwing an error" time="0.028">
+    <testcase classname="End-to-End Recommendation API POST /recommendations - Positive Cases (Known Good Pairings) should recommend Chardonnay or Pinot Noir for Chicken" name="End-to-End Recommendation API POST /recommendations - Positive Cases (Known Good Pairings) should recommend Chardonnay or Pinot Noir for Chicken" time="0.011">
     </testcase>
-    <testcase classname=" should handle errors in strategies by re-throwing the error" name=" should handle errors in strategies by re-throwing the error" time="0.002">
+    <testcase classname="End-to-End Recommendation API POST /recommendations - Positive Cases (Known Good Pairings) should recommend Sauvignon Blanc or Pinot Grigio for Seafood" name="End-to-End Recommendation API POST /recommendations - Positive Cases (Known Good Pairings) should recommend Sauvignon Blanc or Pinot Grigio for Seafood" time="0.006">
     </testcase>
-    <testcase classname=" should search wines with valid parameters by calling Neo4jService" name=" should search wines with valid parameters by calling Neo4jService" time="0.02">
+    <testcase classname="End-to-End Recommendation API POST /recommendations - Positive Cases (Known Good Pairings) should recommend Pinot Noir or Port for Cheese Platter" name="End-to-End Recommendation API POST /recommendations - Positive Cases (Known Good Pairings) should recommend Pinot Noir or Port for Cheese Platter" time="0.005">
     </testcase>
-    <testcase classname=" should handle errors during wine search by re-throwing the error" name=" should handle errors during wine search by re-throwing the error" time="0.001">
+    <testcase classname="End-to-End Recommendation API POST /recommendations - Negative Cases should return 400 for missing userId" name="End-to-End Recommendation API POST /recommendations - Negative Cases should return 400 for missing userId" time="0.006">
     </testcase>
-    <testcase classname="rankRecommendations should rank wines by frequency" name="rankRecommendations should rank wines by frequency" time="0.006">
+    <testcase classname="End-to-End Recommendation API POST /recommendations - Negative Cases should return 400 for missing input object" name="End-to-End Recommendation API POST /recommendations - Negative Cases should return 400 for missing input object" time="0.007">
     </testcase>
-    <testcase classname="rankRecommendations should enhance scores based on similar and pairing relationships" name="rankRecommendations should enhance scores based on similar and pairing relationships" time="0.003">
+    <testcase classname="End-to-End Recommendation API POST /recommendations - Negative Cases should return 404 when no recommendations are found (simulated)" name="End-to-End Recommendation API POST /recommendations - Negative Cases should return 404 when no recommendations are found (simulated)" time="0.005">
     </testcase>
-    <testcase classname="rankRecommendations should handle errors during score enhancement" name="rankRecommendations should handle errors during score enhancement" time="0.002">
+    <testcase classname="End-to-End Recommendation API POST /recommendations - Negative Cases should return 400 when communication bus indicates an agent error" name="End-to-End Recommendation API POST /recommendations - Negative Cases should return 400 when communication bus indicates an agent error" time="0.004">
     </testcase>
-  </testsuite>
-  <testsuite name="KnowledgeGraphService" errors="0" failures="0" skipped="0" timestamp="2025-07-06T07:46:53" time="7.225" tests="19">
-    <testcase classname="KnowledgeGraphService createWineNode should create a wine node with all properties" name="KnowledgeGraphService createWineNode should create a wine node with all properties" time="0.023">
-    </testcase>
-    <testcase classname="KnowledgeGraphService createWineNode should handle minimal wine data" name="KnowledgeGraphService createWineNode should handle minimal wine data" time="0.001">
-    </testcase>
-    <testcase classname="KnowledgeGraphService findSimilarWines should return similar wines" name="KnowledgeGraphService findSimilarWines should return similar wines" time="0.001">
-    </testcase>
-    <testcase classname="KnowledgeGraphService findSimilarWines should respect limit parameter" name="KnowledgeGraphService findSimilarWines should respect limit parameter" time="0">
-    </testcase>
-    <testcase classname="KnowledgeGraphService getWinePairings should return wine pairings" name="KnowledgeGraphService getWinePairings should return wine pairings" time="0.001">
-    </testcase>
-    <testcase classname="KnowledgeGraphService getWineById should return wine when found" name="KnowledgeGraphService getWineById should return wine when found" time="0.001">
-    </testcase>
-    <testcase classname="KnowledgeGraphService getWineById should return null when not found" name="KnowledgeGraphService getWineById should return null when not found" time="0.001">
-    </testcase>
-    <testcase classname="KnowledgeGraphService findWinesByIngredients should return wines matching all ingredients" name="KnowledgeGraphService findWinesByIngredients should return wines matching all ingredients" time="0.001">
-    </testcase>
-    <testcase classname="KnowledgeGraphService findWinesByIngredients should return empty array for empty ingredients" name="KnowledgeGraphService findWinesByIngredients should return empty array for empty ingredients" time="0.008">
-    </testcase>
-    <testcase classname="KnowledgeGraphService findWinesByPreferences should build query with wine type preference" name="KnowledgeGraphService findWinesByPreferences should build query with wine type preference" time="0.002">
-    </testcase>
-    <testcase classname="KnowledgeGraphService findWinesByPreferences should build query with price range" name="KnowledgeGraphService findWinesByPreferences should build query with price range" time="0.001">
-    </testcase>
-    <testcase classname="KnowledgeGraphService findWinesByPreferences should return empty array for undefined preferences" name="KnowledgeGraphService findWinesByPreferences should return empty array for undefined preferences" time="0.001">
-    </testcase>
-    <testcase classname="KnowledgeGraphService findWinesByType should return wines of specified type" name="KnowledgeGraphService findWinesByType should return wines of specified type" time="0.005">
-    </testcase>
-    <testcase classname="KnowledgeGraphService findWinesByType should return empty array for empty type" name="KnowledgeGraphService findWinesByType should return empty array for empty type" time="0">
-    </testcase>
-    <testcase classname="KnowledgeGraphService Preference Management should add or update a preference" name="KnowledgeGraphService Preference Management should add or update a preference" time="0.001">
-    </testcase>
-    <testcase classname="KnowledgeGraphService Preference Management should get only active preferences by default" name="KnowledgeGraphService Preference Management should get only active preferences by default" time="0.003">
-    </testcase>
-    <testcase classname="KnowledgeGraphService Preference Management should get all preferences when includeInactive is true" name="KnowledgeGraphService Preference Management should get all preferences when includeInactive is true" time="0.002">
-    </testcase>
-    <testcase classname="KnowledgeGraphService Preference Management should return an empty array when no preferences are found" name="KnowledgeGraphService Preference Management should return an empty array when no preferences are found" time="0.001">
-    </testcase>
-    <testcase classname="KnowledgeGraphService Preference Management should delete a preference" name="KnowledgeGraphService Preference Management should delete a preference" time="0.005">
+    <testcase classname="End-to-End Recommendation API POST /recommendations - Negative Cases should return 500 on unexpected internal server error" name="End-to-End Recommendation API POST /recommendations - Negative Cases should return 500 on unexpected internal server error" time="0.01">
     </testcase>
   </testsuite>
-  <testsuite name="WineRecommendationController" errors="0" failures="0" skipped="0" timestamp="2025-07-06T07:46:53" time="7.293" tests="5">
-    <testcase classname="WineRecommendationController executeImpl - POST /wine-recommendations should return recommendations successfully" name="WineRecommendationController executeImpl - POST /wine-recommendations should return recommendations successfully" time="0.012">
+  <testsuite name="API Validation" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:50" time="0.825" tests="7">
+    <testcase classname="API Validation POST /recommendations should reject empty request" name="API Validation POST /recommendations should reject empty request" time="0.065">
     </testcase>
-    <testcase classname="WineRecommendationController executeImpl - POST /wine-recommendations should handle service errors" name="WineRecommendationController executeImpl - POST /wine-recommendations should handle service errors" time="0.002">
+    <testcase classname="API Validation POST /recommendations should reject invalid preferences format" name="API Validation POST /recommendations should reject invalid preferences format" time="0.007">
     </testcase>
-    <testcase classname="WineRecommendationController executeImpl - GET /wine-recommendations should return search results successfully" name="WineRecommendationController executeImpl - GET /wine-recommendations should return search results successfully" time="0.001">
+    <testcase classname="API Validation POST /recommendations should handle missing preferences gracefully" name="API Validation POST /recommendations should handle missing preferences gracefully" time="0.005">
     </testcase>
-    <testcase classname="WineRecommendationController executeImpl - GET /wine-recommendations should handle search service errors" name="WineRecommendationController executeImpl - GET /wine-recommendations should handle search service errors" time="0.002">
+    <testcase classname="API Validation POST /recommendations should accept valid request" name="API Validation POST /recommendations should accept valid request" time="0.006">
     </testcase>
-    <testcase classname="WineRecommendationController should return 405 for unsupported HTTP method" name="WineRecommendationController should return 405 for unsupported HTTP method" time="0.001">
+    <testcase classname="API Validation GET /search should accept valid search query with string number parameters" name="API Validation GET /search should accept valid search query with string number parameters" time="0.007">
     </testcase>
-  </testsuite>
-  <testsuite name="Neo4jService" errors="0" failures="0" skipped="0" timestamp="2025-07-06T07:47:00" time="0.626" tests="11">
-    <testcase classname="Neo4jService executeQuery should execute query and return node properties" name="Neo4jService executeQuery should execute query and return node properties" time="0.006">
+    <testcase classname="API Validation GET /search should require query parameter" name="API Validation GET /search should require query parameter" time="0.007">
     </testcase>
-    <testcase classname="Neo4jService executeQuery should convert parameters to Neo4j types" name="Neo4jService executeQuery should convert parameters to Neo4j types" time="0.001">
-    </testcase>
-    <testcase classname="Neo4jService executeQuery should handle empty results" name="Neo4jService executeQuery should handle empty results" time="0.001">
-    </testcase>
-    <testcase classname="Neo4jService executeQuery should handle query errors" name="Neo4jService executeQuery should handle query errors" time="0.028">
-    </testcase>
-    <testcase classname="Neo4jService verifyConnection should return true when connection is verified" name="Neo4jService verifyConnection should return true when connection is verified" time="0.002">
-    </testcase>
-    <testcase classname="Neo4jService verifyConnection should return false when connection fails" name="Neo4jService verifyConnection should return false when connection fails" time="0.002">
-    </testcase>
-    <testcase classname="Neo4jService healthCheck should return healthy status when conditions are met" name="Neo4jService healthCheck should return healthy status when conditions are met" time="0.002">
-    </testcase>
-    <testcase classname="Neo4jService healthCheck should return unhealthy status when circuit is open" name="Neo4jService healthCheck should return unhealthy status when circuit is open" time="0.001">
-    </testcase>
-    <testcase classname="Neo4jService healthCheck should return unhealthy status when connection fails" name="Neo4jService healthCheck should return unhealthy status when connection fails" time="0.001">
-    </testcase>
-    <testcase classname="Neo4jService close should close circuit and driver successfully" name="Neo4jService close should close circuit and driver successfully" time="0.002">
-    </testcase>
-    <testcase classname="Neo4jService close should handle close errors" name="Neo4jService close should handle close errors" time="0.004">
+    <testcase classname="API Validation GET /search should accept valid search" name="API Validation GET /search should accept valid search" time="0.005">
     </testcase>
   </testsuite>
-  <testsuite name="ExplanationAgent" errors="0" failures="0" skipped="0" timestamp="2025-07-06T07:47:00" time="0.294" tests="5">
-    <testcase classname="ExplanationAgent handleExplanationRequestInternal should generate and send an explanation for valid request" name="ExplanationAgent handleExplanationRequestInternal should generate and send an explanation for valid request" time="0.003">
+  <testsuite name="AdminUserPreferenceRoutes" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:45" time="6.248" tests="10">
+    <testcase classname="AdminUserPreferenceRoutes GET /admin/preferences should return 200 with all user preferences" name="AdminUserPreferenceRoutes GET /admin/preferences should return 200 with all user preferences" time="0.059">
     </testcase>
-    <testcase classname="ExplanationAgent handleExplanationRequestInternal should return an error if payload is missing or invalid" name="ExplanationAgent handleExplanationRequestInternal should return an error if payload is missing or invalid" time="0.003">
+    <testcase classname="AdminUserPreferenceRoutes GET /admin/preferences should return 500 if an error occurs" name="AdminUserPreferenceRoutes GET /admin/preferences should return 500 if an error occurs" time="0.054">
     </testcase>
-    <testcase classname="ExplanationAgent handleExplanationRequestInternal should handle LLM service failure gracefully" name="ExplanationAgent handleExplanationRequestInternal should handle LLM service failure gracefully" time="0.056">
+    <testcase classname="AdminUserPreferenceRoutes GET /admin/preferences/:userId should return 200 with preferences for a specific user" name="AdminUserPreferenceRoutes GET /admin/preferences/:userId should return 200 with preferences for a specific user" time="0.011">
     </testcase>
-    <testcase classname="ExplanationAgent handleMessage (fallback) should return an error for unhandled message types" name="ExplanationAgent handleMessage (fallback) should return an error for unhandled message types" time="0.002">
+    <testcase classname="AdminUserPreferenceRoutes GET /admin/preferences/:userId should return 500 if an error occurs" name="AdminUserPreferenceRoutes GET /admin/preferences/:userId should return 500 if an error occurs" time="0.007">
     </testcase>
-    <testcase classname="ExplanationAgent error handling should process errors and send error response" name="ExplanationAgent error handling should process errors and send error response" time="0.004">
+    <testcase classname="AdminUserPreferenceRoutes PUT /admin/preferences/:userId should return 200 on successful update of user preferences" name="AdminUserPreferenceRoutes PUT /admin/preferences/:userId should return 200 on successful update of user preferences" time="0.019">
     </testcase>
-  </testsuite>
-  <testsuite name="PromptManager" errors="0" failures="0" skipped="0" timestamp="2025-07-06T07:47:00" time="0.257" tests="14">
-    <testcase classname="PromptManager should initialize and load prompts from the directory" name="PromptManager should initialize and load prompts from the directory" time="0.006">
+    <testcase classname="AdminUserPreferenceRoutes PUT /admin/preferences/:userId should return 500 if an error occurs" name="AdminUserPreferenceRoutes PUT /admin/preferences/:userId should return 500 if an error occurs" time="0.007">
     </testcase>
-    <testcase classname="PromptManager should render a prompt with variables" name="PromptManager should render a prompt with variables" time="0.001">
+    <testcase classname="AdminUserPreferenceRoutes DELETE /admin/preferences/:userId should return 200 on successful deletion of a specific preference" name="AdminUserPreferenceRoutes DELETE /admin/preferences/:userId should return 200 on successful deletion of a specific preference" time="0.014">
     </testcase>
-    <testcase classname="PromptManager should throw an error if prompt not found" name="PromptManager should throw an error if prompt not found" time="0.001">
+    <testcase classname="AdminUserPreferenceRoutes DELETE /admin/preferences/:userId should return 200 on successful deletion of all preferences for a user" name="AdminUserPreferenceRoutes DELETE /admin/preferences/:userId should return 200 on successful deletion of all preferences for a user" time="0.006">
     </testcase>
-    <testcase classname="PromptManager should validate input variables against schema" name="PromptManager should validate input variables against schema" time="0.006">
+    <testcase classname="AdminUserPreferenceRoutes DELETE /admin/preferences/:userId should return 500 if an error occurs during specific preference deletion" name="AdminUserPreferenceRoutes DELETE /admin/preferences/:userId should return 500 if an error occurs during specific preference deletion" time="0.008">
     </testcase>
-    <testcase classname="PromptManager should use cache when enabled" name="PromptManager should use cache when enabled" time="0.009">
-    </testcase>
-    <testcase classname="PromptManager should clear cache on reloadPrompts" name="PromptManager should clear cache on reloadPrompts" time="0.002">
-    </testcase>
-    <testcase classname="PromptManager should retrieve prompt metadata" name="PromptManager should retrieve prompt metadata" time="0.015">
-    </testcase>
-    <testcase classname="PromptManager should retrieve prompt task" name="PromptManager should retrieve prompt task" time="0.002">
-    </testcase>
-    <testcase classname="PromptManager should handle fs.readdir error during initial load" name="PromptManager should handle fs.readdir error during initial load" time="0.043">
-    </testcase>
-    <testcase classname="PromptManager should handle empty prompt content during load" name="PromptManager should handle empty prompt content during load" time="0.002">
-    </testcase>
-    <testcase classname="PromptManager should handle missing YAML frontmatter markers during load" name="PromptManager should handle missing YAML frontmatter markers during load" time="0.002">
-    </testcase>
-    <testcase classname="PromptManager should handle invalid YAML syntax in frontmatter during load" name="PromptManager should handle invalid YAML syntax in frontmatter during load" time="0.002">
-    </testcase>
-    <testcase classname="PromptManager should handle missing name or description in metadata during load" name="PromptManager should handle missing name or description in metadata during load" time="0.002">
-    </testcase>
-    <testcase classname="PromptManager should return correct stats" name="PromptManager should return correct stats" time="0.004">
+    <testcase classname="AdminUserPreferenceRoutes DELETE /admin/preferences/:userId should return 500 if an error occurs during all preferences deletion" name="AdminUserPreferenceRoutes DELETE /admin/preferences/:userId should return 500 if an error occurs during all preferences deletion" time="0.035">
     </testcase>
   </testsuite>
-  <testsuite name="PreferenceNormalizationService" errors="0" failures="0" skipped="0" timestamp="2025-07-06T07:47:00" time="0.222" tests="22">
-    <testcase classname="PreferenceNormalizationService normalizePreferences should normalize wineType synonyms" name="PreferenceNormalizationService normalizePreferences should normalize wineType synonyms" time="0.003">
+  <testsuite name="PreferenceNormalizationService" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:51" time="0.16" tests="22">
+    <testcase classname="PreferenceNormalizationService normalizePreferences should normalize wineType synonyms" name="PreferenceNormalizationService normalizePreferences should normalize wineType synonyms" time="0.002">
     </testcase>
-    <testcase classname="PreferenceNormalizationService normalizePreferences should normalize sweetness synonyms" name="PreferenceNormalizationService normalizePreferences should normalize sweetness synonyms" time="0.003">
+    <testcase classname="PreferenceNormalizationService normalizePreferences should normalize sweetness synonyms" name="PreferenceNormalizationService normalizePreferences should normalize sweetness synonyms" time="0.001">
     </testcase>
-    <testcase classname="PreferenceNormalizationService normalizePreferences should normalize region synonyms" name="PreferenceNormalizationService normalizePreferences should normalize region synonyms" time="0.001">
+    <testcase classname="PreferenceNormalizationService normalizePreferences should normalize region synonyms" name="PreferenceNormalizationService normalizePreferences should normalize region synonyms" time="0">
     </testcase>
-    <testcase classname="PreferenceNormalizationService normalizePreferences should handle negations for string values" name="PreferenceNormalizationService normalizePreferences should handle negations for string values" time="0.003">
+    <testcase classname="PreferenceNormalizationService normalizePreferences should handle negations for string values" name="PreferenceNormalizationService normalizePreferences should handle negations for string values" time="0.001">
     </testcase>
-    <testcase classname="PreferenceNormalizationService normalizePreferences should handle negations for array values (if applicable)" name="PreferenceNormalizationService normalizePreferences should handle negations for array values (if applicable)" time="0.002">
+    <testcase classname="PreferenceNormalizationService normalizePreferences should handle negations for array values (if applicable)" name="PreferenceNormalizationService normalizePreferences should handle negations for array values (if applicable)" time="0.001">
     </testcase>
-    <testcase classname="PreferenceNormalizationService normalizePreferences should normalize priceRange" name="PreferenceNormalizationService normalizePreferences should normalize priceRange" time="0.001">
+    <testcase classname="PreferenceNormalizationService normalizePreferences should normalize priceRange" name="PreferenceNormalizationService normalizePreferences should normalize priceRange" time="0.002">
     </testcase>
-    <testcase classname="PreferenceNormalizationService normalizePreferences should discard invalid priceRange values" name="PreferenceNormalizationService normalizePreferences should discard invalid priceRange values" time="0.002">
+    <testcase classname="PreferenceNormalizationService normalizePreferences should discard invalid priceRange values" name="PreferenceNormalizationService normalizePreferences should discard invalid priceRange values" time="0.003">
     </testcase>
     <testcase classname="PreferenceNormalizationService normalizePreferences should normalize alcoholContent" name="PreferenceNormalizationService normalizePreferences should normalize alcoholContent" time="0.001">
     </testcase>
-    <testcase classname="PreferenceNormalizationService normalizePreferences should discard invalid alcoholContent values" name="PreferenceNormalizationService normalizePreferences should discard invalid alcoholContent values" time="0.003">
+    <testcase classname="PreferenceNormalizationService normalizePreferences should discard invalid alcoholContent values" name="PreferenceNormalizationService normalizePreferences should discard invalid alcoholContent values" time="0.001">
     </testcase>
-    <testcase classname="PreferenceNormalizationService normalizePreferences should normalize aging" name="PreferenceNormalizationService normalizePreferences should normalize aging" time="0.001">
+    <testcase classname="PreferenceNormalizationService normalizePreferences should normalize aging" name="PreferenceNormalizationService normalizePreferences should normalize aging" time="0.002">
     </testcase>
-    <testcase classname="PreferenceNormalizationService normalizePreferences should discard invalid aging values" name="PreferenceNormalizationService normalizePreferences should discard invalid aging values" time="0.001">
+    <testcase classname="PreferenceNormalizationService normalizePreferences should discard invalid aging values" name="PreferenceNormalizationService normalizePreferences should discard invalid aging values" time="0.002">
     </testcase>
-    <testcase classname="PreferenceNormalizationService normalizePreferences should normalize servingTemperature" name="PreferenceNormalizationService normalizePreferences should normalize servingTemperature" time="0.003">
+    <testcase classname="PreferenceNormalizationService normalizePreferences should normalize servingTemperature" name="PreferenceNormalizationService normalizePreferences should normalize servingTemperature" time="0.002">
     </testcase>
-    <testcase classname="PreferenceNormalizationService normalizePreferences should discard invalid servingTemperature values" name="PreferenceNormalizationService normalizePreferences should discard invalid servingTemperature values" time="0.002">
+    <testcase classname="PreferenceNormalizationService normalizePreferences should discard invalid servingTemperature values" name="PreferenceNormalizationService normalizePreferences should discard invalid servingTemperature values" time="0.001">
     </testcase>
-    <testcase classname="PreferenceNormalizationService normalizePreferences should normalize volume" name="PreferenceNormalizationService normalizePreferences should normalize volume" time="0.002">
+    <testcase classname="PreferenceNormalizationService normalizePreferences should normalize volume" name="PreferenceNormalizationService normalizePreferences should normalize volume" time="0.001">
     </testcase>
     <testcase classname="PreferenceNormalizationService normalizePreferences should discard invalid volume values" name="PreferenceNormalizationService normalizePreferences should discard invalid volume values" time="0.001">
     </testcase>
-    <testcase classname="PreferenceNormalizationService normalizePreferences should normalize location" name="PreferenceNormalizationService normalizePreferences should normalize location" time="0.001">
+    <testcase classname="PreferenceNormalizationService normalizePreferences should normalize location" name="PreferenceNormalizationService normalizePreferences should normalize location" time="0.02">
     </testcase>
-    <testcase classname="PreferenceNormalizationService normalizePreferences should discard invalid location values" name="PreferenceNormalizationService normalizePreferences should discard invalid location values" time="0">
+    <testcase classname="PreferenceNormalizationService normalizePreferences should discard invalid location values" name="PreferenceNormalizationService normalizePreferences should discard invalid location values" time="0.001">
     </testcase>
     <testcase classname="PreferenceNormalizationService normalizePreferences should normalize distance" name="PreferenceNormalizationService normalizePreferences should normalize distance" time="0.001">
     </testcase>
@@ -439,201 +577,185 @@
     </testcase>
     <testcase classname="PreferenceNormalizationService normalizePreferences should handle other preference types" name="PreferenceNormalizationService normalizePreferences should handle other preference types" time="0.001">
     </testcase>
-    <testcase classname="PreferenceNormalizationService normalizePreferences should return an empty array for empty input" name="PreferenceNormalizationService normalizePreferences should return an empty array for empty input" time="0">
+    <testcase classname="PreferenceNormalizationService normalizePreferences should return an empty array for empty input" name="PreferenceNormalizationService normalizePreferences should return an empty array for empty input" time="0.001">
     </testcase>
-    <testcase classname="PreferenceNormalizationService normalizePreferences should retain original properties of PreferenceNode" name="PreferenceNormalizationService normalizePreferences should retain original properties of PreferenceNode" time="0.025">
-    </testcase>
-  </testsuite>
-  <testsuite name="UserPreferenceRoutes" errors="0" failures="0" skipped="0" timestamp="2025-07-06T07:47:00" time="0.522" tests="4">
-    <testcase classname="UserPreferenceRoutes GET /users/:userId/preferences should return 200 with user preferences" name="UserPreferenceRoutes GET /users/:userId/preferences should return 200 with user preferences" time="0.082">
-    </testcase>
-    <testcase classname="UserPreferenceRoutes GET /users/:userId/preferences should return 400 if userId is invalid" name="UserPreferenceRoutes GET /users/:userId/preferences should return 400 if userId is invalid" time="0.045">
-    </testcase>
-    <testcase classname="UserPreferenceRoutes POST /users/:userId/preferences should return 200 on successful preference addition/update" name="UserPreferenceRoutes POST /users/:userId/preferences should return 200 on successful preference addition/update" time="0.048">
-    </testcase>
-    <testcase classname="UserPreferenceRoutes POST /users/:userId/preferences should return 400 for invalid preference data" name="UserPreferenceRoutes POST /users/:userId/preferences should return 400 for invalid preference data" time="0.009">
+    <testcase classname="PreferenceNormalizationService normalizePreferences should retain original properties of PreferenceNode" name="PreferenceNormalizationService normalizePreferences should retain original properties of PreferenceNode" time="0.001">
     </testcase>
   </testsuite>
-  <testsuite name="MCPAdapterAgent" errors="0" failures="0" skipped="0" timestamp="2025-07-06T07:47:00" time="0.16" tests="6">
-    <testcase classname="MCPAdapterAgent should initialize correctly" name="MCPAdapterAgent should initialize correctly" time="0.003">
+  <testsuite name="LLMService" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:51" time="0.12" tests="9">
+    <testcase classname="LLMService sendPrompt should send a prompt to Ollama and return success" name="LLMService sendPrompt should send a prompt to Ollama and return success" time="0.004">
     </testcase>
-    <testcase classname="MCPAdapterAgent handleMessage should return an error for unhandled message types" name="MCPAdapterAgent handleMessage should return an error for unhandled message types" time="0.001">
+    <testcase classname="LLMService sendPrompt should return failure if PromptManager.getPrompt fails" name="LLMService sendPrompt should return failure if PromptManager.getPrompt fails" time="0.002">
     </testcase>
-    <testcase classname="MCPAdapterAgent handleToolRequest should return an error if payload is missing or invalid" name="MCPAdapterAgent handleToolRequest should return an error if payload is missing or invalid" time="0.002">
+    <testcase classname="LLMService sendPrompt should return failure if Ollama API call fails" name="LLMService sendPrompt should return failure if Ollama API call fails" time="0.017">
     </testcase>
-    <testcase classname="MCPAdapterAgent handleToolRequest should process a successful MCP tool request" name="MCPAdapterAgent handleToolRequest should process a successful MCP tool request" time="0.006">
+    <testcase classname="LLMService sendPrompt should return failure if fetch throws an error" name="LLMService sendPrompt should return failure if fetch throws an error" time="0.003">
     </testcase>
-    <testcase classname="MCPAdapterAgent handleToolRequest should handle MCP tool call failure" name="MCPAdapterAgent handleToolRequest should handle MCP tool call failure" time="0.004">
+    <testcase classname="LLMService sendStructuredPrompt should send a structured prompt to Ollama and return success" name="LLMService sendStructuredPrompt should send a structured prompt to Ollama and return success" time="0.005">
     </testcase>
-    <testcase classname="MCPAdapterAgent handleToolRequest should handle general exceptions during processing" name="MCPAdapterAgent handleToolRequest should handle general exceptions during processing" time="0.002">
+    <testcase classname="LLMService sendStructuredPrompt should return failure if PromptManager.getPrompt fails" name="LLMService sendStructuredPrompt should return failure if PromptManager.getPrompt fails" time="0.001">
     </testcase>
-  </testsuite>
-  <testsuite name="Neo4jCircuitWrapper" errors="0" failures="0" skipped="0" timestamp="2025-07-06T07:47:00" time="0.641" tests="11">
-    <testcase classname="Neo4jCircuitWrapper constructor should initialize with provided options" name="Neo4jCircuitWrapper constructor should initialize with provided options" time="0.002">
+    <testcase classname="LLMService sendStructuredPrompt should return failure if Ollama API call fails" name="LLMService sendStructuredPrompt should return failure if Ollama API call fails" time="0.001">
     </testcase>
-    <testcase classname="Neo4jCircuitWrapper execute should execute function through circuit breaker" name="Neo4jCircuitWrapper execute should execute function through circuit breaker" time="0.001">
+    <testcase classname="LLMService sendStructuredPrompt should return failure if fetch throws an error" name="LLMService sendStructuredPrompt should return failure if fetch throws an error" time="0.002">
     </testcase>
-    <testcase classname="Neo4jCircuitWrapper execute should propagate circuit breaker errors" name="Neo4jCircuitWrapper execute should propagate circuit breaker errors" time="0.019">
-    </testcase>
-    <testcase classname="Neo4jCircuitWrapper executeQuery should execute query and return results" name="Neo4jCircuitWrapper executeQuery should execute query and return results" time="0.002">
-    </testcase>
-    <testcase classname="Neo4jCircuitWrapper executeQuery should handle empty results" name="Neo4jCircuitWrapper executeQuery should handle empty results" time="0.001">
-    </testcase>
-    <testcase classname="Neo4jCircuitWrapper executeQuery should close session on error" name="Neo4jCircuitWrapper executeQuery should close session on error" time="0.001">
-    </testcase>
-    <testcase classname="Neo4jCircuitWrapper verifyConnection should return true for successful connection" name="Neo4jCircuitWrapper verifyConnection should return true for successful connection" time="0.005">
-    </testcase>
-    <testcase classname="Neo4jCircuitWrapper verifyConnection should return false for failed connection" name="Neo4jCircuitWrapper verifyConnection should return false for failed connection" time="0">
-    </testcase>
-    <testcase classname="Neo4jCircuitWrapper close should close driver successfully" name="Neo4jCircuitWrapper close should close driver successfully" time="0.002">
-    </testcase>
-    <testcase classname="Neo4jCircuitWrapper close should handle close errors" name="Neo4jCircuitWrapper close should handle close errors" time="0.002">
-    </testcase>
-    <testcase classname="Neo4jCircuitWrapper getCircuitState should return circuit state" name="Neo4jCircuitWrapper getCircuitState should return circuit state" time="0">
+    <testcase classname="LLMService sendStructuredPrompt should return failure if Ollama response is not valid JSON" name="LLMService sendStructuredPrompt should return failure if Ollama response is not valid JSON" time="0.003">
     </testcase>
   </testsuite>
-  <testsuite name="FallbackAgent" errors="0" failures="0" skipped="0" timestamp="2025-07-06T07:47:00" time="0.315" tests="9">
-    <testcase classname="FallbackAgent should initialize correctly" name="FallbackAgent should initialize correctly" time="0.026">
+  <testsuite name="AdminUserPreferenceController" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:51" time="0.328" tests="11">
+    <testcase classname="AdminUserPreferenceController GET /admin/preferences should return all user preferences" name="AdminUserPreferenceController GET /admin/preferences should return all user preferences" time="0.006">
     </testcase>
-    <testcase classname="FallbackAgent handleMessage should return an error for unhandled message types" name="FallbackAgent handleMessage should return an error for unhandled message types" time="0.002">
+    <testcase classname="AdminUserPreferenceController GET /admin/preferences should return 500 if an error occurs when getting all preferences" name="AdminUserPreferenceController GET /admin/preferences should return 500 if an error occurs when getting all preferences" time="0.029">
     </testcase>
-    <testcase classname="FallbackAgent handleFallbackRequest should return an error if payload is missing" name="FallbackAgent handleFallbackRequest should return an error if payload is missing" time="0.001">
+    <testcase classname="AdminUserPreferenceController GET /admin/preferences/:userId should return preferences for a specific user" name="AdminUserPreferenceController GET /admin/preferences/:userId should return preferences for a specific user" time="0.001">
     </testcase>
-    <testcase classname="FallbackAgent handleFallbackRequest should process a fallback request successfully with LLM response" name="FallbackAgent handleFallbackRequest should process a fallback request successfully with LLM response" time="0.002">
+    <testcase classname="AdminUserPreferenceController GET /admin/preferences/:userId should return 500 if an error occurs when getting user preferences" name="AdminUserPreferenceController GET /admin/preferences/:userId should return 500 if an error occurs when getting user preferences" time="0.021">
     </testcase>
-    <testcase classname="FallbackAgent handleFallbackRequest should process a fallback request with default response if LLM fails" name="FallbackAgent handleFallbackRequest should process a fallback request with default response if LLM fails" time="0.005">
+    <testcase classname="AdminUserPreferenceController PUT /admin/preferences/:userId should update preferences for a specific user" name="AdminUserPreferenceController PUT /admin/preferences/:userId should update preferences for a specific user" time="0.002">
     </testcase>
-    <testcase classname="FallbackAgent handleFallbackRequest should handle general exceptions during processing" name="FallbackAgent handleFallbackRequest should handle general exceptions during processing" time="0.002">
+    <testcase classname="AdminUserPreferenceController PUT /admin/preferences/:userId should return 500 if an error occurs when updating user preferences" name="AdminUserPreferenceController PUT /admin/preferences/:userId should return 500 if an error occurs when updating user preferences" time="0.002">
     </testcase>
-    <testcase classname="FallbackAgent generateFallbackResponse should generate a fallback response using LLM" name="FallbackAgent generateFallbackResponse should generate a fallback response using LLM" time="0.005">
+    <testcase classname="AdminUserPreferenceController DELETE /admin/preferences/:userId should delete a specific preference for a user" name="AdminUserPreferenceController DELETE /admin/preferences/:userId should delete a specific preference for a user" time="0.001">
     </testcase>
-    <testcase classname="FallbackAgent generateFallbackResponse should return default fallback response if LLM service fails" name="FallbackAgent generateFallbackResponse should return default fallback response if LLM service fails" time="0.011">
+    <testcase classname="AdminUserPreferenceController DELETE /admin/preferences/:userId should delete all preferences for a user if no preferenceId is provided" name="AdminUserPreferenceController DELETE /admin/preferences/:userId should delete all preferences for a user if no preferenceId is provided" time="0.004">
     </testcase>
-    <testcase classname="FallbackAgent generateFallbackResponse should return LLM_FALLBACK_ERROR for general exceptions during generation" name="FallbackAgent generateFallbackResponse should return LLM_FALLBACK_ERROR for general exceptions during generation" time="0.029">
+    <testcase classname="AdminUserPreferenceController DELETE /admin/preferences/:userId should return 500 if an error occurs during deletion of a specific preference" name="AdminUserPreferenceController DELETE /admin/preferences/:userId should return 500 if an error occurs during deletion of a specific preference" time="0.003">
     </testcase>
-  </testsuite>
-  <testsuite name="InMemoryDeadLetterQueue" errors="0" failures="0" skipped="0" timestamp="2025-07-06T07:47:00" time="0.158" tests="5">
-    <testcase classname="InMemoryDeadLetterQueue should be empty initially" name="InMemoryDeadLetterQueue should be empty initially" time="0.032">
+    <testcase classname="AdminUserPreferenceController DELETE /admin/preferences/:userId should return 500 if an error occurs during deletion of all preferences" name="AdminUserPreferenceController DELETE /admin/preferences/:userId should return 500 if an error occurs during deletion of all preferences" time="0.003">
     </testcase>
-    <testcase classname="InMemoryDeadLetterQueue should add a message to the queue" name="InMemoryDeadLetterQueue should add a message to the queue" time="0.003">
-    </testcase>
-    <testcase classname="InMemoryDeadLetterQueue should add multiple messages to the queue" name="InMemoryDeadLetterQueue should add multiple messages to the queue" time="0.007">
-    </testcase>
-    <testcase classname="InMemoryDeadLetterQueue should return a copy of the queue when getAll is called" name="InMemoryDeadLetterQueue should return a copy of the queue when getAll is called" time="0.004">
-    </testcase>
-    <testcase classname="InMemoryDeadLetterQueue should clear the queue" name="InMemoryDeadLetterQueue should clear the queue" time="0.002">
+    <testcase classname="AdminUserPreferenceController should return 405 for unsupported HTTP method or invalid path" name="AdminUserPreferenceController should return 405 for unsupported HTTP method or invalid path" time="0.001">
     </testcase>
   </testsuite>
-  <testsuite name="UserPreferenceController" errors="0" failures="0" skipped="0" timestamp="2025-07-06T07:47:01" time="0.131" tests="3">
-    <testcase classname="UserPreferenceController getPreferences should return an empty array for preferences" name="UserPreferenceController getPreferences should return an empty array for preferences" time="0.002">
+  <testsuite name="SommelierCoordinator Integration" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:51" time="0.111" tests="3">
+    <testcase classname="SommelierCoordinator Integration handleRecommendationRequest should successfully orchestrate knowledge graph recommendation flow with traceId" name="SommelierCoordinator Integration handleRecommendationRequest should successfully orchestrate knowledge graph recommendation flow with traceId" time="0.001">
     </testcase>
-    <testcase classname="UserPreferenceController getPreferences should return 400 if user ID is missing" name="UserPreferenceController getPreferences should return 400 if user ID is missing" time="0.01">
+    <testcase classname="SommelierCoordinator Integration dead letter queue handling should route failed messages to DLQ with traceId when recommendation fails" name="SommelierCoordinator Integration dead letter queue handling should route failed messages to DLQ with traceId when recommendation fails" time="0.001">
     </testcase>
-    <testcase classname="UserPreferenceController should return 405 for unsupported HTTP method" name="UserPreferenceController should return 405 for unsupported HTTP method" time="0.001">
-    </testcase>
-  </testsuite>
-  <testsuite name="BasicDeadLetterProcessor" errors="0" failures="0" skipped="0" timestamp="2025-07-06T07:47:01" time="0.145" tests="2">
-    <testcase classname="BasicDeadLetterProcessor should call handlePermanentFailure if retry attempts are exhausted" name="BasicDeadLetterProcessor should call handlePermanentFailure if retry attempts are exhausted" time="0.014">
-    </testcase>
-    <testcase classname="BasicDeadLetterProcessor should add the failed message to the in-memory DLQ on permanent failure" name="BasicDeadLetterProcessor should add the failed message to the in-memory DLQ on permanent failure" time="0.004">
+    <testcase classname="SommelierCoordinator Integration should log DLQ processing failures with traceId" name="SommelierCoordinator Integration should log DLQ processing failures with traceId" time="0">
     </testcase>
   </testsuite>
-  <testsuite name="BaseController" errors="0" failures="0" skipped="0" timestamp="2025-07-06T07:47:01" time="0.109" tests="8">
-    <testcase classname="BaseController ok should send 200 status with data when provided" name="BaseController ok should send 200 status with data when provided" time="0.002">
+  <testsuite name="AdminPreferenceService" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:51" time="0.503" tests="10">
+    <testcase classname="AdminPreferenceService viewUserPreferences should return user preferences if successful" name="AdminPreferenceService viewUserPreferences should return user preferences if successful" time="0.002">
     </testcase>
-    <testcase classname="BaseController ok should send 200 status without data when not provided" name="BaseController ok should send 200 status without data when not provided" time="0">
+    <testcase classname="AdminPreferenceService viewUserPreferences should return a failure result if controller returns an error status" name="AdminPreferenceService viewUserPreferences should return a failure result if controller returns an error status" time="0">
     </testcase>
-    <testcase classname="BaseController error responses clientError should return 400" name="BaseController error responses clientError should return 400" time="0.001">
+    <testcase classname="AdminPreferenceService viewUserPreferences should return a failure result if controller throws an error" name="AdminPreferenceService viewUserPreferences should return a failure result if controller throws an error" time="0.001">
     </testcase>
-    <testcase classname="BaseController error responses forbidden should return 403" name="BaseController error responses forbidden should return 403" time="0">
+    <testcase classname="AdminPreferenceService addOrUpdateUserPreferences should add/update preferences successfully" name="AdminPreferenceService addOrUpdateUserPreferences should add/update preferences successfully" time="0.001">
     </testcase>
-    <testcase classname="BaseController error responses notFound should return 404" name="BaseController error responses notFound should return 404" time="0">
+    <testcase classname="AdminPreferenceService addOrUpdateUserPreferences should return a failure result if controller returns an error status" name="AdminPreferenceService addOrUpdateUserPreferences should return a failure result if controller returns an error status" time="0">
     </testcase>
-    <testcase classname="BaseController error responses conflict should return 409" name="BaseController error responses conflict should return 409" time="0.001">
+    <testcase classname="AdminPreferenceService deletePreference should delete a specific preference by type and value" name="AdminPreferenceService deletePreference should delete a specific preference by type and value" time="0.002">
     </testcase>
-    <testcase classname="BaseController error responses fail should return 500" name="BaseController error responses fail should return 500" time="0.001">
+    <testcase classname="AdminPreferenceService deletePreference should delete a specific preference by preferenceId" name="AdminPreferenceService deletePreference should delete a specific preference by preferenceId" time="0.001">
     </testcase>
-    <testcase classname="BaseController execute should call executeImpl" name="BaseController execute should call executeImpl" time="0">
+    <testcase classname="AdminPreferenceService deletePreference should return a failure result if controller returns an error status during specific deletion" name="AdminPreferenceService deletePreference should return a failure result if controller returns an error status during specific deletion" time="0">
+    </testcase>
+    <testcase classname="AdminPreferenceService deleteAllPreferencesForUser should delete all preferences for a user" name="AdminPreferenceService deleteAllPreferencesForUser should delete all preferences for a user" time="0.002">
+    </testcase>
+    <testcase classname="AdminPreferenceService deleteAllPreferencesForUser should return a failure result if controller returns an error status during bulk deletion" name="AdminPreferenceService deleteAllPreferencesForUser should return a failure result if controller returns an error status during bulk deletion" time="0">
     </testcase>
   </testsuite>
-  <testsuite name="CircuitBreaker" errors="0" failures="0" skipped="0" timestamp="2025-07-06T07:47:01" time="0.169" tests="5">
-    <testcase classname="CircuitBreaker initial state should be CLOSED" name="CircuitBreaker initial state should be CLOSED" time="0.002">
+  <testsuite name="KnowledgeGraphService" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:51" time="0.229" tests="22">
+    <testcase classname="KnowledgeGraphService createWineNode should create a wine node with all properties" name="KnowledgeGraphService createWineNode should create a wine node with all properties" time="0.003">
     </testcase>
-    <testcase classname="CircuitBreaker should open circuit after failure threshold" name="CircuitBreaker should open circuit after failure threshold" time="0.015">
+    <testcase classname="KnowledgeGraphService createWineNode should handle minimal wine data" name="KnowledgeGraphService createWineNode should handle minimal wine data" time="0.003">
+    </testcase>
+    <testcase classname="KnowledgeGraphService findSimilarWines should return similar wines" name="KnowledgeGraphService findSimilarWines should return similar wines" time="0.001">
+    </testcase>
+    <testcase classname="KnowledgeGraphService findSimilarWines should respect limit parameter" name="KnowledgeGraphService findSimilarWines should respect limit parameter" time="0.001">
+    </testcase>
+    <testcase classname="KnowledgeGraphService getWinePairings should return wine pairings" name="KnowledgeGraphService getWinePairings should return wine pairings" time="0.001">
+    </testcase>
+    <testcase classname="KnowledgeGraphService getWineById should return wine when found" name="KnowledgeGraphService getWineById should return wine when found" time="0.001">
+    </testcase>
+    <testcase classname="KnowledgeGraphService getWineById should return null when not found" name="KnowledgeGraphService getWineById should return null when not found" time="0">
+    </testcase>
+    <testcase classname="KnowledgeGraphService findWinesByIngredients should return wines matching all ingredients" name="KnowledgeGraphService findWinesByIngredients should return wines matching all ingredients" time="0.001">
+    </testcase>
+    <testcase classname="KnowledgeGraphService findWinesByIngredients should return empty array for empty ingredients" name="KnowledgeGraphService findWinesByIngredients should return empty array for empty ingredients" time="0.001">
+    </testcase>
+    <testcase classname="KnowledgeGraphService findWinesByPreferences should build query with wine type preference" name="KnowledgeGraphService findWinesByPreferences should build query with wine type preference" time="0.001">
+    </testcase>
+    <testcase classname="KnowledgeGraphService findWinesByPreferences should build query with price range" name="KnowledgeGraphService findWinesByPreferences should build query with price range" time="0.001">
+    </testcase>
+    <testcase classname="KnowledgeGraphService findWinesByPreferences should return empty array for undefined preferences" name="KnowledgeGraphService findWinesByPreferences should return empty array for undefined preferences" time="0">
+    </testcase>
+    <testcase classname="KnowledgeGraphService findWinesByType should return wines of specified type" name="KnowledgeGraphService findWinesByType should return wines of specified type" time="0.001">
+    </testcase>
+    <testcase classname="KnowledgeGraphService findWinesByType should return empty array for empty type" name="KnowledgeGraphService findWinesByType should return empty array for empty type" time="0.001">
+    </testcase>
+    <testcase classname="KnowledgeGraphService Preference Management should add or update a single preference using addOrUpdateUserPreferences" name="KnowledgeGraphService Preference Management should add or update a single preference using addOrUpdateUserPreferences" time="0.001">
+    </testcase>
+    <testcase classname="KnowledgeGraphService Preference Management should get only active preferences by default" name="KnowledgeGraphService Preference Management should get only active preferences by default" time="0.019">
+    </testcase>
+    <testcase classname="KnowledgeGraphService Preference Management should get all preferences when includeInactive is true" name="KnowledgeGraphService Preference Management should get all preferences when includeInactive is true" time="0.001">
+    </testcase>
+    <testcase classname="KnowledgeGraphService Preference Management should return an empty array when no preferences are found" name="KnowledgeGraphService Preference Management should return an empty array when no preferences are found" time="0.001">
+    </testcase>
+    <testcase classname="KnowledgeGraphService Preference Management should delete a preference" name="KnowledgeGraphService Preference Management should delete a preference" time="0">
+    </testcase>
+    <testcase classname="KnowledgeGraphService Admin Preference Management should get all user preferences" name="KnowledgeGraphService Admin Preference Management should get all user preferences" time="0.001">
+    </testcase>
+    <testcase classname="KnowledgeGraphService Admin Preference Management should add or update multiple user preferences" name="KnowledgeGraphService Admin Preference Management should add or update multiple user preferences" time="0.001">
+    </testcase>
+    <testcase classname="KnowledgeGraphService Admin Preference Management should delete all preferences for a user" name="KnowledgeGraphService Admin Preference Management should delete all preferences for a user" time="0.001">
+    </testcase>
+  </testsuite>
+  <testsuite name="PromptManager" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:51" time="0.183" tests="14">
+    <testcase classname="PromptManager should initialize and load prompts from the directory" name="PromptManager should initialize and load prompts from the directory" time="0.005">
+    </testcase>
+    <testcase classname="PromptManager should render a prompt with variables" name="PromptManager should render a prompt with variables" time="0.003">
+    </testcase>
+    <testcase classname="PromptManager should throw an error if prompt not found" name="PromptManager should throw an error if prompt not found" time="0.001">
+    </testcase>
+    <testcase classname="PromptManager should validate input variables against schema" name="PromptManager should validate input variables against schema" time="0.003">
+    </testcase>
+    <testcase classname="PromptManager should use cache when enabled" name="PromptManager should use cache when enabled" time="0.001">
+    </testcase>
+    <testcase classname="PromptManager should clear cache on reloadPrompts" name="PromptManager should clear cache on reloadPrompts" time="0.001">
+    </testcase>
+    <testcase classname="PromptManager should retrieve prompt metadata" name="PromptManager should retrieve prompt metadata" time="0.002">
+    </testcase>
+    <testcase classname="PromptManager should retrieve prompt task" name="PromptManager should retrieve prompt task" time="0.001">
+    </testcase>
+    <testcase classname="PromptManager should handle fs.readdir error during initial load" name="PromptManager should handle fs.readdir error during initial load" time="0.034">
+    </testcase>
+    <testcase classname="PromptManager should handle empty prompt content during load" name="PromptManager should handle empty prompt content during load" time="0.002">
+    </testcase>
+    <testcase classname="PromptManager should handle missing YAML frontmatter markers during load" name="PromptManager should handle missing YAML frontmatter markers during load" time="0.001">
+    </testcase>
+    <testcase classname="PromptManager should handle invalid YAML syntax in frontmatter during load" name="PromptManager should handle invalid YAML syntax in frontmatter during load" time="0.021">
+    </testcase>
+    <testcase classname="PromptManager should handle missing name or description in metadata during load" name="PromptManager should handle missing name or description in metadata during load" time="0.007">
+    </testcase>
+    <testcase classname="PromptManager should return correct stats" name="PromptManager should return correct stats" time="0.002">
+    </testcase>
+  </testsuite>
+  <testsuite name="CircuitBreaker" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:51" time="0.123" tests="5">
+    <testcase classname="CircuitBreaker initial state should be CLOSED" name="CircuitBreaker initial state should be CLOSED" time="0.006">
+    </testcase>
+    <testcase classname="CircuitBreaker should open circuit after failure threshold" name="CircuitBreaker should open circuit after failure threshold" time="0.026">
     </testcase>
     <testcase classname="CircuitBreaker should use fallback when circuit is open" name="CircuitBreaker should use fallback when circuit is open" time="0.001">
     </testcase>
-    <testcase classname="CircuitBreaker should transition to HALF_OPEN after timeout" name="CircuitBreaker should transition to HALF_OPEN after timeout" time="0.001">
+    <testcase classname="CircuitBreaker should transition to HALF_OPEN after timeout" name="CircuitBreaker should transition to HALF_OPEN after timeout" time="0.002">
     </testcase>
-    <testcase classname="CircuitBreaker should reset to CLOSED after success threshold" name="CircuitBreaker should reset to CLOSED after success threshold" time="0.001">
-    </testcase>
-  </testsuite>
-  <testsuite name="SharedContextMemory" errors="0" failures="0" skipped="0" timestamp="2025-07-06T07:47:01" time="0.132" tests="4">
-    <testcase classname="SharedContextMemory should store and retrieve context" name="SharedContextMemory should store and retrieve context" time="0.002">
-    </testcase>
-    <testcase classname="SharedContextMemory should maintain separate contexts per owner" name="SharedContextMemory should maintain separate contexts per owner" time="0.001">
-    </testcase>
-    <testcase classname="SharedContextMemory should track version history" name="SharedContextMemory should track version history" time="0.001">
-    </testcase>
-    <testcase classname="SharedContextMemory should handle metadata" name="SharedContextMemory should handle metadata" time="0">
+    <testcase classname="CircuitBreaker should reset to CLOSED after success threshold" name="CircuitBreaker should reset to CLOSED after success threshold" time="0.002">
     </testcase>
   </testsuite>
-  <testsuite name="LoggingDeadLetterHandler" errors="0" failures="0" skipped="0" timestamp="2025-07-06T07:47:01" time="0.094" tests="1">
-    <testcase classname="LoggingDeadLetterHandler should log the failed message, error, and metadata" name="LoggingDeadLetterHandler should log the failed message, error, and metadata" time="0.004">
+  <testsuite name="UserPreferenceController" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:51" time="0.109" tests="3">
+    <testcase classname="UserPreferenceController getPreferences should return an empty array for preferences" name="UserPreferenceController getPreferences should return an empty array for preferences" time="0.004">
+    </testcase>
+    <testcase classname="UserPreferenceController getPreferences should return 400 if user ID is missing" name="UserPreferenceController getPreferences should return 400 if user ID is missing" time="0.006">
+    </testcase>
+    <testcase classname="UserPreferenceController should return 405 for unsupported HTTP method" name="UserPreferenceController should return 405 for unsupported HTTP method" time="0.002">
     </testcase>
   </testsuite>
-  <testsuite name="ConversationHistoryService" errors="0" failures="0" skipped="0" timestamp="2025-07-06T07:47:01" time="0.115" tests="5">
-    <testcase classname="ConversationHistoryService should add a conversation turn to history" name="ConversationHistoryService should add a conversation turn to history" time="0.001">
+  <testsuite name="InputValidationAgent" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:51" time="0.124" tests="7">
+    <testcase classname="InputValidationAgent validateInput should accept valid input with all required fields" name="InputValidationAgent validateInput should accept valid input with all required fields" time="0.002">
     </testcase>
-    <testcase classname="ConversationHistoryService should retrieve conversation history for a user" name="ConversationHistoryService should retrieve conversation history for a user" time="0">
-    </testcase>
-    <testcase classname="ConversationHistoryService should return an empty array for a user with no history" name="ConversationHistoryService should return an empty array for a user with no history" time="0">
-    </testcase>
-    <testcase classname="ConversationHistoryService should clear conversation history for a user" name="ConversationHistoryService should clear conversation history for a user" time="0.001">
-    </testcase>
-    <testcase classname="ConversationHistoryService should handle multiple users with separate histories" name="ConversationHistoryService should handle multiple users with separate histories" time="0.001">
-    </testcase>
-  </testsuite>
-  <testsuite name="RetryManager" errors="0" failures="0" skipped="0" timestamp="2025-07-06T07:46:53" time="7.888" tests="6">
-    <testcase classname="RetryManager with ExponentialBackoffPolicy should retry with exponential backoff" name="RetryManager with ExponentialBackoffPolicy should retry with exponential backoff" time="0.107">
-    </testcase>
-    <testcase classname="RetryManager with ExponentialBackoffPolicy should give up after max attempts" name="RetryManager with ExponentialBackoffPolicy should give up after max attempts" time="0.727">
-    </testcase>
-    <testcase classname="RetryManager with ExponentialBackoffPolicy should respect circuit breaker open state" name="RetryManager with ExponentialBackoffPolicy should respect circuit breaker open state" time="0.703">
-    </testcase>
-    <testcase classname="RetryManager with ExponentialBackoffPolicy should handle half-open state correctly" name="RetryManager with ExponentialBackoffPolicy should handle half-open state correctly" time="0.001">
-    </testcase>
-    <testcase classname="RetryManager with FixedDelayPolicy should retry with fixed delay" name="RetryManager with FixedDelayPolicy should retry with fixed delay" time="0.201">
-    </testcase>
-    <testcase classname="RetryManager policy evaluation should use the maximum delay from all policies" name="RetryManager policy evaluation should use the maximum delay from all policies" time="0.201">
-    </testcase>
-  </testsuite>
-  <testsuite name="RetryManager" errors="0" failures="0" skipped="0" timestamp="2025-07-06T07:46:53" time="8.069" tests="10">
-    <testcase classname="RetryManager with ExponentialBackoffPolicy should retry with exponential backoff" name="RetryManager with ExponentialBackoffPolicy should retry with exponential backoff" time="0.107">
-    </testcase>
-    <testcase classname="RetryManager with ExponentialBackoffPolicy should give up after max attempts" name="RetryManager with ExponentialBackoffPolicy should give up after max attempts" time="0.726">
-    </testcase>
-    <testcase classname="RetryManager with ExponentialBackoffPolicy should respect circuit breaker open state" name="RetryManager with ExponentialBackoffPolicy should respect circuit breaker open state" time="0.704">
-    </testcase>
-    <testcase classname="RetryManager with ExponentialBackoffPolicy should handle half-open state correctly" name="RetryManager with ExponentialBackoffPolicy should handle half-open state correctly" time="0.001">
-    </testcase>
-    <testcase classname="RetryManager with FixedDelayPolicy should retry with fixed delay" name="RetryManager with FixedDelayPolicy should retry with fixed delay" time="0.201">
-    </testcase>
-    <testcase classname="RetryManager policy evaluation should use the maximum delay from all policies" name="RetryManager policy evaluation should use the maximum delay from all policies" time="0.201">
-    </testcase>
-    <testcase classname="DeadLetterProcessor should retry failed handler executions" name="DeadLetterProcessor should retry failed handler executions" time="0.001">
-    </testcase>
-    <testcase classname="DeadLetterProcessor should trigger permanent failure handler when retries exhausted" name="DeadLetterProcessor should trigger permanent failure handler when retries exhausted" time="0.001">
-    </testcase>
-    <testcase classname="DeadLetterProcessor should call all handlers with the same message" name="DeadLetterProcessor should call all handlers with the same message" time="0.002">
-    </testcase>
-    <testcase classname="DeadLetterProcessor should include metadata in handler calls" name="DeadLetterProcessor should include metadata in handler calls" time="0">
-    </testcase>
-  </testsuite>
-  <testsuite name="InputValidationAgent" errors="0" failures="0" skipped="0" timestamp="2025-07-06T07:46:53" time="9.89" tests="7">
-    <testcase classname="InputValidationAgent validateInput should accept valid input with all required fields" name="InputValidationAgent validateInput should accept valid input with all required fields" time="0.031">
-    </testcase>
-    <testcase classname="InputValidationAgent validateInput should reject empty ingredients list" name="InputValidationAgent validateInput should reject empty ingredients list" time="0.002">
+    <testcase classname="InputValidationAgent validateInput should reject empty ingredients list" name="InputValidationAgent validateInput should reject empty ingredients list" time="0.001">
     </testcase>
     <testcase classname="InputValidationAgent validateInput should reject invalid budget values" name="InputValidationAgent validateInput should reject invalid budget values" time="0.001">
     </testcase>
@@ -641,225 +763,231 @@
     </testcase>
     <testcase classname="InputValidationAgent validateInput should validate dietary restrictions via LLM" name="InputValidationAgent validateInput should validate dietary restrictions via LLM" time="0.001">
     </testcase>
-    <testcase classname="InputValidationAgent handleMessage (fallback) should return an error for unhandled message types" name="InputValidationAgent handleMessage (fallback) should return an error for unhandled message types" time="0.003">
+    <testcase classname="InputValidationAgent handleMessage (fallback) should return an error for unhandled message types" name="InputValidationAgent handleMessage (fallback) should return an error for unhandled message types" time="0.004">
     </testcase>
-    <testcase classname="InputValidationAgent error handling should handle AgentError with correlationId" name="InputValidationAgent error handling should handle AgentError with correlationId" time="0.001">
-    </testcase>
-  </testsuite>
-  <testsuite name="UserPreferenceAgent" errors="0" failures="0" skipped="0" timestamp="2025-07-06T07:46:53" time="10.228" tests="9">
-    <testcase classname="UserPreferenceAgent should initialize correctly" name="UserPreferenceAgent should initialize correctly" time="0.009">
-    </testcase>
-    <testcase classname="UserPreferenceAgent handleMessage should return an error for unhandled message types" name="UserPreferenceAgent handleMessage should return an error for unhandled message types" time="0.002">
-    </testcase>
-    <testcase classname="UserPreferenceAgent handlePreferenceRequest should return an error if payload is missing or invalid" name="UserPreferenceAgent handlePreferenceRequest should return an error if payload is missing or invalid" time="0.002">
-    </testcase>
-    <testcase classname="UserPreferenceAgent handlePreferenceRequest should process a preference request with fast extraction success" name="UserPreferenceAgent handlePreferenceRequest should process a preference request with fast extraction success" time="0.005">
-    </testcase>
-    <testcase classname="UserPreferenceAgent handlePreferenceRequest should queue async LLM extraction if fast extraction fails or returns no data" name="UserPreferenceAgent handlePreferenceRequest should queue async LLM extraction if fast extraction fails or returns no data" time="0.01">
-    </testcase>
-    <testcase classname="UserPreferenceAgent handlePreferenceRequest should handle general exceptions during processing" name="UserPreferenceAgent handlePreferenceRequest should handle general exceptions during processing" time="0.02">
-    </testcase>
-    <testcase classname="UserPreferenceAgent mergePreferences should merge preferences, with incoming overriding existing" name="UserPreferenceAgent mergePreferences should merge preferences, with incoming overriding existing" time="0.002">
-    </testcase>
-    <testcase classname="UserPreferenceAgent mergePreferences should handle empty existing preferences" name="UserPreferenceAgent mergePreferences should handle empty existing preferences" time="0">
-    </testcase>
-    <testcase classname="UserPreferenceAgent mergePreferences should handle empty incoming preferences" name="UserPreferenceAgent mergePreferences should handle empty incoming preferences" time="0.001">
+    <testcase classname="InputValidationAgent error handling should handle AgentError with correlationId" name="InputValidationAgent error handling should handle AgentError with correlationId" time="0.003">
     </testcase>
   </testsuite>
-  <testsuite name="Agent Message Handlers" errors="0" failures="0" skipped="0" timestamp="2025-07-06T07:47:00" time="2.893" tests="4">
-    <testcase classname="Agent Message Handlers InputValidationAgent should validate input and return success for valid input" name="Agent Message Handlers InputValidationAgent should validate input and return success for valid input" time="0.004">
+  <testsuite name="InMemoryDeadLetterQueue" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:51" time="0.095" tests="5">
+    <testcase classname="InMemoryDeadLetterQueue should be empty initially" name="InMemoryDeadLetterQueue should be empty initially" time="0.005">
     </testcase>
-    <testcase classname="Agent Message Handlers InputValidationAgent should handle invalid input" name="Agent Message Handlers InputValidationAgent should handle invalid input" time="0.004">
+    <testcase classname="InMemoryDeadLetterQueue should add a message to the queue" name="InMemoryDeadLetterQueue should add a message to the queue" time="0.001">
     </testcase>
-    <testcase classname="Agent Message Handlers InputValidationAgent should handle LLM service failures" name="Agent Message Handlers InputValidationAgent should handle LLM service failures" time="0.001">
+    <testcase classname="InMemoryDeadLetterQueue should add multiple messages to the queue" name="InMemoryDeadLetterQueue should add multiple messages to the queue" time="0.001">
     </testcase>
-    <testcase classname="Agent Message Handlers InputValidationAgent should forward user preferences when found" name="Agent Message Handlers InputValidationAgent should forward user preferences when found" time="0.001">
+    <testcase classname="InMemoryDeadLetterQueue should return a copy of the queue when getAll is called" name="InMemoryDeadLetterQueue should return a copy of the queue when getAll is called" time="0.002">
     </testcase>
-  </testsuite>
-  <testsuite name="End-to-End Recommendation API" errors="0" failures="0" skipped="0" timestamp="2025-07-06T07:47:00" time="3.985" tests="9">
-    <testcase classname="End-to-End Recommendation API POST /recommendations - Positive Cases (Known Good Pairings) should recommend Cabernet Sauvignon or Malbec for Steak" name="End-to-End Recommendation API POST /recommendations - Positive Cases (Known Good Pairings) should recommend Cabernet Sauvignon or Malbec for Steak" time="0.047">
-    </testcase>
-    <testcase classname="End-to-End Recommendation API POST /recommendations - Positive Cases (Known Good Pairings) should recommend Chardonnay or Pinot Noir for Chicken" name="End-to-End Recommendation API POST /recommendations - Positive Cases (Known Good Pairings) should recommend Chardonnay or Pinot Noir for Chicken" time="0.008">
-    </testcase>
-    <testcase classname="End-to-End Recommendation API POST /recommendations - Positive Cases (Known Good Pairings) should recommend Sauvignon Blanc or Pinot Grigio for Seafood" name="End-to-End Recommendation API POST /recommendations - Positive Cases (Known Good Pairings) should recommend Sauvignon Blanc or Pinot Grigio for Seafood" time="0.006">
-    </testcase>
-    <testcase classname="End-to-End Recommendation API POST /recommendations - Positive Cases (Known Good Pairings) should recommend Pinot Noir or Port for Cheese Platter" name="End-to-End Recommendation API POST /recommendations - Positive Cases (Known Good Pairings) should recommend Pinot Noir or Port for Cheese Platter" time="0.006">
-    </testcase>
-    <testcase classname="End-to-End Recommendation API POST /recommendations - Negative Cases should return 400 for missing userId" name="End-to-End Recommendation API POST /recommendations - Negative Cases should return 400 for missing userId" time="0.023">
-    </testcase>
-    <testcase classname="End-to-End Recommendation API POST /recommendations - Negative Cases should return 400 for missing input object" name="End-to-End Recommendation API POST /recommendations - Negative Cases should return 400 for missing input object" time="0.006">
-    </testcase>
-    <testcase classname="End-to-End Recommendation API POST /recommendations - Negative Cases should return 404 when no recommendations are found (simulated)" name="End-to-End Recommendation API POST /recommendations - Negative Cases should return 404 when no recommendations are found (simulated)" time="0.007">
-    </testcase>
-    <testcase classname="End-to-End Recommendation API POST /recommendations - Negative Cases should return 400 when communication bus indicates an agent error" name="End-to-End Recommendation API POST /recommendations - Negative Cases should return 400 when communication bus indicates an agent error" time="0.005">
-    </testcase>
-    <testcase classname="End-to-End Recommendation API POST /recommendations - Negative Cases should return 500 on unexpected internal server error" name="End-to-End Recommendation API POST /recommendations - Negative Cases should return 500 on unexpected internal server error" time="0.013">
+    <testcase classname="InMemoryDeadLetterQueue should clear the queue" name="InMemoryDeadLetterQueue should clear the queue" time="0.002">
     </testcase>
   </testsuite>
-  <testsuite name="LLMRecommendationAgent" errors="0" failures="0" skipped="0" timestamp="2025-07-06T07:47:00" time="3.317" tests="10">
-    <testcase classname="LLMRecommendationAgent should initialize correctly" name="LLMRecommendationAgent should initialize correctly" time="0.004">
+  <testsuite name="BasicDeadLetterProcessor" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:51" time="0.117" tests="2">
+    <testcase classname="BasicDeadLetterProcessor should call handlePermanentFailure if retry attempts are exhausted" name="BasicDeadLetterProcessor should call handlePermanentFailure if retry attempts are exhausted" time="0.008">
     </testcase>
-    <testcase classname="LLMRecommendationAgent handleMessage should return an error for unhandled message types" name="LLMRecommendationAgent handleMessage should return an error for unhandled message types" time="0.004">
-    </testcase>
-    <testcase classname="LLMRecommendationAgent handleMessage should process a recommendation request successfully" name="LLMRecommendationAgent handleMessage should process a recommendation request successfully" time="0.005">
-    </testcase>
-    <testcase classname="LLMRecommendationAgent handleMessage should return an error if payload is missing" name="LLMRecommendationAgent handleMessage should return an error if payload is missing" time="0.002">
-    </testcase>
-    <testcase classname="LLMRecommendationAgent handleMessage should return an error if insufficient information for recommendation" name="LLMRecommendationAgent handleMessage should return an error if insufficient information for recommendation" time="0.001">
-    </testcase>
-    <testcase classname="LLMRecommendationAgent handleMessage should handle simulated LLM error" name="LLMRecommendationAgent handleMessage should handle simulated LLM error" time="0.002">
-    </testcase>
-    <testcase classname="LLMRecommendationAgent handleMessage should handle LLM service failure" name="LLMRecommendationAgent handleMessage should handle LLM service failure" time="0.002">
-    </testcase>
-    <testcase classname="LLMRecommendationAgent handleMessage should handle general exceptions during processing" name="LLMRecommendationAgent handleMessage should handle general exceptions during processing" time="0.002">
-    </testcase>
-    <testcase classname="LLMRecommendationAgent handleMessage should handle LLM response with malformed JSON" name="LLMRecommendationAgent handleMessage should handle LLM response with malformed JSON" time="0.003">
-    </testcase>
-    <testcase classname="LLMRecommendationAgent handleMessage should handle LLM response with valid JSON but incorrect RecommendationResult structure" name="LLMRecommendationAgent handleMessage should handle LLM response with valid JSON but incorrect RecommendationResult structure" time="0.002">
+    <testcase classname="BasicDeadLetterProcessor should add the failed message to the in-memory DLQ on permanent failure" name="BasicDeadLetterProcessor should add the failed message to the in-memory DLQ on permanent failure" time="0.004">
     </testcase>
   </testsuite>
-  <testsuite name="RecommendationAgent" errors="0" failures="0" skipped="0" timestamp="2025-07-06T07:46:53" time="10.633" tests="14">
-    <testcase classname="RecommendationAgent should initialize correctly" name="RecommendationAgent should initialize correctly" time="0.007">
+  <testsuite name="RecommendationRequest DTO" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:51" time="0.091" tests="5">
+    <testcase classname="RecommendationRequest DTO should validate a request with conversation history" name="RecommendationRequest DTO should validate a request with conversation history" time="0.001">
     </testcase>
-    <testcase classname="RecommendationAgent handleMessage should return an error for unhandled message types" name="RecommendationAgent handleMessage should return an error for unhandled message types" time="0.003">
+    <testcase classname="RecommendationRequest DTO should validate a request without conversation history" name="RecommendationRequest DTO should validate a request without conversation history" time="0">
     </testcase>
-    <testcase classname="RecommendationAgent handleRecommendationRequest should return an error if payload input is missing" name="RecommendationAgent handleRecommendationRequest should return an error if payload input is missing" time="0.002">
+    <testcase classname="RecommendationRequest DTO should reject a request with invalid conversation history format" name="RecommendationRequest DTO should reject a request with invalid conversation history format" time="0.002">
     </testcase>
-    <testcase classname="RecommendationAgent handleRecommendationRequest should process an ingredient-based recommendation request successfully" name="RecommendationAgent handleRecommendationRequest should process an ingredient-based recommendation request successfully" time="0.003">
+    <testcase classname="RecommendationRequest DTO should reject a request with invalid role in conversation history" name="RecommendationRequest DTO should reject a request with invalid role in conversation history" time="0">
     </testcase>
-    <testcase classname="RecommendationAgent handleRecommendationRequest should process a preference-based recommendation request successfully" name="RecommendationAgent handleRecommendationRequest should process a preference-based recommendation request successfully" time="0.004">
-    </testcase>
-    <testcase classname="RecommendationAgent handleRecommendationRequest should handle no wines found and send appropriate response" name="RecommendationAgent handleRecommendationRequest should handle no wines found and send appropriate response" time="0.002">
-    </testcase>
-    <testcase classname="RecommendationAgent handleRecommendationRequest should handle general exceptions during processing" name="RecommendationAgent handleRecommendationRequest should handle general exceptions during processing" time="0.001">
-    </testcase>
-    <testcase classname="RecommendationAgent handlePreferenceUpdate should log debug message for successful preference update" name="RecommendationAgent handlePreferenceUpdate should log debug message for successful preference update" time="0.001">
-    </testcase>
-    <testcase classname="RecommendationAgent handlePreferenceUpdate should return error for failed preference update" name="RecommendationAgent handlePreferenceUpdate should return error for failed preference update" time="0.001">
-    </testcase>
-    <testcase classname="RecommendationAgent enhanceKnowledgeGraphResults should enhance recommendations with LLM response" name="RecommendationAgent enhanceKnowledgeGraphResults should enhance recommendations with LLM response" time="0.002">
-    </testcase>
-    <testcase classname="RecommendationAgent enhanceKnowledgeGraphResults should return original recommendations if LLM service fails" name="RecommendationAgent enhanceKnowledgeGraphResults should return original recommendations if LLM service fails" time="0.001">
-    </testcase>
-    <testcase classname="RecommendationAgent enhanceKnowledgeGraphResults should return original recommendations if LLM response format is invalid" name="RecommendationAgent enhanceKnowledgeGraphResults should return original recommendations if LLM response format is invalid" time="0.001">
-    </testcase>
-    <testcase classname="RecommendationAgent enhanceKnowledgeGraphResults should return original recommendations for general exceptions" name="RecommendationAgent enhanceKnowledgeGraphResults should return original recommendations for general exceptions" time="0">
-    </testcase>
-    <testcase classname="RecommendationAgent handleNoRecommendations should send a recommendation-response with no wines and an error message" name="RecommendationAgent handleNoRecommendations should send a recommendation-response with no wines and an error message" time="0.001">
+    <testcase classname="RecommendationRequest DTO should reject a request with missing content in conversation history turn" name="RecommendationRequest DTO should reject a request with missing content in conversation history turn" time="0.001">
     </testcase>
   </testsuite>
-  <testsuite name="AgentRegistry Integration" errors="0" failures="0" skipped="0" timestamp="2025-07-06T07:46:53" time="10.717" tests="2">
-    <testcase classname="AgentRegistry Integration should register all agents with their capabilities" name="AgentRegistry Integration should register all agents with their capabilities" time="0.041">
-    </testcase>
-    <testcase classname="AgentRegistry Integration should retrieve agents by name with correct capabilities" name="AgentRegistry Integration should retrieve agents by name with correct capabilities" time="0.004">
+  <testsuite name="undefined" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:51" time="0.09" tests="1">
+    <testcase classname=" should return 400 for invalid body" name=" should return 400 for invalid body" time="0.006">
     </testcase>
   </testsuite>
-  <testsuite name="Agent Capabilities" errors="0" failures="0" skipped="0" timestamp="2025-07-06T07:46:53" time="10.755" tests="8">
-    <testcase classname="Agent Capabilities should return correct capabilities for InputValidationAgent" name="Agent Capabilities should return correct capabilities for InputValidationAgent" time="0.005">
+  <testsuite name="Admin Conversational Flow Integration Tests" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:51" time="0.081" tests="4">
+    <testcase classname="Admin Conversational Flow Integration Tests POST /admin-commands should return 200 with agent response on successful command execution" name="Admin Conversational Flow Integration Tests POST /admin-commands should return 200 with agent response on successful command execution" time="0.002">
     </testcase>
-    <testcase classname="Agent Capabilities should return correct capabilities for LLMRecommendationAgent" name="Agent Capabilities should return correct capabilities for LLMRecommendationAgent" time="0.01">
+    <testcase classname="Admin Conversational Flow Integration Tests POST /admin-commands should return 400 if communication bus returns a failure result" name="Admin Conversational Flow Integration Tests POST /admin-commands should return 400 if communication bus returns a failure result" time="0.001">
     </testcase>
-    <testcase classname="Agent Capabilities should return correct capabilities for MCPAdapterAgent" name="Agent Capabilities should return correct capabilities for MCPAdapterAgent" time="0.001">
+    <testcase classname="Admin Conversational Flow Integration Tests POST /admin-commands should return 404 if agent response payload is null" name="Admin Conversational Flow Integration Tests POST /admin-commands should return 404 if agent response payload is null" time="0.001">
     </testcase>
-    <testcase classname="Agent Capabilities should return correct capabilities for ValueAnalysisAgent" name="Agent Capabilities should return correct capabilities for ValueAnalysisAgent" time="0.001">
-    </testcase>
-    <testcase classname="Agent Capabilities should return correct capabilities for UserPreferenceAgent" name="Agent Capabilities should return correct capabilities for UserPreferenceAgent" time="0.001">
-    </testcase>
-    <testcase classname="Agent Capabilities should return correct capabilities for ExplanationAgent" name="Agent Capabilities should return correct capabilities for ExplanationAgent" time="0.001">
-    </testcase>
-    <testcase classname="Agent Capabilities should return correct capabilities for FallbackAgent" name="Agent Capabilities should return correct capabilities for FallbackAgent" time="0.001">
-    </testcase>
-    <testcase classname="Agent Capabilities AgentRegistry Integration should register all agents with their capabilities" name="Agent Capabilities AgentRegistry Integration should register all agents with their capabilities" time="0.005">
+    <testcase classname="Admin Conversational Flow Integration Tests POST /admin-commands should return 500 if an unexpected error occurs" name="Admin Conversational Flow Integration Tests POST /admin-commands should return 500 if an unexpected error occurs" time="0.001">
     </testcase>
   </testsuite>
-  <testsuite name="RecommendationRoutes" errors="0" failures="0" skipped="0" timestamp="2025-07-06T07:47:00" time="3.662" tests="9">
-    <testcase classname="RecommendationRoutes POST /recommendations should return 200 with recommendations when communication bus returns success" name="RecommendationRoutes POST /recommendations should return 200 with recommendations when communication bus returns success" time="0.029">
+  <testsuite name="ConversationHistoryService" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:51" time="0.09" tests="5">
+    <testcase classname="ConversationHistoryService should add a conversation turn to history" name="ConversationHistoryService should add a conversation turn to history" time="0.001">
     </testcase>
-    <testcase classname="RecommendationRoutes POST /recommendations should return 400 when communication bus returns an error" name="RecommendationRoutes POST /recommendations should return 400 when communication bus returns an error" time="0.005">
+    <testcase classname="ConversationHistoryService should retrieve conversation history for a user" name="ConversationHistoryService should retrieve conversation history for a user" time="0">
     </testcase>
-    <testcase classname="RecommendationRoutes POST /recommendations should return 404 when communication bus returns null data" name="RecommendationRoutes POST /recommendations should return 404 when communication bus returns null data" time="0.004">
+    <testcase classname="ConversationHistoryService should return an empty array for a user with no history" name="ConversationHistoryService should return an empty array for a user with no history" time="0">
     </testcase>
-    <testcase classname="RecommendationRoutes POST /recommendations should return 500 on unexpected errors" name="RecommendationRoutes POST /recommendations should return 500 on unexpected errors" time="0.011">
+    <testcase classname="ConversationHistoryService should clear conversation history for a user" name="ConversationHistoryService should clear conversation history for a user" time="0">
     </testcase>
-    <testcase classname="RecommendationRoutes POST /recommendations should return 400 for invalid input (e.g., missing userId)" name="RecommendationRoutes POST /recommendations should return 400 for invalid input (e.g., missing userId)" time="0.011">
-    </testcase>
-    <testcase classname="RecommendationRoutes POST /recommendations should return 400 for an empty request body" name="RecommendationRoutes POST /recommendations should return 400 for an empty request body" time="0.023">
-    </testcase>
-    <testcase classname="RecommendationRoutes POST /recommendations should return 200 with recommendations for food pairing input" name="RecommendationRoutes POST /recommendations should return 200 with recommendations for food pairing input" time="0.018">
-    </testcase>
-    <testcase classname="RecommendationRoutes POST /recommendations should return 200 with recommendations for ingredients input" name="RecommendationRoutes POST /recommendations should return 200 with recommendations for ingredients input" time="0.013">
-    </testcase>
-    <testcase classname="RecommendationRoutes POST /recommendations should return 200 with recommendations for conversation history input" name="RecommendationRoutes POST /recommendations should return 200 with recommendations for conversation history input" time="0.011">
+    <testcase classname="ConversationHistoryService should handle multiple users with separate histories" name="ConversationHistoryService should handle multiple users with separate histories" time="0.001">
     </testcase>
   </testsuite>
-  <testsuite name="API Validation" errors="0" failures="0" skipped="0" timestamp="2025-07-06T07:46:59" time="4.44" tests="7">
-    <testcase classname="API Validation POST /recommendations should reject empty request" name="API Validation POST /recommendations should reject empty request" time="0.038">
+  <testsuite name="SharedContextMemory" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:51" time="0.082" tests="4">
+    <testcase classname="SharedContextMemory should store and retrieve context" name="SharedContextMemory should store and retrieve context" time="0.001">
     </testcase>
-    <testcase classname="API Validation POST /recommendations should reject invalid preferences format" name="API Validation POST /recommendations should reject invalid preferences format" time="0.006">
+    <testcase classname="SharedContextMemory should maintain separate contexts per owner" name="SharedContextMemory should maintain separate contexts per owner" time="0">
     </testcase>
-    <testcase classname="API Validation POST /recommendations should handle missing preferences gracefully" name="API Validation POST /recommendations should handle missing preferences gracefully" time="0.004">
+    <testcase classname="SharedContextMemory should track version history" name="SharedContextMemory should track version history" time="0.001">
     </testcase>
-    <testcase classname="API Validation POST /recommendations should accept valid request" name="API Validation POST /recommendations should accept valid request" time="0.011">
-    </testcase>
-    <testcase classname="API Validation GET /search should accept valid search query with string number parameters" name="API Validation GET /search should accept valid search query with string number parameters" time="0.01">
-    </testcase>
-    <testcase classname="API Validation GET /search should require query parameter" name="API Validation GET /search should require query parameter" time="0.008">
-    </testcase>
-    <testcase classname="API Validation GET /search should accept valid search" name="API Validation GET /search should accept valid search" time="0.006">
+    <testcase classname="SharedContextMemory should handle metadata" name="SharedContextMemory should handle metadata" time="0">
     </testcase>
   </testsuite>
-  <testsuite name="Recommendations API" errors="0" failures="0" skipped="0" timestamp="2025-07-06T07:46:53" time="10.873" tests="5">
-    <testcase classname="Recommendations API should return recommendation for valid input" name="Recommendations API should return recommendation for valid input" time="0.063">
+  <testsuite name="BaseController" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:51" time="0.085" tests="8">
+    <testcase classname="BaseController ok should send 200 status with data when provided" name="BaseController ok should send 200 status with data when provided" time="0.001">
     </testcase>
-    <testcase classname="Recommendations API should return 400 if communicationBus.sendMessageAndWaitForResponse returns failure" name="Recommendations API should return 400 if communicationBus.sendMessageAndWaitForResponse returns failure" time="0.008">
+    <testcase classname="BaseController ok should send 200 status without data when not provided" name="BaseController ok should send 200 status without data when not provided" time="0">
     </testcase>
-    <testcase classname="Recommendations API should return 404 if communicationBus.sendMessageAndWaitForResponse returns null data" name="Recommendations API should return 404 if communicationBus.sendMessageAndWaitForResponse returns null data" time="0.013">
+    <testcase classname="BaseController error responses clientError should return 400" name="BaseController error responses clientError should return 400" time="0">
     </testcase>
-    <testcase classname="Recommendations API should return 500 for unexpected errors" name="Recommendations API should return 500 for unexpected errors" time="0.006">
+    <testcase classname="BaseController error responses forbidden should return 403" name="BaseController error responses forbidden should return 403" time="0.001">
     </testcase>
-    <testcase classname="Recommendations API should return 400 for invalid input" name="Recommendations API should return 400 for invalid input" time="0.006">
+    <testcase classname="BaseController error responses notFound should return 404" name="BaseController error responses notFound should return 404" time="0">
+    </testcase>
+    <testcase classname="BaseController error responses conflict should return 409" name="BaseController error responses conflict should return 409" time="0">
+    </testcase>
+    <testcase classname="BaseController error responses fail should return 500" name="BaseController error responses fail should return 500" time="0.001">
+    </testcase>
+    <testcase classname="BaseController execute should call executeImpl" name="BaseController execute should call executeImpl" time="0">
     </testcase>
   </testsuite>
-  <testsuite name="PreferenceExtractionService" errors="0" failures="0" skipped="0" timestamp="2025-07-06T07:47:01" time="3.247" tests="9">
-    <testcase classname="PreferenceExtractionService should prioritize Duckling results over Regex results for the same preference type" name="PreferenceExtractionService should prioritize Duckling results over Regex results for the same preference type" time="0.002">
+  <testsuite name="LoggingDeadLetterHandler" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:51" time="0.068" tests="1">
+    <testcase classname="LoggingDeadLetterHandler should log the failed message, error, and metadata" name="LoggingDeadLetterHandler should log the failed message, error, and metadata" time="0.001">
+    </testcase>
+  </testsuite>
+  <testsuite name="PreferenceExtractionService" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:51" time="0.119" tests="9">
+    <testcase classname="PreferenceExtractionService should prioritize Duckling results over Regex results for the same preference type" name="PreferenceExtractionService should prioritize Duckling results over Regex results for the same preference type" time="0.004">
     </testcase>
     <testcase classname="PreferenceExtractionService should merge results from both Regex and Duckling if keys are different" name="PreferenceExtractionService should merge results from both Regex and Duckling if keys are different" time="0.001">
     </testcase>
     <testcase classname="PreferenceExtractionService should return null if neither Regex nor Duckling find preferences" name="PreferenceExtractionService should return null if neither Regex nor Duckling find preferences" time="0.001">
     </testcase>
-    <testcase classname="PreferenceExtractionService should handle multiple Duckling entities and merge with Regex" name="PreferenceExtractionService should handle multiple Duckling entities and merge with Regex" time="0">
+    <testcase classname="PreferenceExtractionService should handle multiple Duckling entities and merge with Regex" name="PreferenceExtractionService should handle multiple Duckling entities and merge with Regex" time="0.001">
     </testcase>
-    <testcase classname="PreferenceExtractionService should handle overlapping preferences from Duckling and Regex, prioritizing Duckling" name="PreferenceExtractionService should handle overlapping preferences from Duckling and Regex, prioritizing Duckling" time="0.006">
+    <testcase classname="PreferenceExtractionService should handle overlapping preferences from Duckling and Regex, prioritizing Duckling" name="PreferenceExtractionService should handle overlapping preferences from Duckling and Regex, prioritizing Duckling" time="0">
     </testcase>
-    <testcase classname="PreferenceExtractionService Error Handling should handle Duckling API failure gracefully" name="PreferenceExtractionService Error Handling should handle Duckling API failure gracefully" time="0">
+    <testcase classname="PreferenceExtractionService Error Handling should handle Duckling API failure gracefully" name="PreferenceExtractionService Error Handling should handle Duckling API failure gracefully" time="0.001">
     </testcase>
     <testcase classname="PreferenceExtractionService Error Handling should handle empty input" name="PreferenceExtractionService Error Handling should handle empty input" time="0.001">
     </testcase>
-    <testcase classname="PreferenceExtractionService Direct Method Tests extractWithEnhancedRegex should handle all wine types" name="PreferenceExtractionService Direct Method Tests extractWithEnhancedRegex should handle all wine types" time="0.001">
+    <testcase classname="PreferenceExtractionService Direct Method Tests extractWithEnhancedRegex should handle all wine types" name="PreferenceExtractionService Direct Method Tests extractWithEnhancedRegex should handle all wine types" time="0">
     </testcase>
-    <testcase classname="PreferenceExtractionService Direct Method Tests extractWithDuckling should handle price ranges" name="PreferenceExtractionService Direct Method Tests extractWithDuckling should handle price ranges" time="0">
+    <testcase classname="PreferenceExtractionService Direct Method Tests extractWithDuckling should handle price ranges" name="PreferenceExtractionService Direct Method Tests extractWithDuckling should handle price ranges" time="0.001">
     </testcase>
   </testsuite>
-  <testsuite name="LLMPreferenceExtractorAgent" errors="0" failures="0" skipped="0" timestamp="2025-07-06T07:46:53" time="10.978" tests="10">
-    <testcase classname="LLMPreferenceExtractorAgent should initialize correctly" name="LLMPreferenceExtractorAgent should initialize correctly" time="0.008">
+  <testsuite name="UserProfileService" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:51" time="0.451" tests="5">
+    <testcase classname="UserProfileService getPreferences should retrieve user preferences from KnowledgeGraphService and map them correctly" name="UserProfileService getPreferences should retrieve user preferences from KnowledgeGraphService and map them correctly" time="0.001">
     </testcase>
-    <testcase classname="LLMPreferenceExtractorAgent handleMessage should return an error for unhandled message types" name="LLMPreferenceExtractorAgent handleMessage should return an error for unhandled message types" time="0.002">
+    <testcase classname="UserProfileService getPreferences should return an empty object if no preferences are found" name="UserProfileService getPreferences should return an empty object if no preferences are found" time="0.001">
     </testcase>
-    <testcase classname="LLMPreferenceExtractorAgent handleExtractionRequest should return an error if payload is missing" name="LLMPreferenceExtractorAgent handleExtractionRequest should return an error if payload is missing" time="0.002">
+    <testcase classname="UserProfileService getPreferences should handle preferences with unknown types gracefully" name="UserProfileService getPreferences should handle preferences with unknown types gracefully" time="0">
+    </testcase>
+    <testcase classname="UserProfileService savePreferences should save user preferences to KnowledgeGraphService" name="UserProfileService savePreferences should save user preferences to KnowledgeGraphService" time="0.002">
+    </testcase>
+    <testcase classname="UserProfileService savePreferences should handle empty preferences object" name="UserProfileService savePreferences should handle empty preferences object" time="0">
+    </testcase>
+  </testsuite>
+  <testsuite name="WineRecommendationController" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:51" time="0.154" tests="5">
+    <testcase classname="WineRecommendationController executeImpl - POST /wine-recommendations should return recommendations successfully" name="WineRecommendationController executeImpl - POST /wine-recommendations should return recommendations successfully" time="0.011">
+    </testcase>
+    <testcase classname="WineRecommendationController executeImpl - POST /wine-recommendations should handle service errors" name="WineRecommendationController executeImpl - POST /wine-recommendations should handle service errors" time="0.005">
+    </testcase>
+    <testcase classname="WineRecommendationController executeImpl - GET /wine-recommendations should return search results successfully" name="WineRecommendationController executeImpl - GET /wine-recommendations should return search results successfully" time="0.001">
+    </testcase>
+    <testcase classname="WineRecommendationController executeImpl - GET /wine-recommendations should handle search service errors" name="WineRecommendationController executeImpl - GET /wine-recommendations should handle search service errors" time="0.009">
+    </testcase>
+    <testcase classname="WineRecommendationController should return 405 for unsupported HTTP method" name="WineRecommendationController should return 405 for unsupported HTTP method" time="0.001">
+    </testcase>
+  </testsuite>
+  <testsuite name="LLMPreferenceExtractorAgent" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:45" time="6.552" tests="10">
+    <testcase classname="LLMPreferenceExtractorAgent should initialize correctly" name="LLMPreferenceExtractorAgent should initialize correctly" time="0.009">
+    </testcase>
+    <testcase classname="LLMPreferenceExtractorAgent handleMessage should return an error for unhandled message types" name="LLMPreferenceExtractorAgent handleMessage should return an error for unhandled message types" time="0.003">
+    </testcase>
+    <testcase classname="LLMPreferenceExtractorAgent handleExtractionRequest should return an error if payload is missing" name="LLMPreferenceExtractorAgent handleExtractionRequest should return an error if payload is missing" time="0.001">
     </testcase>
     <testcase classname="LLMPreferenceExtractorAgent handleExtractionRequest should process a preference extraction request successfully" name="LLMPreferenceExtractorAgent handleExtractionRequest should process a preference extraction request successfully" time="0.002">
     </testcase>
-    <testcase classname="LLMPreferenceExtractorAgent handleExtractionRequest should handle LLM service failure" name="LLMPreferenceExtractorAgent handleExtractionRequest should handle LLM service failure" time="0.303">
+    <testcase classname="LLMPreferenceExtractorAgent handleExtractionRequest should handle LLM service failure" name="LLMPreferenceExtractorAgent handleExtractionRequest should handle LLM service failure" time="0.306">
     </testcase>
-    <testcase classname="LLMPreferenceExtractorAgent calculateConfidenceScore should return a base score for empty result" name="LLMPreferenceExtractorAgent calculateConfidenceScore should return a base score for empty result" time="0.001">
+    <testcase classname="LLMPreferenceExtractorAgent calculateConfidenceScore should return a base score for empty result" name="LLMPreferenceExtractorAgent calculateConfidenceScore should return a base score for empty result" time="0.005">
     </testcase>
-    <testcase classname="LLMPreferenceExtractorAgent calculateConfidenceScore should increase score for isValid true" name="LLMPreferenceExtractorAgent calculateConfidenceScore should increase score for isValid true" time="0">
+    <testcase classname="LLMPreferenceExtractorAgent calculateConfidenceScore should increase score for isValid true" name="LLMPreferenceExtractorAgent calculateConfidenceScore should increase score for isValid true" time="0.001">
     </testcase>
-    <testcase classname="LLMPreferenceExtractorAgent calculateConfidenceScore should increase score for preferences" name="LLMPreferenceExtractorAgent calculateConfidenceScore should increase score for preferences" time="0">
+    <testcase classname="LLMPreferenceExtractorAgent calculateConfidenceScore should increase score for preferences" name="LLMPreferenceExtractorAgent calculateConfidenceScore should increase score for preferences" time="0.001">
     </testcase>
-    <testcase classname="LLMPreferenceExtractorAgent calculateConfidenceScore should increase score for ingredients" name="LLMPreferenceExtractorAgent calculateConfidenceScore should increase score for ingredients" time="0.001">
+    <testcase classname="LLMPreferenceExtractorAgent calculateConfidenceScore should increase score for ingredients" name="LLMPreferenceExtractorAgent calculateConfidenceScore should increase score for ingredients" time="0">
     </testcase>
-    <testcase classname="LLMPreferenceExtractorAgent calculateConfidenceScore should return max score for all valid fields" name="LLMPreferenceExtractorAgent calculateConfidenceScore should return max score for all valid fields" time="0">
+    <testcase classname="LLMPreferenceExtractorAgent calculateConfidenceScore should return max score for all valid fields" name="LLMPreferenceExtractorAgent calculateConfidenceScore should return max score for all valid fields" time="0.001">
+    </testcase>
+  </testsuite>
+  <testsuite name="E2E Admin User Preference API" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:45" time="6.678" tests="1">
+    <testcase classname="E2E Admin User Preference API Admin User Preference Management E2E should allow an admin to add, retrieve, update, and delete user preferences" name="E2E Admin User Preference API Admin User Preference Management E2E should allow an admin to add, retrieve, update, and delete user preferences" time="0.319">
+    </testcase>
+  </testsuite>
+  <testsuite name="RetryManager" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:45" time="6.907" tests="6">
+    <testcase classname="RetryManager with ExponentialBackoffPolicy should retry with exponential backoff" name="RetryManager with ExponentialBackoffPolicy should retry with exponential backoff" time="0.11">
+    </testcase>
+    <testcase classname="RetryManager with ExponentialBackoffPolicy should give up after max attempts" name="RetryManager with ExponentialBackoffPolicy should give up after max attempts" time="0.716">
+    </testcase>
+    <testcase classname="RetryManager with ExponentialBackoffPolicy should respect circuit breaker open state" name="RetryManager with ExponentialBackoffPolicy should respect circuit breaker open state" time="0.704">
+    </testcase>
+    <testcase classname="RetryManager with ExponentialBackoffPolicy should handle half-open state correctly" name="RetryManager with ExponentialBackoffPolicy should handle half-open state correctly" time="0">
+    </testcase>
+    <testcase classname="RetryManager with FixedDelayPolicy should retry with fixed delay" name="RetryManager with FixedDelayPolicy should retry with fixed delay" time="0.201">
+    </testcase>
+    <testcase classname="RetryManager policy evaluation should use the maximum delay from all policies" name="RetryManager policy evaluation should use the maximum delay from all policies" time="0.201">
+    </testcase>
+  </testsuite>
+  <testsuite name="RetryManager" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:45" time="7.126" tests="10">
+    <testcase classname="RetryManager with ExponentialBackoffPolicy should retry with exponential backoff" name="RetryManager with ExponentialBackoffPolicy should retry with exponential backoff" time="0.113">
+    </testcase>
+    <testcase classname="RetryManager with ExponentialBackoffPolicy should give up after max attempts" name="RetryManager with ExponentialBackoffPolicy should give up after max attempts" time="0.714">
+    </testcase>
+    <testcase classname="RetryManager with ExponentialBackoffPolicy should respect circuit breaker open state" name="RetryManager with ExponentialBackoffPolicy should respect circuit breaker open state" time="0.703">
+    </testcase>
+    <testcase classname="RetryManager with ExponentialBackoffPolicy should handle half-open state correctly" name="RetryManager with ExponentialBackoffPolicy should handle half-open state correctly" time="0">
+    </testcase>
+    <testcase classname="RetryManager with FixedDelayPolicy should retry with fixed delay" name="RetryManager with FixedDelayPolicy should retry with fixed delay" time="0.201">
+    </testcase>
+    <testcase classname="RetryManager policy evaluation should use the maximum delay from all policies" name="RetryManager policy evaluation should use the maximum delay from all policies" time="0.201">
+    </testcase>
+    <testcase classname="DeadLetterProcessor should retry failed handler executions" name="DeadLetterProcessor should retry failed handler executions" time="0">
+    </testcase>
+    <testcase classname="DeadLetterProcessor should trigger permanent failure handler when retries exhausted" name="DeadLetterProcessor should trigger permanent failure handler when retries exhausted" time="0.002">
+    </testcase>
+    <testcase classname="DeadLetterProcessor should call all handlers with the same message" name="DeadLetterProcessor should call all handlers with the same message" time="0.001">
+    </testcase>
+    <testcase classname="DeadLetterProcessor should include metadata in handler calls" name="DeadLetterProcessor should include metadata in handler calls" time="0">
+    </testcase>
+  </testsuite>
+  <testsuite name="AdminConversationalAgent" errors="0" failures="0" skipped="0" timestamp="2025-07-12T06:27:51" time="2.349" tests="13">
+    <testcase classname="AdminConversationalAgent should return agent name" name="AdminConversationalAgent should return agent name" time="0.001">
+    </testcase>
+    <testcase classname="AdminConversationalAgent should return FEATURE_DISABLED error if feature flag is disabled" name="AdminConversationalAgent should return FEATURE_DISABLED error if feature flag is disabled" time="0.001">
+    </testcase>
+    <testcase classname="AdminConversationalAgent should extract and process &quot;view&quot; command successfully" name="AdminConversationalAgent should extract and process &quot;view&quot; command successfully" time="0.001">
+    </testcase>
+    <testcase classname="AdminConversationalAgent should extract and process &quot;add&quot; command successfully" name="AdminConversationalAgent should extract and process &quot;add&quot; command successfully" time="0.001">
+    </testcase>
+    <testcase classname="AdminConversationalAgent should extract and process &quot;update&quot; command successfully" name="AdminConversationalAgent should extract and process &quot;update&quot; command successfully" time="0">
+    </testcase>
+    <testcase classname="AdminConversationalAgent should extract and process &quot;delete&quot; command by type and value successfully" name="AdminConversationalAgent should extract and process &quot;delete&quot; command by type and value successfully" time="0.001">
+    </testcase>
+    <testcase classname="AdminConversationalAgent should extract and process &quot;delete&quot; command by preferenceId successfully" name="AdminConversationalAgent should extract and process &quot;delete&quot; command by preferenceId successfully" time="0.001">
+    </testcase>
+    <testcase classname="AdminConversationalAgent should extract and process &quot;delete all&quot; command successfully" name="AdminConversationalAgent should extract and process &quot;delete all&quot; command successfully" time="0">
+    </testcase>
+    <testcase classname="AdminConversationalAgent should return LLM_EXTRACTION_FAILED error if LLM extraction fails" name="AdminConversationalAgent should return LLM_EXTRACTION_FAILED error if LLM extraction fails" time="0.008">
+    </testcase>
+    <testcase classname="AdminConversationalAgent should return UNSUPPORTED_ADMIN_ACTION error for unsupported action" name="AdminConversationalAgent should return UNSUPPORTED_ADMIN_ACTION error for unsupported action" time="0.001">
+    </testcase>
+    <testcase classname="AdminConversationalAgent should return MISSING_PREFERENCE_DATA error for add/update with missing data" name="AdminConversationalAgent should return MISSING_PREFERENCE_DATA error for add/update with missing data" time="0.003">
+    </testcase>
+    <testcase classname="AdminConversationalAgent should return ADMIN_AGENT_ERROR for unhandled message type" name="AdminConversationalAgent should return ADMIN_AGENT_ERROR for unhandled message type" time="0">
+    </testcase>
+    <testcase classname="AdminConversationalAgent should return ADMIN_AGENT_ERROR for general internal errors" name="AdminConversationalAgent should return ADMIN_AGENT_ERROR for general internal errors" time="0.011">
     </testcase>
   </testsuite>
 </testsuites>

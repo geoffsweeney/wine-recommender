@@ -77,7 +77,7 @@ describe('Agent Message Handlers', () => {
 
       const testMessage = createAgentMessage(
         'validate-input',
-        { userInput: 'red wine, 20-50', recommendationSource: 'test' },
+        { userInput: { message: 'red wine, 20-50', recommendationSource: 'test' } },
         'test-sender',
         'test-conversation-id',
         'test-trace',
@@ -104,7 +104,7 @@ describe('Agent Message Handlers', () => {
 
       const testMessage = createAgentMessage(
         'validate-input',
-        { userInput: 'invalid wine type, price 0-0', recommendationSource: 'test' },
+        { userInput: { message: 'invalid wine type, price 0-0', recommendationSource: 'test' } },
         'test-sender',
         'test-conversation-id',
         'test-trace',
@@ -127,7 +127,7 @@ describe('Agent Message Handlers', () => {
 
       const testMessage = createAgentMessage(
         'validate-input',
-        { userInput: "red wine", recommendationSource: 'test' },
+        { userInput: { message: "red wine", recommendationSource: 'test' } },
         'test-sender',
         'test-conversation-id',
         'test-trace',
@@ -161,8 +161,7 @@ describe('Agent Message Handlers', () => {
       const testMessage = createAgentMessage(
         'validate-input',
         {
-          userInput: 'red wine, 20-30, dry, full-bodied',
-          recommendationSource: 'test',
+          userInput: { message: 'red wine, 20-30, dry, full-bodied', recommendationSource: 'test' },
           preferences: { sweetness: 'dry', body: 'full' }
         },
         'test-sender',

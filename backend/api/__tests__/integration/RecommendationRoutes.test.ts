@@ -6,6 +6,7 @@ import { AgentMessage, MessageTypes } from '../../../core/agents/communication/A
 import { EnhancedAgentCommunicationBus } from '../../../core/agents/communication/EnhancedAgentCommunicationBus';
 import { SommelierCoordinator } from '../../../core/agents/SommelierCoordinator'; // Import SommelierCoordinator
 import { TYPES } from '../../../di/Types';
+import { AdminCommandController } from '../../controllers/AdminCommandController'; // Import AdminCommandController
 import createRouter from '../../routes'; // Import createRouter function
 
 describe('RecommendationRoutes', () => {
@@ -29,7 +30,8 @@ describe('RecommendationRoutes', () => {
 
     app = express();
     app.use(express.json());
-    app.use(createRouter(container)); // Call createRouter to get the router instance
+    const mockAdminCommandController = mock<AdminCommandController>(); // Create a proper mock AdminCommandController
+    app.use(createRouter(container, mockAdminCommandController)); // Pass the AdminCommandController
   });
 
   beforeEach(() => {

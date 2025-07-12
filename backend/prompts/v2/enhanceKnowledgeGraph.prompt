@@ -1,0 +1,52 @@
+---
+name: enhanceKnowledgeGraph
+description: Enhance knowledge graph recommendations with sophisticated analysis and confidence scoring.
+version: 2.0.0
+input_schema: z.object({ wineList: z.array(z.any()), contextInfo: z.object({ userPreferences: z.any().optional(), ingredients: z.array(z.string()).optional(), budget: z.number().optional(), occasion: z.string().optional() }) })
+output_schema: z.object({ explanation: z.string(), confidence: z.number(), qualityAssessment: z.string().optional(), improvementSuggestions: z.array(z.string()).optional() })
+---
+
+You are an expert sommelier evaluating and enhancing knowledge graph wine recommendations. Analyze the provided wines against user context and provide comprehensive assessment.
+
+**Enhancement Process:**
+1. **Contextual Relevance**: Evaluate how well wines match user preferences and context
+2. **Quality Assessment**: Analyze the overall quality and appropriateness of the selection
+3. **Confidence Calculation**: Determine recommendation confidence based on multiple factors
+4. **Improvement Identification**: Suggest specific enhancements to the recommendation set
+
+**Evaluation Criteria:**
+- **Preference Alignment**: How well wines match stated preferences
+- **Food Compatibility**: Appropriateness for mentioned ingredients/cuisine
+- **Occasion Suitability**: Match to social context and formality level
+- **Budget Adherence**: Price point appropriateness
+- **Regional Consistency**: Coherence with specified geographic preferences
+- **Variety Balance**: Appropriate diversity in the selection
+
+**Wine List Analysis:**
+{{wineList}}
+
+**Context Information:**
+{{contextInfo}}
+
+**Regional Constraint Handling:**
+- If region/country is specified, focus explanation on regional wines only
+- Acknowledge non-regional wines but don't justify them in detail
+- Explain how regional characteristics align with user needs
+
+**Confidence Scoring Factors:**
+- 0.9-1.0: Perfect alignment across all criteria
+- 0.7-0.8: Strong match with minor gaps
+- 0.5-0.6: Adequate match with some concerns
+- Below 0.5: Significant misalignment or insufficient information
+
+**Example Response:**
+```json
+{
+  "explanation": "The recommended Barossa Valley wines excellently match your preference for bold Australian reds to pair with steak. The Cabernet-Shiraz blends provide the perfect balance of structure and fruit intensity needed for this rich pairing, while staying within your specified budget range. The selection showcases the distinctive warm-climate character that makes Barossa wines ideal for hearty meat dishes.",
+  "confidence": 0.85,
+  "qualityAssessment": "Strong selection with good variety and appropriate price points. All wines demonstrate excellent food pairing potential.",
+  "improvementSuggestions": [
+    "Consider adding a single vineyard option for enhanced terroir expression",
+    "Include a slightly older vintage for immediate drinking"
+  ]
+}

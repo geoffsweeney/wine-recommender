@@ -36,6 +36,11 @@ import { RecommendationStrategyProvider } from '../services/strategies/Recommend
 import { UserPreferencesStrategy } from '../services/strategies/UserPreferencesStrategy'; // Import UserPreferencesStrategy
 import { UserProfileService } from '../services/UserProfileService';
 import { TYPES } from './Types';
+import { AdminPreferenceService } from '../services/AdminPreferenceService'; // Import AdminPreferenceService
+import { AdminConversationalAgent } from '../core/agents/AdminConversationalAgent'; // Import AdminConversationalAgent
+import { AdminConversationalAgentConfig } from '../core/agents/AdminConversationalAgent'; // Import AdminConversationalAgentConfig
+import { AdminCommandController } from '../api/controllers/AdminCommandController'; // Import AdminCommandController
+import { featureFlags } from '../config/featureFlags'; // Import featureFlags
 
 export function setupContainer() {
   // Environment configuration
@@ -120,6 +125,7 @@ export function setupContainer() {
   container.registerSingleton(TYPES.KnowledgeGraphService, KnowledgeGraphService);
   container.registerSingleton(TYPES.PreferenceExtractionService, PreferenceExtractionService);
   container.registerSingleton(TYPES.PreferenceNormalizationService, PreferenceNormalizationService);
+  container.registerSingleton(TYPES.AdminPreferenceService, AdminPreferenceService); // Register AdminPreferenceService
   
   // Define PromptManagerConfig
   const promptManagerConfig: PromptManagerConfig = {
@@ -238,6 +244,18 @@ export function setupContainer() {
   container.registerInstance(TYPES.ShopperAgentConfig, shopperAgentConfig);
   container.registerSingleton(TYPES.ShopperAgent, ShopperAgent);
 
+  // Define AdminConversationalAgentConfig
+  const adminConversationalAgentConfig: AdminConversationalAgentConfig = {
+    agentId: 'admin-conversational-agent',
+  };
+  container.registerInstance(TYPES.AdminConversationalAgentConfig, adminConversationalAgentConfig);
+  
+  // Register FeatureFlags
+  container.registerInstance(TYPES.FeatureFlags, featureFlags);
+
+  container.registerSingleton(TYPES.AdminConversationalAgent, AdminConversationalAgent);
+  container.registerSingleton(TYPES.AdminCommandController, AdminCommandController); // Register AdminCommandController
+ 
   // Register generic AgentId and AgentConfig
   container.registerInstance(TYPES.AgentId, 'default-agent-id');
   container.registerInstance(TYPES.AgentConfig, {}); // Empty object for generic config
@@ -304,6 +322,8 @@ export function setupContainer() {
   container.resolve(FallbackAgent);
   container.resolve(MCPAdapterAgent);
   container.resolve(ShopperAgent); // Resolve ShopperAgent
+  container.resolve(AdminConversationalAgent); // Resolve AdminConversationalAgent
+  container.resolve(AdminCommandController); // Resolve AdminCommandController
   container.resolve(SommelierCoordinator);
 
   // Initialize AgentRegistry after all agents are instantiated

@@ -1,21 +1,29 @@
-import { Request, Response, Router } from 'express';
+import { Response, Router } from 'express';
 import { DependencyContainer } from 'tsyringe'; // Added DependencyContainer
 import { v4 as uuidv4 } from 'uuid';
-import { SommelierCoordinator } from '../core/agents/SommelierCoordinator';
 import { createAgentMessage, MessageTypes } from '../core/agents/communication/AgentMessage';
 import { EnhancedAgentCommunicationBus } from '../core/agents/communication/EnhancedAgentCommunicationBus';
 import { TYPES } from '../di/Types';
-import { RecommendationRequest as RecommendationRequestSchema } from './dtos/RecommendationRequest.dto'; // Import the DTO schema
-import { validateRequest } from './middleware/validation'; // Import validation middleware
+import { AdminCommandController } from './controllers/AdminCommandController'; // Added
+import { AdminUserPreferenceController } from './controllers/AdminUserPreferenceController';
+import { AdminCommandRequestSchema } from './dtos/AdminCommandRequest.dto'; // Added
+import { DeletePreferenceQuerySchema } from './dtos/DeletePreferenceQuery.dto'; // Added
+import { RecommendationRequest } from './dtos/RecommendationRequest.dto'; // Added
+import { UserIdParamSchema } from './dtos/UserIdParam.dto'; // Added
+import { UserPreferencesUpdateSchema } from './dtos/UserPreferencesUpdate.dto'; // Added
+import { ValidatedRequest, validateRequest } from './middleware/validation'; // Added
 
 // Define a local interface to extend Request with validatedBody/Query
-interface ValidatedRequest extends Request {
-  validatedBody?: any;
-  validatedQuery?: any;
-}
+// interface ValidatedRequest extends Request { // Moved to validation.ts
+//   validatedBody?: any;
+//   validatedQuery?: any;
+// }
 
 // Export a function that returns the router, allowing dependencies to be resolved at call time
-export default function createRouter(dependencyContainer: DependencyContainer): Router {
+export default function createRouter(
+  dependencyContainer: DependencyContainer,
+  adminCommandController: AdminCommandController // Add AdminCommandController as an argument
+): Router {
   const router = Router();
 
   // Resolve dependencies inside the function, so they are resolved when the function is called
@@ -24,7 +32,7 @@ export default function createRouter(dependencyContainer: DependencyContainer): 
 
   router.post(
     '/recommendations',
-    validateRequest(RecommendationRequestSchema, 'body'), // Apply validation middleware
+    validateRequest(RecommendationRequest, 'body'), // Apply validation middleware
     async (req: ValidatedRequest, res: Response): Promise<void> => { // Cast req to ValidatedRequest
       try {
         const correlationId = uuidv4();
@@ -70,5 +78,21 @@ export default function createRouter(dependencyContainer: DependencyContainer): 
     }
   );
 
-  return router;
+  // Admin Command Route
+  // const adminCommandController = dependencyContainer.resolve<AdminCommandController>(TYPES.AdminCommandController); // Removed
+  router.post(
+    '/admin-commands',
+    validateRequest(AdminCommandRequestSchema, 'body'),
+    async (req: ValidatedRequest, res) => adminCommandController.execute(req, res) // Use the injected controller
+  );
+ 
+   // Admin User Preference Routes
+   const adminUserPreferenceController = dependencyContainer.resolve(AdminUserPreferenceController);
+  
+   router.get('/admin/preferences', (req, res) => adminUserPreferenceController.execute(req, res));
+   router.get('/admin/preferences/:userId', validateRequest(UserIdParamSchema, 'params'), (req, res) => adminUserPreferenceController.execute(req, res));
+   router.put('/admin/preferences/:userId', validateRequest(UserIdParamSchema, 'params'), validateRequest(UserPreferencesUpdateSchema, 'body'), (req, res) => adminUserPreferenceController.execute(req, res));
+   router.delete('/admin/preferences/:userId', validateRequest(UserIdParamSchema, 'params'), validateRequest(DeletePreferenceQuerySchema, 'query'), (req, res) => adminUserPreferenceController.execute(req, res));
+  
+    return router;
 }

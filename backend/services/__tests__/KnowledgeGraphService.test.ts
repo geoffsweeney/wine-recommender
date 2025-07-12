@@ -1,8 +1,8 @@
 import 'reflect-metadata';
-import { KnowledgeGraphService } from '../KnowledgeGraphService';
-import { Neo4jService } from '../Neo4jService';
-import { Neo4jCircuitWrapper } from '../Neo4jCircuitWrapper';
 import winston from 'winston';
+import { KnowledgeGraphService } from '../KnowledgeGraphService';
+import { Neo4jCircuitWrapper } from '../Neo4jCircuitWrapper';
+import { Neo4jService } from '../Neo4jService';
 
 jest.mock('../Neo4jService');
 
@@ -285,27 +285,21 @@ RETURN w`,
   });
 
   describe('Preference Management', () => {
-    it('should add or update a preference', async () => {
+    it('should add or update a single preference using addOrUpdateUserPreferences', async () => {
       const userId = 'test-user';
       const preference = {
         type: 'wineType',
         value: 'red',
         source: 'manual',
         confidence: 1.0,
-        timestamp: new Date().toISOString(),
+        timestamp: Date.now(),
         active: true,
       };
 
-      await service.addOrUpdatePreference(userId, preference);
+      await service.addOrUpdateUserPreferences(userId, [preference]); // Call the new method with an array
 
       expect(mockNeo4j.executeQuery).toHaveBeenCalledWith(
-        `
-      MERGE (u:User {id: $userId})
-      MERGE (p:Preference {type: $type, value: $value})
-      ON CREATE SET p.source = $source, p.confidence = $confidence, p.timestamp = $timestamp, p.active = $active
-      ON MATCH SET p.source = $source, p.confidence = $confidence, p.timestamp = $timestamp, p.active = $active
-      MERGE (u)-[:HAS_PREFERENCE]->(p)
-    `,
+        expect.stringMatching(/MERGE \(u:User \{id: \$userId\}\)\s*MERGE \(p:Preference \{type: \$type, value: \$value\}\)\s*ON CREATE SET p\.source = \$source, p\.confidence = \$confidence, p\.timestamp = \$timestamp, p\.active = \$active\s*ON MATCH SET p\.source = \$source, p\.confidence = \$confidence, p\.timestamp = \$timestamp, p\.active = \$active\s*MERGE \(u\)-\[:HAS_PREFERENCE\]->\(p\)/),
         {
           userId,
           type: preference.type,
@@ -385,19 +379,70 @@ RETURN w`,
 
     it('should delete a preference', async () => {
       const userId = 'test-user';
-      const preferenceId = 'pref-123';
-
-      await service.deletePreference(userId, preferenceId);
-
+      const type = 'wineType';
+      const value = 'Red';
+ 
+      await service.deletePreference(userId, type, value);
+ 
       expect(mockNeo4j.executeQuery).toHaveBeenCalledWith(
         `
-      MATCH (u:User {id: $userId})-[r:HAS_PREFERENCE]->(p:Preference)
-      WHERE p.id = $preferenceId
+      MATCH (u:User {id: $userId})-[r:HAS_PREFERENCE]->(p:Preference {type: $type, value: $value})
       DELETE r, p
     `,
-        { userId, preferenceId }
+        { userId, type, value }
       );
     });
+});
 
+describe('Admin Preference Management', () => {
+  it('should get all user preferences', async () => {
+    const mockResults = [
+      { userId: 'user1', p: { type: 'wineType', value: 'red' } },
+      { userId: 'user1', p: { type: 'sweetness', value: 'dry' } },
+      { userId: 'user2', p: { type: 'wineType', value: 'white' } },
+    ];
+    mockNeo4j.executeQuery.mockResolvedValue(mockResults);
+
+    const allPreferences = await service.getAllUserPreferences();
+
+    expect(mockNeo4j.executeQuery).toHaveBeenCalledWith(
+      expect.stringMatching(/MATCH \(u:User\)-\[:HAS_PREFERENCE\]->\(p:Preference\)\s*RETURN u\.id AS userId, p/)
+    );
+    expect(allPreferences).toEqual([
+      { userId: 'user1', preferences: [{ type: 'wineType', value: 'red' }, { type: 'sweetness', value: 'dry' }] },
+      { userId: 'user2', preferences: [{ type: 'wineType', value: 'white' }] },
+    ]);
   });
+
+  it('should add or update multiple user preferences', async () => {
+    const userId = 'test-user';
+    const preferences = [
+      { type: 'wineType', value: 'red', source: 'manual', confidence: 1.0, timestamp: Date.now(), active: true },
+      { type: 'sweetness', value: 'dry', source: 'manual', confidence: 1.0, timestamp: Date.now(), active: true },
+    ];
+
+    await service.addOrUpdateUserPreferences(userId, preferences);
+
+    expect(mockNeo4j.executeQuery).toHaveBeenCalledTimes(preferences.length);
+    expect(mockNeo4j.executeQuery).toHaveBeenCalledWith(
+      expect.stringContaining('MERGE (u:User {id: $userId})'),
+      expect.objectContaining({ userId, type: 'wineType', value: 'red' })
+    );
+    expect(mockNeo4j.executeQuery).toHaveBeenCalledWith(
+      expect.stringContaining('MERGE (u:User {id: $userId})'),
+      expect.objectContaining({ userId, type: 'sweetness', value: 'dry' })
+    );
+  });
+
+  it('should delete all preferences for a user', async () => {
+    const userId = 'test-user';
+
+    await service.deleteAllPreferencesForUser(userId);
+
+    expect(mockNeo4j.executeQuery).toHaveBeenCalledWith(
+      expect.stringMatching(/MATCH \(u:User \{id: \$userId\}\)-\[r:HAS_PREFERENCE\]->\(p:Preference\)\s*DELETE r, p/),
+      { userId }
+    );
+  });
+});
 });

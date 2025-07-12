@@ -238,8 +238,8 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
       timestamp: Date.now(),
       phase: 'INITIALIZED',
       originalInput: userInput,
-      ingredients: userInput.ingredients || [],
-      budget: userInput.budget || 0,
+      ingredients: userInput.input.ingredients || [],
+      budget: userInput.input.budget || 0,
       agentResponses: new Map(),
       validatedIngredients: null,
       userPreferences: null,
@@ -264,7 +264,7 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
         'input-validation-agent',
         createAgentMessage(
           MessageTypes.VALIDATE_INPUT,
-          { userInput: userInput.input.message }, // Pass the message as userInput
+          { userInput: userInput.input }, // Pass the entire input object
           this.id,
           conversationId,
           this.generateCorrelationId(),
@@ -307,7 +307,7 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
           'llm-preference-extractor',
           createAgentMessage(
             MessageTypes.PREFERENCE_EXTRACTION_REQUEST, // This message type is what LLMPreferenceExtractorAgent expects
-            { input: userInput.input.message, userId: userInput.userId, history: limitedConversationHistory }, // Use limited history
+            { input: userInput.input, userId: userInput.userId, history: limitedConversationHistory }, // Use limited history
             this.id,
             conversationId,
             preferenceMessageCorrelationId, // Use the same correlation ID
@@ -417,7 +417,14 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
             input: {
               ingredients: state.ingredients,
               preferences: state.userPreferences,
-              message: userInput.input.message, // Pass the original user message
+              message: userInput.input.message, // Pass the original user message if available
+              // Ensure all relevant input fields are passed to the recommendation agent
+              foodPairing: userInput.input.preferences?.foodPairing,
+              wineType: userInput.input.preferences?.wineType,
+              sweetness: userInput.input.preferences?.sweetness,
+              priceRange: userInput.input.preferences?.priceRange,
+              excludeAllergens: userInput.input.preferences?.excludeAllergens,
+              // Add other input fields as needed by the recommendation agent
             },
             conversationHistory: userInput.conversationHistory, // Pass conversation history if available
             userId: userInput.userId,
@@ -445,7 +452,7 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
             const refinementInput = {
               currentRecommendations: recommendationsResult.data.payload, // Pass the full recommendation result
               reasoning: recommendationsResult.data.payload.reasoning, // Pass existing reasoning
-              userInput: userInput.input.message, // Pass original user input
+              userInput: userInput.input, // Pass original user input object
               conversationHistory: userInput.conversationHistory, // Pass conversation history
               preferences: state.userPreferences, // Pass user preferences
               ingredients: state.ingredients // Pass ingredients

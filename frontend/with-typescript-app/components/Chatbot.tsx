@@ -16,6 +16,7 @@ const Chatbot: React.FC = () => {
   const [inputText, setInputText] = useState('');
   const [userId, setUserId] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isAdminMode, setIsAdminMode] = useState(false); // New state for admin mode
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -72,9 +73,26 @@ const Chatbot: React.FC = () => {
   const handleSendMessage = async () => {
     if (inputText.trim() === '' || !userId) return;
 
+    let currentInputText = inputText;
+    let targetEndpoint = `${API_BASE_URL}/recommendations`;
+
+    // Check for admin command prefix
+    if (currentInputText.startsWith('/admin ')) {
+      setIsAdminMode(true);
+      currentInputText = currentInputText.substring('/admin '.length); // Remove prefix
+      targetEndpoint = `${API_BASE_URL}/admin-commands`; // New endpoint for admin commands
+    } else if (currentInputText.toLowerCase() === '/exitadmin') {
+      setIsAdminMode(false);
+      setInputText('');
+      setMessages((prevMessages) => [...prevMessages, { id: uuidv4(), text: 'Exited admin mode.', sender: 'assistant' }]);
+      return;
+    } else if (isAdminMode) {
+      targetEndpoint = `${API_BASE_URL}/admin-commands`; // If already in admin mode, send to admin endpoint
+    }
+
     const newUserMessage: Message = {
       id: uuidv4(),
-      text: inputText,
+      text: currentInputText, // Use currentInputText
       sender: 'user',
     };
     setMessages((prevMessages) => [...prevMessages, newUserMessage]);
@@ -88,7 +106,7 @@ const Chatbot: React.FC = () => {
         content: msg.text,
       }));
 
-      const response = await fetch(`${API_BASE_URL}/recommendations`, {
+      const response = await fetch(targetEndpoint, { // Use targetEndpoint
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -96,9 +114,9 @@ const Chatbot: React.FC = () => {
         body: JSON.stringify({
           userId: userId,
           input: {
-            message: inputText,
+            message: currentInputText, // Use currentInputText
           },
-          conversationHistory: [...conversationHistory, { role: 'user', content: inputText }], // Include current user message in history sent to backend
+          conversationHistory: [...conversationHistory, { role: 'user', content: currentInputText }], // Include current user message in history sent to backend
         }),
       });
 
@@ -164,6 +182,11 @@ const Chatbot: React.FC = () => {
       overflow="hidden"
       mx="auto" // Center the component
     >
+      {isAdminMode && (
+        <Box bg="purple.500" color="white" p={2} textAlign="center">
+          Admin Mode Active
+        </Box>
+      )}
       <VStack spacing={4} align="stretch" p={4} flex="1" overflowY="auto">
         {messages.map((message) => (
           <Box

@@ -1,14 +1,16 @@
-import { Express } from 'express';
+import express, { Express } from 'express';
 import { Server } from 'http';
+import { mock } from 'jest-mock-extended'; // Import mock
 import request from 'supertest';
 import { DependencyContainer } from 'tsyringe';
 import { v4 as uuidv4 } from 'uuid';
+import { AdminCommandController } from '../../api/controllers/AdminCommandController'; // Import AdminCommandController
+import createRouter from '../../api/routes'; // Import createRouter
 import { AgentError } from '../../core/agents/AgentError'; // Added
 import { AgentMessage, createAgentMessage, MessageTypes } from '../../core/agents/communication/AgentMessage';
 import { EnhancedAgentCommunicationBus } from '../../core/agents/communication/EnhancedAgentCommunicationBus';
 import { SommelierCoordinator } from '../../core/agents/SommelierCoordinator';
 import { TYPES } from '../../di/Types';
-import { createServer } from '../../server';
 import { LLMService } from '../../services/LLMService';
 import { Neo4jService } from '../../services/Neo4jService';
 import { createTestContainer } from '../../test-setup';
@@ -70,7 +72,10 @@ describe('Recommendations API', () => {
     coordinator = container.resolve(SommelierCoordinator);
 
     // Create the Express app
-    app = createServer(container);
+    app = express();
+    app.use(express.json());
+    const mockAdminCommandController = mock<AdminCommandController>(); // Create a proper mock AdminCommandController
+    app.use('/api', createRouter(container, mockAdminCommandController)); // Use createRouter with AdminCommandController
 
     // Start the server
     await new Promise<void>((resolve) => {

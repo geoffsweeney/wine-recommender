@@ -15,23 +15,48 @@ export class KnowledgeGraphService {
 
   /**
    * Add or update a user preference node and relationship.
+   * This method now handles an array of preferences.
    */
-  async addOrUpdatePreference(userId: string, preference: any): Promise<void> {
-    await this.neo4j.executeQuery(`
-      MERGE (u:User {id: $userId})
-      MERGE (p:Preference {type: $type, value: $value})
-      ON CREATE SET p.source = $source, p.confidence = $confidence, p.timestamp = $timestamp, p.active = $active
-      ON MATCH SET p.source = $source, p.confidence = $confidence, p.timestamp = $timestamp, p.active = $active
-      MERGE (u)-[:HAS_PREFERENCE]->(p)
-    `, {
-      userId,
-      type: preference.type,
-      value: preference.value,
-      source: preference.source,
-      confidence: preference.confidence,
-      timestamp: preference.timestamp,
-      active: preference.active,
+  async addOrUpdateUserPreferences(userId: string, preferences: any[]): Promise<void> {
+    for (const preference of preferences) {
+      await this.neo4j.executeQuery(`
+        MERGE (u:User {id: $userId})
+        MERGE (p:Preference {type: $type, value: $value})
+        ON CREATE SET p.source = $source, p.confidence = $confidence, p.timestamp = $timestamp, p.active = $active
+        ON MATCH SET p.source = $source, p.confidence = $confidence, p.timestamp = $timestamp, p.active = $active
+        MERGE (u)-[:HAS_PREFERENCE]->(p)
+      `, {
+        userId,
+        type: preference.type,
+        value: preference.value,
+        source: preference.source,
+        confidence: preference.confidence,
+        timestamp: preference.timestamp,
+        active: preference.active,
+      });
+    }
+  }
+
+  /**
+   * Get all user preferences from the graph.
+   */
+  async getAllUserPreferences(): Promise<any[]> {
+    const query = `
+      MATCH (u:User)-[:HAS_PREFERENCE]->(p:Preference)
+      RETURN u.id AS userId, p
+    `;
+    const results = await this.neo4j.executeQuery<any>(query);
+    // Group preferences by userId
+    const groupedPreferences: { [userId: string]: any[] } = {};
+    results.forEach((record: any) => {
+      const userId = record.userId;
+      const preference = record.p;
+      if (!groupedPreferences[userId]) {
+        groupedPreferences[userId] = [];
+      }
+      groupedPreferences[userId].push(preference);
     });
+    return Object.entries(groupedPreferences).map(([userId, prefs]) => ({ userId, preferences: prefs }));
   }
 
   /**
@@ -46,20 +71,30 @@ export class KnowledgeGraphService {
       MATCH (u:User {id: $userId})-[:HAS_PREFERENCE]->(p:Preference)
      WHERE p.active = true RETURN p`;
     const results = await this.neo4j.executeQuery<any>(query, { userId });
-    // Map to preference node objects
-    return results.map((record: any) => record.p);
+    // The executeQuery now returns objects with the 'p' key containing the extracted properties
+    return results.map(record => record.p);
   }
 
   /**
-   * Delete a user preference by id.
+   * Delete a user preference by type and value.
    */
-  async deletePreference(userId: string, preferenceId: string): Promise<void> {
+  async deletePreference(userId: string, type: string, value: string): Promise<void> {
+    await this.neo4j.executeQuery(`
+      MATCH (u:User {id: $userId})-[r:HAS_PREFERENCE]->(p:Preference {type: $type, value: $value})
+      DELETE r, p
+    `, { userId, type, value });
+  }
+
+  /**
+   * Delete all preferences for a given user.
+   */
+  async deleteAllPreferencesForUser(userId: string): Promise<void> {
     await this.neo4j.executeQuery(`
       MATCH (u:User {id: $userId})-[r:HAS_PREFERENCE]->(p:Preference)
-      WHERE p.id = $preferenceId
       DELETE r, p
-    `, { userId, preferenceId });
+    `, { userId });
   }
+
 
   // ...existing methods continue here (no duplicate class declaration)...
 

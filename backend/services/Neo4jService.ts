@@ -122,17 +122,17 @@ export class Neo4jService {
   getCircuitState(): string {
     return this.circuit.getCircuitState();
   }
-
-  // Health check method for monitoring
-  async healthCheck(): Promise<{ status: 'healthy' | 'unhealthy'; circuitState: string; connectionVerified: boolean }> {
-    const circuitState = this.getCircuitState();
-    const connectionVerificationResult = await this.verifyConnection(); // Get the Result object
-    const connectionVerified = connectionVerificationResult.success && connectionVerificationResult.data;
-
-    return {
-      status: connectionVerified && circuitState === 'CLOSED' ? 'healthy' : 'unhealthy',
-      circuitState,
-      connectionVerified
-    };
-  }
-}
+ 
+   // Health check method for monitoring
+   async healthCheck(): Promise<{ status: 'healthy' | 'unhealthy'; circuitState: string; connectionVerified: boolean }> {
+     const circuitState = this.getCircuitState();
+     const connectionVerificationResult = await this.verifyConnection(); // Get the Result object
+     const connectionVerified = connectionVerificationResult.success && connectionVerificationResult.data;
+ 
+     return {
+       status: connectionVerified && circuitState === 'CLOSED' ? 'healthy' : 'unhealthy',
+       circuitState,
+       connectionVerified
+     };
+   }
+ }

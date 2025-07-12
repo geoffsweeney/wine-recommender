@@ -31,6 +31,8 @@ export const MessageTypes = {
   UPDATE_RECOMMENDATION_HISTORY: 'update_recommendation_history',
   GENERATE_EXPLANATION: 'generate_explanation',
   ORCHESTRATE_RECOMMENDATION_REQUEST: 'orchestrate_recommendation_request',
+  ORCHESTRATE_ADMIN_COMMAND: 'orchestrate_admin_command', // Added for admin commands
+  ADMIN_CONVERSATIONAL_COMMAND: 'admin_conversational_command', // Added for admin conversational agent
   PREFERENCE_EXTRACTION_REQUEST: 'preference-extraction-request', // Added
   PREFERENCE_EXTRACTION_RESPONSE: 'preference-extraction-response', // Added
   ERROR: 'error',

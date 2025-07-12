@@ -6,10 +6,13 @@ import { TYPES } from '../di/Types';
 import { ILogger } from '../types/ILogger';
 import { IFileSystem } from '../types/IFileSystem';
 import { IPath } from '../types/IPath';
+import * as fs from 'fs'; // Add this import for native file watching
 
 export interface PromptVariables {
   [key: string]: string | number | boolean | string[] | null | undefined | object;
 }
+
+export type AdminPreferenceExtractionOutput = z.infer<typeof AdminPreferenceExtractionOutputSchema>;
 
 
 export interface PromptTask<T = PromptVariables, U = any> { // T for input variables, U for output schema
@@ -37,6 +40,7 @@ export interface PromptTemplate {
   rawLlmPrompt: PromptTask<RawLlmPromptVars>; // Added for raw LLM prompts
   inputValidation: PromptTask<InputValidationVars>; // Added for input validation
   enhanceKnowledgeGraph: PromptTask<EnhanceKnowledgeGraphVars>; // Added for enhancing KG results
+  adminPreferenceExtraction: PromptTask<AdminPreferenceExtractionVars>; // Added for admin preference management
 }
 
 interface PromptVersions {
@@ -106,6 +110,10 @@ export interface InputValidationVars {
 export interface EnhanceKnowledgeGraphVars {
   wineList: string;
   contextInfo: string;
+}
+
+export interface AdminPreferenceExtractionVars {
+  userInput: string;
 }
 
 
@@ -200,6 +208,18 @@ const EnhanceKnowledgeGraphSchema = z.object({
   contextInfo: z.string(),
 });
 
+const AdminPreferenceExtractionSchema = z.object({
+  userInput: z.string().min(1, 'User input cannot be empty'),
+});
+
+const AdminPreferenceExtractionOutputSchema = z.object({
+  action: z.union([z.literal('view'), z.literal('add'), z.literal('update'), z.literal('delete')]),
+  userId: z.string().min(1, 'User ID is required'),
+  preferenceType: z.string().optional(),
+  preferenceValue: z.string().optional(),
+  preferenceId: z.string().optional(), // For composite IDs like "type:value"
+});
+
 
 class TemplateRenderer {
   public static render(template: string, variables: PromptVariables): Result<string, Error> {
@@ -238,6 +258,7 @@ export class PromptManager {
   private config: Required<PromptManagerConfig>;
   private renderedCache = new Map<string, string>();
   private loadPromise: Promise<void> | null = null;
+  private watchers: fs.FSWatcher[] = [];
 
   constructor(
     @inject(TYPES.Logger) private logger: ILogger,
@@ -247,26 +268,78 @@ export class PromptManager {
   ) {
     this.config = {
       baseDir: config.baseDir || this.path.join(__dirname, '../prompts'),
-      defaultVersion: config.defaultVersion || 'v1',
+      defaultVersion: config.defaultVersion || '', // Ensure string type, fallback to empty string
       enableCaching: config.enableCaching ?? true,
       enableValidation: config.enableValidation ?? true,
-      watchForChanges: config.watchForChanges ?? false,
+      watchForChanges: config.watchForChanges ?? false, // Default to false for tests
     };
-    
-    this.currentVersion = this.config.defaultVersion;
+    // Don't set currentVersion yet; do it in loadPrompts
+    this.currentVersion = '';
     this.loadPromise = this.loadPrompts();
+    if (this.config.watchForChanges) {
+      this.logger.info(`[PromptManager] watchForChanges is enabled. Setting up file watchers...`);
+      this.setupWatchers();
+    }
+  }
+
+  private async setupWatchers() {
+    // Clean up any existing watchers
+    this.watchers.forEach(w => w.close());
+    this.watchers = [];
+
+    // Watch the base directory for new/removed version folders
+    const baseWatcher = fs.watch(this.config.baseDir, { persistent: false }, (event, filename) => {
+      if (filename && /^v\d+$/.test(filename)) {
+        this.logger.info(`[PromptManager] Detected version directory change (${event}): ${filename}. Reloading prompts...`);
+        this.reloadPrompts();
+        this.setupWatchers(); // Re-setup watchers for new/removed versions
+      }
+    });
+    this.watchers.push(baseWatcher);
+
+    // Watch each version directory for prompt file changes
+    try {
+      const versions = await this.fileSystem.readdir(this.config.baseDir);
+      for (const version of versions) {
+        if (!/^v\d+$/.test(version)) continue;
+        const versionDir = this.path.join(this.config.baseDir, version);
+        const stat = await this.fileSystem.stat(versionDir);
+        if (!stat.isDirectory()) continue;
+        const watcher = fs.watch(versionDir, { persistent: false }, (event, filename) => {
+          if (filename && filename.endsWith('.prompt')) {
+            this.logger.info(`[PromptManager] Detected prompt file change (${event}) in ${version}/${filename}. Reloading prompts...`);
+            this.reloadPrompts();
+          }
+        });
+        this.watchers.push(watcher);
+        this.logger.info(`[PromptManager] Watching prompt directory: ${versionDir}`);
+      }
+    } catch (err) {
+      this.logger.error(`[PromptManager] Error setting up file watchers: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
 
   private async loadPrompts(): Promise<void> {
     try {
       const versions = await this.fileSystem.readdir(this.config.baseDir);
 
+      // Only keep directories matching /^v\d+$/
+      const versionDirs: string[] = [];
       for (const version of versions) {
         const promptDir = this.path.join(this.config.baseDir, version);
         const stat = await this.fileSystem.stat(promptDir);
+        if (stat.isDirectory() && /^v\d+$/.test(version)) {
+          versionDirs.push(version);
+        }
+      }
 
-        if (!stat.isDirectory()) continue;
+      if (versionDirs.length === 0) {
+        throw new Error(`No versioned prompt directories found in ${this.config.baseDir}`);
+      }
 
+      // Load all prompt templates for all versions
+      for (const version of versionDirs) {
+        const promptDir = this.path.join(this.config.baseDir, version);
         const template: Partial<PromptTemplate> = {};
         const files = await this.fileSystem.readdir(promptDir);
 
@@ -282,8 +355,8 @@ export class PromptManager {
             template[task] = {
               template: templateContent.trim(),
               description: metadata?.description || '',
-              inputSchema: this.getInputSchemaForTask(task), // Use input_schema from mapping
-              outputSchema: this.getOutputSchemaForTask(task), // Use output_schema from mapping
+              inputSchema: this.getInputSchemaForTask(task),
+              outputSchema: this.getOutputSchemaForTask(task),
               metadata,
             };
           } catch (parseError) {
@@ -294,6 +367,19 @@ export class PromptManager {
 
         this.prompts[version] = template as PromptTemplate;
       }
+
+      // Determine which version to use as current
+      let versionToUse = this.config.defaultVersion;
+      if (!versionToUse || !this.prompts[versionToUse]) {
+        // Find the highest version (e.g., v10 > v2 > v1)
+        versionToUse = versionDirs
+          .map(name => ({ name, num: parseInt(name.slice(1), 10) }))
+          .sort((a, b) => b.num - a.num)[0].name;
+        this.logger.info(`PromptManager: No valid defaultVersion set, using highest version "${versionToUse}"`);
+      } else {
+        this.logger.info(`PromptManager: Using configured defaultVersion "${versionToUse}"`);
+      }
+      this.currentVersion = versionToUse;
 
       this.renderedCache.clear();
       this.logger.debug(`PromptManager: Prompts loaded successfully for versions: ${Object.keys(this.prompts).join(', ')}`);
@@ -363,6 +449,7 @@ export class PromptManager {
       case 'rawLlmPrompt': return RawLlmPromptSchema;
       case 'inputValidation': return InputValidationInputSchema; // Input schema for validation prompt
       case 'enhanceKnowledgeGraph': return EnhanceKnowledgeGraphSchema;
+      case 'adminPreferenceExtraction': return AdminPreferenceExtractionSchema; // Input schema for admin preference extraction
       default: return undefined;
     }
   }
@@ -382,6 +469,9 @@ export class PromptManager {
       case 'resolveSynonym':
         this.logger.debug('[PromptManager] Returning ResolveSynonymSchema');
         return ResolveSynonymSchema; // Assuming output is also a resolved synonym
+      case 'adminPreferenceExtraction':
+        this.logger.debug('[PromptManager] Returning AdminPreferenceExtractionOutputSchema');
+        return AdminPreferenceExtractionOutputSchema; // Output schema for admin preference extraction
       default:
         this.logger.warn(`[PromptManager] No output schema found for task: ${String(task)}`);
         return undefined;
@@ -504,6 +594,10 @@ export class PromptManager {
     try {
       this.clearCache();
       await this.loadPrompts();
+      if (this.config.watchForChanges) {
+        this.logger.info(`[PromptManager] Re-initializing file watchers after reload.`);
+        this.setupWatchers();
+      }
       return success(true);
     } catch (error) {
       return failure(new Error(`Failed to reload prompts: ${error instanceof Error ? error.message : String(error)}`));

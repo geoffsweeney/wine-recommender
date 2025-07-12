@@ -1,9 +1,0 @@
----
-name: Food Pairing
-version: v1
-author: system
-description: Suggest wine pairings for a given food
-input_schema: z.object({ food: z.string() })
-output_schema: z.object({ pairings: z.array(z.string()) })
----
-Suggest wine pairings for the following food: {{food}}

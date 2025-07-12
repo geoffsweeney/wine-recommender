@@ -43,6 +43,7 @@ export const TYPES = {
     PreferenceExtractionService: Symbol.for('PreferenceExtractionService'),
     PreferenceNormalizationService: Symbol.for('PreferenceNormalizationService'),
     RecommendationService: Symbol.for('RecommendationService'), // Added RecommendationService
+    AdminPreferenceService: Symbol.for('AdminPreferenceService'), // Added
     PromptManager: Symbol.for('PromptManager'),
     PromptManagerConfig: Symbol.for('PromptManagerConfig'), // Added
     WineRepository: Symbol.for('WineRepository'),
@@ -50,6 +51,7 @@ export const TYPES = {
     
     // Controllers
     WineController: Symbol.for('WineController'),
+    AdminCommandController: Symbol.for('AdminCommandController'), // Added for AdminCommandController
 
     // Agents
     SommelierCoordinator: Symbol.for('SommelierCoordinator'),
@@ -78,14 +80,21 @@ export const TYPES = {
     MCPAdapterAgentConfig: Symbol.for('MCPAdapterAgentConfig'), // New symbol for MCPAdapterAgentConfig
     ShopperAgent: Symbol.for('ShopperAgent'), // Added
     ShopperAgentConfig: Symbol.for('ShopperAgentConfig'), // Added
+    AdminConversationalAgent: Symbol.for('AdminConversationalAgent'), // Added
+    AdminConversationalAgentConfig: Symbol.for('AdminConversationalAgentConfig'), // Added
     AgentDependencies: Symbol.for('AgentDependencies'), // New symbol for AgentDependencies
     CommunicatingAgentDependencies: Symbol.for('CommunicatingAgentDependencies'), // Added
     UserProfileService: Symbol.for('UserProfileService'), // Added
     ConversationHistoryService: Symbol.for('ConversationHistoryService'), // Added
     AgentRegistry: Symbol.for('AgentRegistry'), // Added for AgentRegistry
+    FeatureFlags: Symbol.for('FeatureFlags'), // Added FeatureFlags
 } as const;
 
 export type TypeKeys = keyof typeof TYPES;
+
+import { FeatureFlags } from '../config/featureFlags'; // Added
+
+export { FeatureFlags }; // Export FeatureFlags
 
 // Placeholder interfaces for AgentDependencies
 // These should be replaced with actual interfaces as they are defined

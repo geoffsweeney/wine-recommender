@@ -6,6 +6,7 @@ import { MessageTypes } from '../../../core/agents/communication/AgentMessage';
 import { EnhancedAgentCommunicationBus } from '../../../core/agents/communication/EnhancedAgentCommunicationBus';
 import { SommelierCoordinator } from '../../../core/agents/SommelierCoordinator';
 import { TYPES } from '../../../di/Types';
+import { AdminCommandController } from '../../controllers/AdminCommandController'; // Import AdminCommandController
 import createRouter from '../../routes';
 
 describe('End-to-End Recommendation API', () => {
@@ -29,7 +30,8 @@ describe('End-to-End Recommendation API', () => {
 
     app = express();
     app.use(express.json());
-    app.use(createRouter(container));
+    const mockAdminCommandController = mock<AdminCommandController>(); // Create a proper mock AdminCommandController
+    app.use(createRouter(container, mockAdminCommandController));
   });
 
   beforeEach(() => {

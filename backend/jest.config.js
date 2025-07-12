@@ -6,6 +6,9 @@ module.exports = {
   moduleNameMapper: {
     '^@src/(.*)$': '<rootDir>/$1',
     '^@tests/(.*)$': '<rootDir>/__tests__/$1',
+    '^@src/core/types/Result$': '<rootDir>/core/types/Result.ts',
+    '^@src/utils/result-utils$': '<rootDir>/utils/result-utils.ts',
+    '^@src/core/agents/AgentError$': '<rootDir>/core/agents/AgentError.ts',
     // Removed '^zod$': '<rootDir>/backend/__mocks__/zod.ts', to use real zod
     '^spacy$': '<rootDir>/../__mocks__/spacy.js',
     '^spacy/matcher$': '<rootDir>/../__mocks__/spacy.js',
@@ -14,9 +17,9 @@ module.exports = {
   },
   transform: {
     '^.+\\.tsx?$': [
-      'ts-jest', 
+      'ts-jest',
       {
-        tsconfig: 'tsconfig.test.json'
+        tsconfig: './tsconfig.json'
       }
     ]
   },
