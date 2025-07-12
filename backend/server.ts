@@ -11,6 +11,7 @@ import { PromptManager } from './services/PromptManager'; // Import PromptManage
 
 import { TYPES } from './di/Types'; // Import TYPES from the new location
 import { setupContainer } from './di/container'; // Import setupContainer
+import { AdminCommandController } from './api/controllers/AdminCommandController';
 
 export const registerDependencies = setupContainer;
 
@@ -34,7 +35,8 @@ export function createServer(dependencyContainer?: DependencyContainer): Express
   });
 
   // Use the routers
-  app.use('/api', apiRateLimiter, createMainRouter(currentContainer));
+  const adminCommandController = currentContainer.resolve(AdminCommandController);
+  app.use('/api', apiRateLimiter, createMainRouter(currentContainer, adminCommandController));
   app.use('/api', createUserPreferenceRouter(currentContainer));
   app.use('/api', createWineRecommendationRouter(currentContainer));
 

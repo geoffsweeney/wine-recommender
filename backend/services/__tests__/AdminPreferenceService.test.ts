@@ -1,12 +1,6 @@
 import 'reflect-metadata';
-import { AdminPreferenceService } from '../AdminPreferenceService';
-import { AdminUserPreferenceController } from '../../api/controllers/AdminUserPreferenceController';
-import { KnowledgeGraphService } from '../KnowledgeGraphService';
-import { UserProfileService } from '../UserProfileService';
-import { Result } from '../../core/types/Result';
-import { success, failure } from '../../utils/result-utils';
-import { AgentError } from '../../core/agents/AgentError';
 import { ILogger } from '../../di/Types'; // Import ILogger
+import { AdminPreferenceService } from '../AdminPreferenceService';
 
 // Mock dependencies
 const mockAdminUserPreferenceController = {

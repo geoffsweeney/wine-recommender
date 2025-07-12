@@ -1,9 +1,8 @@
-import { Neo4jCircuitWrapper } from '../Neo4jCircuitWrapper';
-import { Driver, Session, Record } from 'neo4j-driver';
-import { CircuitOptions } from '../../core/CircuitBreaker';
+import { Driver, Record, Session } from 'neo4j-driver';
 import { container } from 'tsyringe';
-import { CircuitBreaker } from '../../core/CircuitBreaker';
+import { CircuitBreaker, CircuitOptions } from '../../core/CircuitBreaker';
 import { TYPES } from '../../di/Types';
+import { Neo4jCircuitWrapper } from '../Neo4jCircuitWrapper';
 
 describe('Neo4jCircuitWrapper', () => {
   let wrapper: Neo4jCircuitWrapper;

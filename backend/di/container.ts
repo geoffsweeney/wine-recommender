@@ -5,6 +5,9 @@ import * as path from 'path'; // Import path
 import 'reflect-metadata';
 import { container, DependencyContainer } from 'tsyringe';
 import winston from 'winston';
+import { AdminCommandController } from '../api/controllers/AdminCommandController'; // Import AdminCommandController
+import { featureFlags } from '../config/featureFlags'; // Import featureFlags
+import { AdminConversationalAgent, AdminConversationalAgentConfig } from '../core/agents/AdminConversationalAgent'; // Import AdminConversationalAgent
 import { AgentRegistry } from '../core/agents/AgentRegistry';
 import { EnhancedAgentCommunicationBus } from '../core/agents/communication/EnhancedAgentCommunicationBus';
 import { ExplanationAgent } from '../core/agents/ExplanationAgent';
@@ -21,6 +24,7 @@ import { ValueAnalysisAgent } from '../core/agents/ValueAnalysisAgent';
 import { CircuitOptions } from '../core/CircuitBreaker';
 import { ConversationHistoryService } from '../core/ConversationHistoryService';
 import { BasicDeadLetterProcessor } from '../core/DeadLetterProcessor';
+import { AdminPreferenceService } from '../services/AdminPreferenceService'; // Import AdminPreferenceService
 import { KnowledgeGraphService } from '../services/KnowledgeGraphService';
 import { LLMService } from '../services/LLMService';
 import { Neo4jCircuitWrapper } from '../services/Neo4jCircuitWrapper';
@@ -36,11 +40,6 @@ import { RecommendationStrategyProvider } from '../services/strategies/Recommend
 import { UserPreferencesStrategy } from '../services/strategies/UserPreferencesStrategy'; // Import UserPreferencesStrategy
 import { UserProfileService } from '../services/UserProfileService';
 import { TYPES } from './Types';
-import { AdminPreferenceService } from '../services/AdminPreferenceService'; // Import AdminPreferenceService
-import { AdminConversationalAgent } from '../core/agents/AdminConversationalAgent'; // Import AdminConversationalAgent
-import { AdminConversationalAgentConfig } from '../core/agents/AdminConversationalAgent'; // Import AdminConversationalAgentConfig
-import { AdminCommandController } from '../api/controllers/AdminCommandController'; // Import AdminCommandController
-import { featureFlags } from '../config/featureFlags'; // Import featureFlags
 
 export function setupContainer() {
   // Environment configuration

@@ -1,17 +1,17 @@
 import { inject, injectable } from 'tsyringe';
+import winston from 'winston';
+import { z } from 'zod';
 import { TYPES } from '../../di/Types';
-import { CommunicatingAgent, CommunicatingAgentDependencies } from './CommunicatingAgent';
-import { EnhancedAgentCommunicationBus } from './communication/EnhancedAgentCommunicationBus';
-import { AgentMessage, createAgentMessage, MessageTypes } from './communication/AgentMessage'; // Added MessageTypes
+import { LLMService } from '../../services/LLMService'; // Keep LLMService import
+import { PromptManager } from '../../services/PromptManager'; // Import PromptManager
+import { PreferenceNode } from '../../types';
+import { InputValidationSchema } from '../../types/agent-outputs';
 import { BasicDeadLetterProcessor } from '../DeadLetterProcessor';
 import { Result } from '../types/Result';
 import { AgentError } from './AgentError';
-import winston from 'winston';
-import { UserPreferences, PreferenceNode } from '../../types';
-import { InputValidationSchema } from '../../types/agent-outputs';
-import { z } from 'zod';
-import { LLMService } from '../../services/LLMService'; // Keep LLMService import
-import { PromptManager } from '../../services/PromptManager'; // Import PromptManager
+import { CommunicatingAgent, CommunicatingAgentDependencies } from './CommunicatingAgent';
+import { AgentMessage, createAgentMessage, MessageTypes } from './communication/AgentMessage'; // Added MessageTypes
+import { EnhancedAgentCommunicationBus } from './communication/EnhancedAgentCommunicationBus';
 
 export interface ValidationResult extends z.infer<typeof InputValidationSchema> {}
 
