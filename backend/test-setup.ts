@@ -309,17 +309,6 @@ export const createTestContainer = (): { container: DependencyContainer; resetMo
   };
   container.registerInstance(TYPES.AgentDependencies, mockAgentDependencies);
 
-  const mockCommunicatingAgentDependencies = {
-    communicationBus: mockAgentCommunicationBus, // Changed to real instance
-    logger: mockLogger,
-    messageQueue: {},
-    stateManager: {},
-    config
-  };
-  container.registerInstance(TYPES.CommunicatingAgentDependencies, mockCommunicatingAgentDependencies);
-
-  // Mock SommelierCoordinatorId
-  container.registerInstance(TYPES.SommelierCoordinatorId, 'sommelier-coordinator-test-id');
 
   // Mock SommelierCoordinatorConfig
   const sommelierCoordinatorConfig = {

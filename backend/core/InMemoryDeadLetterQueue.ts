@@ -1,6 +1,9 @@
+import { injectable } from 'tsyringe';
+
 /**
  * Simple in-memory implementation of a Dead Letter Queue for POC purposes.
  */
+@injectable()
 export class InMemoryDeadLetterQueue {
   private queue: any[] = [];
 

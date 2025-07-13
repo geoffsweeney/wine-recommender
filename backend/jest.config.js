@@ -19,12 +19,13 @@ module.exports = {
     '^.+\\.tsx?$': [
       'ts-jest',
       {
-        tsconfig: './tsconfig.json'
+        tsconfig: '/home/geoff/src/roo/wine-recommender/tsconfig.json'
       }
     ]
   },
   testMatch: [
-    '**/__tests__/**/*.test.ts'
+    '**/__tests__/**/*.test.ts',
+    '**/tests/**/*.test.ts'
   ],
   setupFiles: ['<rootDir>/setup-env.ts'],
   setupFilesAfterEnv: ['<rootDir>/test-setup.ts'],

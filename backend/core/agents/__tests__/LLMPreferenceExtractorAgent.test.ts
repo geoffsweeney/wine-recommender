@@ -10,7 +10,7 @@ import winston from 'winston';
 import { createAgentMessage } from '../communication/AgentMessage';
 import { EnhancedAgentCommunicationBus } from '../communication/EnhancedAgentCommunicationBus';
 import { container } from 'tsyringe'; // Added import
-import { TYPES } from '../../../di/Types'; // Added import
+import { ICommunicatingAgentDependencies, TYPES } from '../../../di/Types'; // Added import
 
 // Test wrapper to access protected properties for testing
 class TestLLMPreferenceExtractorAgent extends LLMPreferenceExtractorAgent {
@@ -32,6 +32,7 @@ describe('LLMPreferenceExtractorAgent', () => {
   let mockUserProfileService: jest.Mocked<UserProfileService>;
   let agent: TestLLMPreferenceExtractorAgent;
   let mockAgentConfig: LLMPreferenceExtractorAgentConfig;
+  let mockCommunicatingAgentDependencies: ICommunicatingAgentDependencies;
 
   beforeEach(() => {
     mockBus = mockDeep<EnhancedAgentCommunicationBus>();
@@ -43,6 +44,14 @@ describe('LLMPreferenceExtractorAgent', () => {
     mockUserProfileService = mockDeep<UserProfileService>();
     mockAgentConfig = {
       maxRetries: 3
+    };
+
+    mockCommunicatingAgentDependencies = {
+      communicationBus: mockBus,
+      logger: mockLogger,
+      messageQueue: {} as any,
+      stateManager: {} as any,
+      config: mockAgentConfig as any,
     };
     
     // Register mocks with the container
@@ -56,6 +65,7 @@ describe('LLMPreferenceExtractorAgent', () => {
     container.registerInstance(TYPES.PreferenceNormalizationService, mockPreferenceNormalizationService);
     container.registerInstance(TYPES.UserProfileService, mockUserProfileService);
     container.registerInstance(TYPES.LLMPreferenceExtractorAgentConfig, mockAgentConfig);
+    container.registerInstance(TYPES.CommunicatingAgentDependencies, mockCommunicatingAgentDependencies);
 
     jest.clearAllMocks();
     agent = new TestLLMPreferenceExtractorAgent(
@@ -64,9 +74,8 @@ describe('LLMPreferenceExtractorAgent', () => {
       mockPreferenceNormalizationService,
       mockUserProfileService,
       mockDeadLetter,
-      mockLogger,
-      mockBus,
-      mockAgentConfig
+      mockAgentConfig,
+      mockCommunicatingAgentDependencies
     );
   });
 

@@ -1,6 +1,6 @@
 import { DependencyContainer } from 'tsyringe';
 import winston from 'winston';
-import { TYPES } from '../../../di/Types';
+import { ICommunicatingAgentDependencies, TYPES } from '../../../di/Types';
 import { LLMService } from '../../../services/LLMService';
 import { PromptManager } from '../../../services/PromptManager';
 import { createTestContainer } from '../../../test-setup';
@@ -20,6 +20,7 @@ describe('LLMRecommendationAgent', () => {
   let mockLogger: jest.Mocked<winston.Logger>;
   let mockCommunicationBus: jest.Mocked<EnhancedAgentCommunicationBus>;
   let mockAgentConfig: LLMRecommendationAgentConfig;
+  let mockCommunicatingAgentDependencies: ICommunicatingAgentDependencies;
 
   beforeEach(() => {
     ({ container, resetMocks } = createTestContainer());
@@ -33,13 +34,20 @@ describe('LLMRecommendationAgent', () => {
     mockAgentConfig = container.resolve(TYPES.LLMRecommendationAgentConfig) as LLMRecommendationAgentConfig;
 
     // Manually instantiate the agent, passing the resolved mocks
+    mockCommunicatingAgentDependencies = {
+      communicationBus: mockCommunicationBus,
+      logger: mockLogger,
+      messageQueue: {} as any,
+      stateManager: {} as any,
+      config: mockAgentConfig as any,
+    };
+
     llmRecommendationAgent = new LLMRecommendationAgent(
       mockLLMService,
       mockPromptManager,
       mockDeadLetterProcessor,
-      mockLogger,
-      mockCommunicationBus,
-      mockAgentConfig
+      mockAgentConfig,
+      mockCommunicatingAgentDependencies
     );
 
     // Mock PromptManager methods that LLMService calls

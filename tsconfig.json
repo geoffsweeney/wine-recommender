@@ -10,7 +10,7 @@
     "outDir": "./dist",
     "rootDir": "./",
     "baseUrl": "./",
-    "typeRoots": ["./node_modules/@types", "./backend/di"], // Add backend/di to typeRoots
+    "typeRoots": ["./node_modules/@types", "./backend/types"],
     "paths": {
       "@src/*": ["./backend/*"],
       "*": ["node_modules/*"]
@@ -20,7 +20,8 @@
   },
   "include": [
     "backend/**/*.ts",
-    "backend/types/**/*.d.ts"
+    "backend/types/**/*.d.ts",
+    "backend/di/modules/**/*.ts"
   ],
   "exclude": [
     "node_modules",

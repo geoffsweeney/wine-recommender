@@ -5,6 +5,7 @@ import { BasicDeadLetterProcessor } from '../../DeadLetterProcessor';
 import { EnhancedAgentCommunicationBus } from '../communication/EnhancedAgentCommunicationBus';
 import winston from 'winston';
 import { createAgentMessage } from '../communication/AgentMessage';
+import { ICommunicatingAgentDependencies } from '../../../di/Types';
 
 // Test wrapper to access protected properties for testing
 class TestValueAnalysisAgent extends ValueAnalysisAgent {
@@ -25,6 +26,7 @@ describe('ValueAnalysisAgent', () => {
   let mockLogger: winston.Logger;
   let agent: TestValueAnalysisAgent;
   let mockAgentConfig: ValueAnalysisAgentConfig;
+  let mockCommunicatingAgentDependencies: ICommunicatingAgentDependencies;
 
   beforeEach(() => {
     mockBus = mockDeep<EnhancedAgentCommunicationBus>();
@@ -34,11 +36,18 @@ describe('ValueAnalysisAgent', () => {
       defaultTimeoutMs: 5000
     };
     jest.clearAllMocks();
+    mockCommunicatingAgentDependencies = {
+      communicationBus: mockBus,
+      logger: mockLogger,
+      messageQueue: {} as any,
+      stateManager: {} as any,
+      config: mockAgentConfig as any,
+    };
+
     agent = new TestValueAnalysisAgent(
-      mockBus,
       mockDeadLetter,
-      mockLogger,
-      mockAgentConfig
+      mockAgentConfig,
+      mockCommunicatingAgentDependencies
     );
   });
 

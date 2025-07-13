@@ -10,17 +10,33 @@ import { failure, success } from '../../utils/result-utils';
 import { Result } from '../types/Result';
 import { AgentError } from './AgentError';
 import { CommunicatingAgent } from './CommunicatingAgent';
-import { AgentMessage, MessageTypes } from './communication/AgentMessage';
+import { ICommunicatingAgentDependencies } from '../../di/Types';
+import { AgentMessage, createAgentMessage, MessageTypes } from './communication/AgentMessage';
+
+
+/**
+ * Type guard to check if a Result is successful
+ * @param result The Result to check
+ * @returns true if the result is successful, false otherwise
+ */
+function isSuccess<T, E>(result: Result<T, E>): result is { success: true; data: T } {
+  return result.success;
+}
+
+/**
+ * Type guard to check if a Result is an error
+ * @param result The Result to check
+ * @returns true if the result is an error, false otherwise
+ */
+function isError<T, E>(result: Result<T, E>): result is { success: false; error: E } {
+  return !result.success;
+}
 
 // Define the configuration interface for the AdminConversationalAgent
 export interface AdminConversationalAgentConfig {
   agentId: string;
   // Add any other specific configuration parameters here
 }
-
-// Define a type for the dependencies that CommunicatingAgent expects
-import { CommunicatingAgentDependencies } from './CommunicatingAgent';
-import { createAgentMessage } from './communication/AgentMessage';
 
 // Zod schema for the output of the adminPreferenceExtraction prompt
 const AdminPreferenceExtractionOutputSchema = z.object({
@@ -36,22 +52,26 @@ import { AdminPreferenceExtractionOutput } from '../../services/PromptManager'; 
 
 @injectable()
 export class AdminConversationalAgent extends CommunicatingAgent {
-  protected readonly logger: ILogger; // Change to protected
 
   constructor(
     @inject(TYPES.AdminConversationalAgentConfig) private readonly agentConfig: AdminConversationalAgentConfig,
     @inject(TYPES.LLMService) private readonly llmService: LLMService,
     @inject(TYPES.PromptManager) private readonly promptManager: PromptManager,
     @inject(TYPES.AdminPreferenceService) private readonly adminPreferenceService: AdminPreferenceService,
-    @inject(KnowledgeGraphService) private readonly knowledgeGraphService: KnowledgeGraphService,
-    @inject(UserProfileService) private readonly userProfileService: UserProfileService,
-    @inject(TYPES.CommunicatingAgentDependencies) dependencies: CommunicatingAgentDependencies, // Inject dependencies
-    @inject(TYPES.Logger) logger: ILogger, // Inject logger separately for direct use
+    @inject(TYPES.KnowledgeGraphService) private readonly knowledgeGraphService: KnowledgeGraphService,
+    @inject(TYPES.UserProfileService) private readonly userProfileService: UserProfileService,
+    @inject(TYPES.CommunicatingAgentDependencies) dependencies: ICommunicatingAgentDependencies, // Inject dependencies
     @inject(TYPES.FeatureFlags) private readonly featureFlags: FeatureFlags // Inject FeatureFlags
   ) {
     super(agentConfig.agentId, agentConfig, dependencies); // Pass all required dependencies
-    this.logger = logger; // Assign injected logger
     this.logger.info(`AdminConversationalAgent initialized with ID: ${this.id}`);
+    this.logger.info(`AdminConversationalAgent: registerMessageHandlers called.`);
+    this.registerMessageHandlers(); // Ensure handlers are registered
+  }
+
+  private registerMessageHandlers(): void {
+    this.communicationBus.registerMessageHandler(this.id, MessageTypes.ADMIN_CONVERSATIONAL_COMMAND, this.handleMessage.bind(this) as any);
+    this.communicationBus.registerMessageHandler(this.id, MessageTypes.ORCHESTRATE_ADMIN_COMMAND, this.handleMessage.bind(this) as any);
   }
 
   public getName(): string {
@@ -68,7 +88,7 @@ export class AdminConversationalAgent extends CommunicatingAgent {
     return this.handleMessage(message);
   }
 
-  protected async handleMessage<T>(message: AgentMessage<T>): Promise<Result<AgentMessage | null, AgentError>> {
+  public async handleMessage<T>(message: AgentMessage<T>): Promise<Result<AgentMessage | null, AgentError>> {
     const { correlationId, payload, type } = message;
     this.logger.info(`[${correlationId}] AdminConversationalAgent received message type: ${type}`, { correlationId, type });
 
@@ -95,11 +115,11 @@ export class AdminConversationalAgent extends CommunicatingAgent {
           AdminPreferenceExtractionOutput // Expected output type
         >(
           'adminPreferenceExtraction',
-          { userInput },
+          { userInput }, // Wrap userInput in the correct type
           { correlationId, agentId: this.id, operation: 'extractAdminCommand' }
         );
 
-        if (extractionResult.success) {
+        if (isSuccess(extractionResult)) {
           const extractedCommand: AdminPreferenceExtractionOutput = extractionResult.data; // Type assertion
           this.logger.debug(`[${correlationId}] Extracted command: ${JSON.stringify(extractedCommand)}`, { correlationId, extractedCommand });
 
@@ -128,41 +148,39 @@ export class AdminConversationalAgent extends CommunicatingAgent {
                 correlationId
               );
               break;
-            case 'delete':
-              if (extractedCommand.preferenceType && extractedCommand.preferenceValue) {
-                adminResponseResult = await this.adminPreferenceService.deletePreference(
-                  extractedCommand.userId,
-                  correlationId,
-                  extractedCommand.preferenceType,
-                  extractedCommand.preferenceValue,
-                  undefined // Explicitly pass undefined for preferenceId
-                );
-              } else if (extractedCommand.preferenceId) {
-                adminResponseResult = await this.adminPreferenceService.deletePreference(
-                  extractedCommand.userId,
-                  correlationId,
-                  undefined,
-                  undefined,
-                  extractedCommand.preferenceId
-                );
-              } else {
-                adminResponseResult = await this.adminPreferenceService.deleteAllPreferencesForUser(extractedCommand.userId, correlationId);
-              }
-              break;
+            case 'delete': {
+              // Instead of directly deleting, return a confirmation request
+              const confirmationPayload = {
+                action: 'confirm_delete',
+                userId: extractedCommand.userId,
+                preferenceType: extractedCommand.preferenceType,
+                preferenceValue: extractedCommand.preferenceValue,
+                preferenceId: extractedCommand.preferenceId,
+                message: `Are you sure you want to delete ${extractedCommand.preferenceType ? `${extractedCommand.preferenceType}: ${extractedCommand.preferenceValue}` : extractedCommand.preferenceId ? `preference ID: ${extractedCommand.preferenceId}` : 'all preferences'} for user ${extractedCommand.userId}?`
+              };
+              return success(createAgentMessage(
+                MessageTypes.ADMIN_CONFIRMATION_REQUIRED, // New message type for confirmation
+                confirmationPayload,
+                this.id,
+                message.correlationId,
+                message.correlationId,
+                message.sourceAgent
+              ));
+            }
           }
 
-          if (adminResponseResult.success) {
+          if (isSuccess(adminResponseResult)) {
             let responsePayload: string;
             if (typeof adminResponseResult.data === 'string') {
               responsePayload = adminResponseResult.data;
-            } else if (adminResponseResult.data && typeof adminResponseResult.data === 'object') {
+            } else if (typeof adminResponseResult.data === 'object') {
               responsePayload = JSON.stringify(adminResponseResult.data, null, 2); // Pretty print JSON
             } else {
               responsePayload = 'Admin command executed successfully.';
             }
 
             return success(createAgentMessage(
-              'ADMIN_RESPONSE',
+              MessageTypes.ADMIN_RESPONSE, // Use MessageTypes enum
               responsePayload, // Send formatted string as payload
               this.id,
               message.correlationId, // Use message.correlationId as conversationId
@@ -171,15 +189,17 @@ export class AdminConversationalAgent extends CommunicatingAgent {
             ));
           } else {
             // Handle specific error codes from adminPreferenceService
-            if (adminResponseResult.error.code === 'MISSING_PREFERENCE_DATA') {
-              return failure(adminResponseResult.error);
+            const error = adminResponseResult.error;
+            if (error.code === 'MISSING_PREFERENCE_DATA') {
+              return failure(error);
             }
-            return failure(adminResponseResult.error);
+            return failure(error);
           }
 
         } else {
-          this.logger.error(`[${correlationId}] Failed to extract admin command: ${extractionResult.error.message}`, { correlationId, error: extractionResult.error });
-          return failure(new AgentError(`Failed to understand command: ${extractionResult.error.message}`, 'LLM_EXTRACTION_FAILED', this.id, correlationId, true, { originalError: extractionResult.error.message }));
+          const extractionError = extractionResult.error;
+          this.logger.error(`[${correlationId}] Failed to extract admin command: ${extractionError.message}`, { correlationId, error: extractionError });
+          return failure(new AgentError(`Failed to understand command: ${extractionError.message}`, 'LLM_EXTRACTION_FAILED', this.id, correlationId, true, { originalError: extractionError.message }));
         }
       }
 

@@ -21,8 +21,8 @@ export abstract class BaseAgent<TConfig = unknown, TState = unknown> {
   protected dependencies: AgentDependencies; // Made protected for now
 
   constructor(
-    @inject(TYPES.AgentId) id: string,
-    @inject(TYPES.AgentConfig) config: TConfig,
+    id: string,
+    config: TConfig,
     @inject(TYPES.AgentDependencies) dependencies: AgentDependencies
   ) {
     this.id = id;

@@ -9,9 +9,10 @@ import { InputValidationSchema } from '../../types/agent-outputs';
 import { BasicDeadLetterProcessor } from '../DeadLetterProcessor';
 import { Result } from '../types/Result';
 import { AgentError } from './AgentError';
-import { CommunicatingAgent, CommunicatingAgentDependencies } from './CommunicatingAgent';
+import { CommunicatingAgent } from './CommunicatingAgent';
 import { AgentMessage, createAgentMessage, MessageTypes } from './communication/AgentMessage'; // Added MessageTypes
 import { EnhancedAgentCommunicationBus } from './communication/EnhancedAgentCommunicationBus';
+import { ICommunicatingAgentDependencies } from '../../di/Types'; // Import ICommunicatingAgentDependencies
 
 export interface ValidationResult extends z.infer<typeof InputValidationSchema> {}
 
@@ -26,21 +27,13 @@ export interface InputValidationAgentConfig {
 @injectable()
 export class InputValidationAgent extends CommunicatingAgent {
   constructor(
-    @inject(EnhancedAgentCommunicationBus) private readonly injectedCommunicationBus: EnhancedAgentCommunicationBus,
     @inject(TYPES.DeadLetterProcessor) private readonly deadLetterProcessor: BasicDeadLetterProcessor,
-    @inject(TYPES.Logger) protected readonly logger: winston.Logger,
     @inject(TYPES.InputValidationAgentConfig) private readonly agentConfig: InputValidationAgentConfig,
     @inject(TYPES.LLMService) private readonly llmService: LLMService,
-    @inject(TYPES.PromptManager) private readonly promptManager: PromptManager
+    @inject(TYPES.PromptManager) private readonly promptManager: PromptManager,
+    @inject(TYPES.CommunicatingAgentDependencies) dependencies: ICommunicatingAgentDependencies // Inject dependencies for base class
   ) {
     const id = 'input-validation-agent';
-    const dependencies: CommunicatingAgentDependencies = {
-      communicationBus: injectedCommunicationBus,
-      logger: logger,
-      messageQueue: {} as any,
-      stateManager: {} as any,
-      config: agentConfig as any
-    };
     super(id, agentConfig, dependencies);
     this.registerHandlers();
     this.logger.info(`[${this.id}] InputValidationAgent initialized`, { agentId: this.id, operation: 'initialization' });

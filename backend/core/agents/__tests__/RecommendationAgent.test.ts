@@ -8,6 +8,7 @@ import winston from 'winston';
 import { createAgentMessage } from '../communication/AgentMessage';
 import { EnhancedAgentCommunicationBus } from '../communication/EnhancedAgentCommunicationBus';
 import { RecommendationResult } from '../../../types/agent-outputs';
+import { ICommunicatingAgentDependencies } from '../../../di/Types';
 
 // Test wrapper to access protected properties for testing
 class TestRecommendationAgent extends RecommendationAgent {
@@ -39,6 +40,7 @@ describe('RecommendationAgent', () => {
   let mockKnowledgeGraphService: KnowledgeGraphService;
   let agent: TestRecommendationAgent;
   let mockAgentConfig: RecommendationAgentConfig;
+  let mockCommunicatingAgentDependencies: ICommunicatingAgentDependencies;
 
   beforeEach(() => {
     mockBus = mockDeep<EnhancedAgentCommunicationBus>();
@@ -58,14 +60,21 @@ describe('RecommendationAgent', () => {
       fallbackToLLM: true,
       confidenceThreshold: 0.7
     };
+    mockCommunicatingAgentDependencies = {
+      communicationBus: mockBus,
+      logger: mockLogger,
+      messageQueue: {} as any,
+      stateManager: {} as any,
+      config: mockAgentConfig as any,
+    };
+
     jest.clearAllMocks();
     agent = new TestRecommendationAgent(
       mockLLMService,
       mockKnowledgeGraphService,
       mockDeadLetter,
-      mockLogger,
-      mockBus,
-      mockAgentConfig
+      mockAgentConfig,
+      mockCommunicatingAgentDependencies
     );
   });
 

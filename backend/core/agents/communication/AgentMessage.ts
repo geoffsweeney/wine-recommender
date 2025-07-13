@@ -31,12 +31,14 @@ export const MessageTypes = {
   UPDATE_RECOMMENDATION_HISTORY: 'update_recommendation_history',
   GENERATE_EXPLANATION: 'generate_explanation',
   ORCHESTRATE_RECOMMENDATION_REQUEST: 'orchestrate_recommendation_request',
-  ORCHESTRATE_ADMIN_COMMAND: 'orchestrate_admin_command', // Added for admin commands
-  ADMIN_CONVERSATIONAL_COMMAND: 'admin_conversational_command', // Added for admin conversational agent
-  PREFERENCE_EXTRACTION_REQUEST: 'preference-extraction-request', // Added
-  PREFERENCE_EXTRACTION_RESPONSE: 'preference-extraction-response', // Added
+  ORCHESTRATE_ADMIN_COMMAND: 'orchestrate_admin_command',
+  ADMIN_CONVERSATIONAL_COMMAND: 'admin_conversational_command',
+  ADMIN_CONFIRMATION_REQUIRED: 'admin_confirmation_required', // New message type for confirmation
+  ADMIN_RESPONSE: 'admin_response', // New message type for general admin responses
+  PREFERENCE_EXTRACTION_REQUEST: 'preference-extraction-request',
+  PREFERENCE_EXTRACTION_RESPONSE: 'preference-extraction-response',
   ERROR: 'error',
-  PREFERENCE_UPDATE: 'preference-update', // Added
+  PREFERENCE_UPDATE: 'preference-update',
   // Add other message types as needed
 } as const;
 

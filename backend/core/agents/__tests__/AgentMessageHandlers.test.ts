@@ -16,6 +16,7 @@ describe('Agent Message Handlers', () => {
   let mockLogger: winston.Logger;
   let agent: InputValidationAgent; // Changed type to InputValidationAgent
   let mockAgentConfig: InputValidationAgentConfig;
+  let mockCommunicatingAgentDependencies: any; // Add mock for ICommunicatingAgentDependencies
 
   beforeEach(() => {
     container.clearInstances(); // Clear the container before each test
@@ -33,6 +34,12 @@ describe('Agent Message Handlers', () => {
       maxIngredients: 5
     };
 
+    mockCommunicatingAgentDependencies = {
+      communicationBus: mockBus,
+      deadLetterProcessor: mockDeadLetter,
+      logger: mockLogger,
+    };
+
     // Create mocks for LLMService and PromptManager
     const mockLLMService = mockDeep<LLMService>();
     const mockPromptManager = mockDeep<PromptManager>(); // Add mock for PromptManager
@@ -41,12 +48,11 @@ describe('Agent Message Handlers', () => {
     const mockLlmApiKey = 'mock-api-key'; // Mock the LLM API Key
 
     // Register mocks with the container
-    container.registerInstance(TYPES.AgentCommunicationBus, mockBus);
-    container.registerInstance(TYPES.DeadLetterProcessor, mockDeadLetter);
-    container.registerInstance(TYPES.Logger, mockLogger);
+    container.registerInstance(TYPES.CommunicatingAgentDependencies, mockCommunicatingAgentDependencies);
+    container.registerInstance(TYPES.DeadLetterProcessor, mockDeadLetter); // Re-add this
+    container.registerInstance(TYPES.LLMService, mockLLMService); // Re-add this
+    container.registerInstance(TYPES.PromptManager, mockPromptManager); // Re-add this
     container.registerInstance(TYPES.InputValidationAgentConfig, mockAgentConfig);
-    container.registerInstance(TYPES.LLMService, mockLLMService); // Register mock LLMService
-    container.registerInstance(TYPES.PromptManager, mockPromptManager); // Register mock PromptManager
     container.registerInstance(TYPES.LlmApiUrl, mockLlmApiUrl); // Register mock LLM API URL
     container.registerInstance(TYPES.LlmModel, mockLlmModel); // Register mock LLM Model
     container.registerInstance(TYPES.LlmApiKey, mockLlmApiKey); // Register mock LLM API Key

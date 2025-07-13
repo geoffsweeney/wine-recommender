@@ -1,14 +1,12 @@
-import neo4j, { Driver, int as neo4jInt } from "neo4j-driver";
 import { inject, injectable } from "tsyringe";
+import { int as neo4jInt } from "neo4j-driver";
 import { AgentError } from '../core/agents/AgentError'; // Import AgentError
 import { Result } from '../core/types/Result'; // Import Result
 import { ILogger, TYPES } from '../di/Types';
-import { INeo4jCircuitWrapper } from "./Neo4jCircuitWrapper";
+import { INeo4jCircuitWrapper } from "./Neo4jCircuitWrapper"; // Import the interface
 
 @injectable()
 export class Neo4jService {
-  private driver: Driver | null = null;
-
   constructor(
     @inject(TYPES.Neo4jUri) private readonly uri: string,
     @inject(TYPES.Neo4jUser) private readonly user: string,
@@ -16,42 +14,17 @@ export class Neo4jService {
     @inject(TYPES.Neo4jCircuitWrapper) private readonly circuit: INeo4jCircuitWrapper,
     @inject(TYPES.Logger) private readonly logger: ILogger
   ) {
-  }
-
-  async init(): Promise<void> {
-    if (this.driver) {
-      this.logger.info('Neo4j driver already initialized.');
-      return;
-    }
-    try {
-      this.driver = neo4j.driver(
-        this.uri,
-        neo4j.auth.basic(this.user, this.password),
-        {
-          maxConnectionLifetime: 3 * 60 * 60 * 1000, // 3 hours
-          maxConnectionPoolSize: 50,
-          connectionAcquisitionTimeout: 2 * 60 * 1000, // 2 minutes
-          disableLosslessIntegers: false
-        }
-      );
-      this.logger.info('Neo4j driver initialized successfully');
-    } catch (error) {
-      this.logger.error('Failed to initialize Neo4j driver', { error });
-      throw error;
-    }
+    // The Neo4j driver is now managed by Neo4jCircuitWrapper
+    // No direct driver initialization here
   }
 
   async executeQuery<T = any>(query: string, params?: Record<string, any>): Promise<T[]> {
-    if (!this.driver) {
-      await this.init(); // Initialize driver if not already
-    }
-
     const processedParams = params ? this.convertToNeo4jTypes(params) : undefined;
     
-    const circuitResult = await this.circuit.executeQuery<T>(query, processedParams); // Use new return type
+    const circuitResult = await this.circuit.executeQuery<T>(query, processedParams);
     
     if (!circuitResult.success) {
-      throw circuitResult.error; // Propagate AgentError
+      throw circuitResult.error;
     }
     return circuitResult.data;
   }
@@ -94,11 +67,6 @@ export class Neo4jService {
   }
 
   async verifyConnection(): Promise<Result<boolean, AgentError>> {
-    if (!this.driver) {
-      this.logger.warn('Cannot verify connection - driver not initialized');
-      return { success: false, error: new AgentError('Neo4j driver not initialized', 'NEO4J_DRIVER_NOT_INITIALIZED', 'Neo4jService', 'N/A', false) };
-    }
-
     const verificationResult = await this.circuit.verifyConnection();
     if (!verificationResult.success) {
       return { success: false, error: verificationResult.error };
@@ -107,15 +75,12 @@ export class Neo4jService {
   }
 
   async close(): Promise<void> {
-    if (this.driver) {
-      try {
-        await this.circuit.close();
-        this.driver = null;
-        this.logger.info('Neo4j service closed successfully');
-      } catch (error) {
-        this.logger.error('Failed to close Neo4j service', { error });
-        throw error;
-      }
+    try {
+      await this.circuit.close();
+      this.logger.info('Neo4j service closed successfully');
+    } catch (error) {
+      this.logger.error('Failed to close Neo4j service', { error });
+      throw error;
     }
   }
 

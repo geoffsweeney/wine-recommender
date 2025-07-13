@@ -6,6 +6,7 @@ import { LLMService } from '../../../services/LLMService';
 import winston from 'winston';
 import { createAgentMessage } from '../communication/AgentMessage';
 import { EnhancedAgentCommunicationBus } from '../communication/EnhancedAgentCommunicationBus';
+import { ICommunicatingAgentDependencies } from '../../../di/Types';
 
 // Test wrapper to access protected properties for testing
 class TestFallbackAgent extends FallbackAgent {
@@ -24,6 +25,7 @@ describe('FallbackAgent', () => {
   let mockLLMService: LLMService;
   let agent: TestFallbackAgent;
   let mockAgentConfig: FallbackAgentConfig;
+  let mockCommunicatingAgentDependencies: ICommunicatingAgentDependencies;
 
   beforeEach(() => {
     mockBus = mockDeep<EnhancedAgentCommunicationBus>();
@@ -33,13 +35,20 @@ describe('FallbackAgent', () => {
     mockAgentConfig = {
       defaultFallbackResponse: 'I am sorry, I cannot help with that right now.'
     };
+    mockCommunicatingAgentDependencies = {
+      communicationBus: mockBus,
+      logger: mockLogger,
+      messageQueue: {} as any,
+      stateManager: {} as any,
+      config: mockAgentConfig as any,
+    };
+
     jest.clearAllMocks();
     agent = new TestFallbackAgent(
       mockLLMService,
       mockDeadLetter,
-      mockLogger,
-      mockBus,
-      mockAgentConfig
+      mockAgentConfig,
+      mockCommunicatingAgentDependencies
     );
   });
 

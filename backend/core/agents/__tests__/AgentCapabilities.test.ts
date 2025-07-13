@@ -1,3 +1,4 @@
+import { mock } from 'jest-mock-extended'; // Import mock
 import { InputValidationAgent } from '../InputValidationAgent';
 import { RecommendationAgent } from '../RecommendationAgent';
 import { LLMRecommendationAgent } from '../LLMRecommendationAgent';
@@ -10,6 +11,8 @@ import { AgentRegistry } from '../AgentRegistry';
 import { createTestContainer } from '../../../test-setup'; // Import the testContainer factory
 import { TYPES } from '../../../di/Types';
 import { DependencyContainer } from 'tsyringe';
+import { AdminConversationalAgent } from '../AdminConversationalAgent'; // Import AdminConversationalAgent
+import { AdminPreferenceService } from '../../../services/AdminPreferenceService'; // Import AdminPreferenceService
 
 describe('Agent Capabilities', () => {
   let container: DependencyContainer;
@@ -26,6 +29,14 @@ describe('Agent Capabilities', () => {
     container.register('UserPreferenceAgent', { useClass: UserPreferenceAgent });
     container.register('ExplanationAgent', { useClass: ExplanationAgent });
     container.register('FallbackAgent', { useClass: FallbackAgent });
+    container.register('AdminConversationalAgent', { useClass: AdminConversationalAgent }); // Register AdminConversationalAgent
+    container.registerInstance(TYPES.AdminConversationalAgentConfig, { agentId: 'test-admin-conversational-agent' }); // Register mock config
+
+    // Register mock CommunicatingAgentDependencies
+    container.registerInstance(TYPES.CommunicatingAgentDependencies, {
+      communicationBus: mock<any>(), // Mock the communication bus
+      logger: mock<any>() // Mock the logger
+    });
   });
 
   afterEach(() => {
@@ -133,6 +144,8 @@ describe('Agent Capabilities', () => {
       
       // Register ShopperAgentConfig
       container.register(TYPES.ShopperAgentConfig, { useValue: {} });
+      container.register(TYPES.AdminPreferenceService, { useValue: mock<AdminPreferenceService>() }); // Register mock AdminPreferenceService
+      container.registerInstance(TYPES.FeatureFlags, { adminConversationalPreferences: true }); // Register mock FeatureFlags
 
       agentRegistry = container.resolve(AgentRegistry);
     });

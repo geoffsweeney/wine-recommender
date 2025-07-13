@@ -1,5 +1,6 @@
 import { inject, injectable } from 'tsyringe';
-import { CommunicatingAgent, CommunicatingAgentDependencies } from './CommunicatingAgent';
+import { CommunicatingAgent } from './CommunicatingAgent';
+import { ICommunicatingAgentDependencies } from '../../di/Types';
 import { AgentMessage, createAgentMessage, MessageTypes } from './communication/AgentMessage';
 import { EnhancedAgentCommunicationBus } from './communication/EnhancedAgentCommunicationBus';
 import { LLMService } from '../../services/LLMService';
@@ -42,19 +43,11 @@ export class ExplanationAgent extends CommunicatingAgent {
   constructor(
     @inject(LLMService) private readonly llmService: LLMService,
     @inject(TYPES.DeadLetterProcessor) private readonly deadLetterProcessor: DeadLetterProcessor,
-    @inject(TYPES.Logger) protected readonly logger: winston.Logger,
-    @inject(EnhancedAgentCommunicationBus) private readonly injectedCommunicationBus: EnhancedAgentCommunicationBus,
     @inject(TYPES.ExplanationAgentConfig) private readonly agentConfig: ExplanationAgentConfig, // Inject agent config
-    @inject(TYPES.PromptManager) private readonly promptManager: PromptManager // Inject PromptManager
+    @inject(TYPES.PromptManager) private readonly promptManager: PromptManager, // Inject PromptManager
+    @inject(TYPES.CommunicatingAgentDependencies) dependencies: ICommunicatingAgentDependencies // Inject dependencies for base class
   ) {
     const id = 'explanation-agent';
-    const dependencies: CommunicatingAgentDependencies = {
-      communicationBus: injectedCommunicationBus,
-      logger: logger,
-      messageQueue: {} as any, // Placeholder for IMessageQueue
-      stateManager: {} as any, // Placeholder for IStateManager
-      config: agentConfig as any // Use the injected config
-    };
     super(id, agentConfig, dependencies);
     this.registerHandlers(); // Corrected method name
     this.logger.info(`[${this.id}] ExplanationAgent initialized`, { agentId: this.id, operation: 'initialization' });

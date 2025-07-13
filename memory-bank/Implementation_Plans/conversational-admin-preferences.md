@@ -25,6 +25,16 @@ The new feature aligns with existing architecture patterns, leveraging the agent
 ### Proposed Architecture for Conversational Admin User Preference Manager:
 
 #### Frontend (Chatbot UI)
+*   **Admin Mode/Context (Simplified)**: Implemented a simple mechanism to activate "admin context" in the UI using `/admin` and `/exitadmin` commands. Visual indicators for "admin mode" are also in place. (Completed)
+*   **Input Routing**: The chatbot input component has been modified to conditionally route administrator input to the `/admin-commands` API endpoint, constructing the appropriate payload (`AdminCommandRequest`). (Completed)
+*   **Dynamic Response Display**:
+    *   Logic to parse responses from the `AdminConversationalAgent` (handling both string and JSON formats) has been implemented.
+    *   UI components for structured display have been developed:
+        *   An interactive table (`AdminPreferenceTable.tsx`) is used for displaying "view" preferences.
+        *   The backend was modified to return structured data for "add"/"update" operations, which is now displayed in the `AdminPreferenceTable`.
+        *   Confirmation dialogs (`AdminConfirmationDialog.tsx`) are implemented for "delete" commands, with backend-driven confirmation.
+    *   Clear error display for API responses has been implemented. (Completed)
+*   **UI/UX Considerations**: The initial implementation focuses on functional display of structured data (tables, confirmation dialogs). Further enhancements for interactive forms and more advanced UI/UX are planned for future iterations.
 *   **New Admin Mode/Context**: The chatbot UI will need a mechanism to identify if the current user is an administrator and activate an "admin mode" or context. This could be based on user roles or a simple toggle.
 *   **Input Handling**: When in admin mode, user input will be routed to a new backend endpoint or agent specifically designed for administrative commands.
 *   **Output Display**: Responses from the backend, including preference data or confirmation messages, will be displayed in the chatbot UI.
@@ -48,7 +58,7 @@ The new feature aligns with existing architecture patterns, leveraging the agent
     *   `UserProfileService`: For user-related data.
 *   **Error Handling**: Implement robust error handling, returning `Result` types.
 *   **Logging & Tracing**: Ensure `correlationId` is passed through all internal calls and logged.
-*   **Dependency Injection**: The agent will be injected with `PromptManager`, `LLMService`, `AdminUserPreferenceController` (or `AdminPreferenceService`), `KnowledgeGraphService`, `UserProfileService`, and its own configuration.
+*   **Dependency Injection**: The agent will leverage the new `tsyringe`-based Dependency Injection system. All its dependencies, including `PromptManager`, `LLMService`, `AdminUserPreferenceController` (or `AdminPreferenceService`), `KnowledgeGraphService`, `UserProfileService`, and its own configuration, will be injected through its constructor, adhering to the modular registration patterns established in `backend/di/modules/agents.ts`.
 
 #### Backend (New Service: `AdminPreferenceService` - Optional but Recommended)
 *   **Purpose**: To encapsulate the business logic for admin preference management, providing a cleaner interface for the `AdminConversationalAgent` than directly calling the controller. This service would wrap the calls to `AdminUserPreferenceController` and potentially add additional validation or business rules.

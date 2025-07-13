@@ -1,5 +1,6 @@
 import { inject, injectable } from 'tsyringe';
-import { CommunicatingAgent, CommunicatingAgentDependencies } from './CommunicatingAgent';
+import { CommunicatingAgent } from './CommunicatingAgent';
+import { ICommunicatingAgentDependencies } from '../../di/Types';
 import { EnhancedAgentCommunicationBus } from './communication/EnhancedAgentCommunicationBus';
 import { AgentMessage, createAgentMessage } from './communication/AgentMessage';
 import { DeadLetterProcessor } from '../DeadLetterProcessor';
@@ -32,18 +33,10 @@ export class MCPAdapterAgent extends CommunicatingAgent {
   constructor(
   @inject(MCPClient) private readonly mcpClient: MCPClient,
   @inject(TYPES.DeadLetterProcessor) private readonly deadLetterProcessor: DeadLetterProcessor,
-  @inject(TYPES.Logger) protected readonly logger: winston.Logger,
-  @inject(EnhancedAgentCommunicationBus) private readonly injectedCommunicationBus: EnhancedAgentCommunicationBus,
-  @inject(TYPES.MCPAdapterAgentConfig) private readonly agentConfig: MCPAdapterAgentConfig // Inject agent config
+  @inject(TYPES.MCPAdapterAgentConfig) private readonly agentConfig: MCPAdapterAgentConfig, // Inject agent config
+  @inject(TYPES.CommunicatingAgentDependencies) dependencies: ICommunicatingAgentDependencies // Inject dependencies for base class
   ) {
     const id = 'mcp-adapter';
-    const dependencies: CommunicatingAgentDependencies = {
-      communicationBus: injectedCommunicationBus,
-      logger: logger,
-      messageQueue: {} as any, // Placeholder for IMessageQueue
-      stateManager: {} as any, // Placeholder for IStateManager
-      config: agentConfig as any // Use the injected config
-    };
     super(id, agentConfig, dependencies);
     this.registerHandlers();
     this.logger.info(`[${this.id}] MCPAdapterAgent initialized`, { agentId: this.id, operation: 'initialization' });

@@ -1,5 +1,6 @@
 import { inject, injectable } from 'tsyringe';
-import { CommunicatingAgent, CommunicatingAgentDependencies } from './CommunicatingAgent';
+import { CommunicatingAgent } from './CommunicatingAgent';
+import { ICommunicatingAgentDependencies } from '../../di/Types';
 import { EnhancedAgentCommunicationBus } from './communication/EnhancedAgentCommunicationBus';
 import { AgentMessage, createAgentMessage, MessageTypes } from './communication/AgentMessage';
 import { DeadLetterProcessor } from '../DeadLetterProcessor';
@@ -33,18 +34,10 @@ export class FallbackAgent extends CommunicatingAgent {
   constructor(
     @inject(LLMService) private readonly llmService: LLMService,
     @inject(TYPES.DeadLetterProcessor) private readonly deadLetterProcessor: DeadLetterProcessor,
-    @inject(TYPES.Logger) protected readonly logger: winston.Logger,
-    @inject(EnhancedAgentCommunicationBus) private readonly injectedCommunicationBus: EnhancedAgentCommunicationBus,
-    @inject(TYPES.FallbackAgentConfig) private readonly agentConfig: FallbackAgentConfig // Inject agent config
+    @inject(TYPES.FallbackAgentConfig) private readonly agentConfig: FallbackAgentConfig, // Inject agent config
+    @inject(TYPES.CommunicatingAgentDependencies) dependencies: ICommunicatingAgentDependencies // Inject dependencies for base class
   ) {
     const id = 'fallback-agent';
-    const dependencies: CommunicatingAgentDependencies = {
-      communicationBus: injectedCommunicationBus,
-      logger: logger,
-      messageQueue: {} as any, // Placeholder for IMessageQueue
-      stateManager: {} as any, // Placeholder for IStateManager
-      config: agentConfig as any // Use the injected config
-    };
     super(id, agentConfig, dependencies);
     this.registerHandlers(); // Corrected method name
     this.logger.info(`[${this.id}] FallbackAgent initialized`, { agentId: this.id, operation: 'initialization' });

@@ -9,7 +9,7 @@ import { UserProfileService } from '../../../services/UserProfileService';
 import { failure, success } from '../../../utils/result-utils';
 import { AdminConversationalAgent, AdminConversationalAgentConfig } from '../AdminConversationalAgent';
 import { AgentError } from '../AgentError';
-import { CommunicatingAgentDependencies } from '../CommunicatingAgent';
+import { ICommunicatingAgentDependencies } from '../../../di/Types';
 import { createAgentMessage, MessageTypes } from '../communication/AgentMessage';
 
 describe('AdminConversationalAgent', () => {
@@ -20,7 +20,7 @@ describe('AdminConversationalAgent', () => {
   let mockKnowledgeGraphService: jest.Mocked<KnowledgeGraphService>;
   let mockUserProfileService: jest.Mocked<UserProfileService>;
   let mockLogger: jest.Mocked<ILogger>;
-  let mockCommunicatingAgentDependencies: CommunicatingAgentDependencies;
+  let mockCommunicatingAgentDependencies: ICommunicatingAgentDependencies;
   let mockFeatureFlags: FeatureFlags;
 
   const agentConfig: AdminConversationalAgentConfig = {
@@ -52,7 +52,6 @@ describe('AdminConversationalAgent', () => {
       mockKnowledgeGraphService,
       mockUserProfileService,
       mockCommunicatingAgentDependencies,
-      mockLogger,
       mockFeatureFlags
     );
 
@@ -111,7 +110,7 @@ describe('AdminConversationalAgent', () => {
 
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data?.type).toBe('ADMIN_RESPONSE');
+      expect(result.data?.type).toBe('admin_response');
       expect(result.data?.payload).toBe(JSON.stringify(mockPreferences, null, 2));
     }
     expect(mockLlmService.sendStructuredPrompt).toHaveBeenCalledWith(
@@ -146,7 +145,7 @@ describe('AdminConversationalAgent', () => {
 
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data?.type).toBe('ADMIN_RESPONSE');
+      expect(result.data?.type).toBe('admin_response');
       expect(result.data?.payload).toBe('Preference added.');
     }
     expect(mockAdminPreferenceService.addOrUpdateUserPreferences).toHaveBeenCalledWith(
@@ -180,7 +179,7 @@ describe('AdminConversationalAgent', () => {
 
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data?.type).toBe('ADMIN_RESPONSE');
+      expect(result.data?.type).toBe('admin_response');
       expect(result.data?.payload).toBe('Preference updated.');
     }
     expect(mockAdminPreferenceService.addOrUpdateUserPreferences).toHaveBeenCalledWith(
@@ -214,16 +213,15 @@ describe('AdminConversationalAgent', () => {
 
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data?.type).toBe('ADMIN_RESPONSE');
-      expect(result.data?.payload).toBe('Preference deleted.');
+      expect(result.data?.type).toBe('admin_confirmation_required');
+      // For delete operations, we expect a confirmation message
+      const payload = result.data?.payload as any;
+      expect(payload.action).toBe('confirm_delete');
+      expect(payload.userId).toBe(userId);
+      expect(payload.preferenceType).toBe(preferenceType);
+      expect(payload.preferenceValue).toBe(preferenceValue);
     }
-    expect(mockAdminPreferenceService.deletePreference).toHaveBeenCalledWith(
-      userId,
-      correlationId,
-      preferenceType,
-      preferenceValue,
-      undefined
-    );
+    expect(mockAdminPreferenceService.deletePreference).not.toHaveBeenCalled();
   });
 
   it('should extract and process "delete" command by preferenceId successfully', async () => {
@@ -249,16 +247,14 @@ describe('AdminConversationalAgent', () => {
 
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data?.type).toBe('ADMIN_RESPONSE');
-      expect(result.data?.payload).toBe('Preference deleted by ID.');
+      expect(result.data?.type).toBe('admin_confirmation_required');
+      // For delete operations, we expect a confirmation message
+      const payload = result.data?.payload as any;
+      expect(payload.action).toBe('confirm_delete');
+      expect(payload.userId).toBe(userId);
+      expect(payload.preferenceId).toBe(preferenceId);
     }
-    expect(mockAdminPreferenceService.deletePreference).toHaveBeenCalledWith(
-      userId,
-      correlationId,
-      undefined,
-      undefined,
-      preferenceId
-    );
+    expect(mockAdminPreferenceService.deletePreference).not.toHaveBeenCalled();
   });
 
   it('should extract and process "delete all" command successfully', async () => {
@@ -283,10 +279,14 @@ describe('AdminConversationalAgent', () => {
 
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data?.type).toBe('ADMIN_RESPONSE');
-      expect(result.data?.payload).toBe('All preferences deleted.');
+      expect(result.data?.type).toBe('admin_confirmation_required');
+      // For delete operations, we expect a confirmation message
+      const payload = result.data?.payload as any;
+      expect(payload.action).toBe('confirm_delete');
+      expect(payload.userId).toBe(userId);
+      expect(payload.message).toContain('all preferences');
     }
-    expect(mockAdminPreferenceService.deleteAllPreferencesForUser).toHaveBeenCalledWith(userId, correlationId);
+    expect(mockAdminPreferenceService.deleteAllPreferencesForUser).not.toHaveBeenCalled();
   });
 
   it('should return LLM_EXTRACTION_FAILED error if LLM extraction fails', async () => {

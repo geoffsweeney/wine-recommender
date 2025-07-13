@@ -6,6 +6,7 @@ import { EnhancedAgentCommunicationBus } from '../communication/EnhancedAgentCom
 import { MCPClient } from '../../../mcp/mcpClient';
 import winston from 'winston';
 import { createAgentMessage } from '../communication/AgentMessage';
+import { ICommunicatingAgentDependencies } from '../../../di/Types';
 
 // Test wrapper to access protected properties for testing
 class TestMCPAdapterAgent extends MCPAdapterAgent {
@@ -21,6 +22,7 @@ describe('MCPAdapterAgent', () => {
   let mockMCPClient: MCPClient;
   let agent: TestMCPAdapterAgent;
   let mockAgentConfig: MCPAdapterAgentConfig;
+  let mockCommunicatingAgentDependencies: ICommunicatingAgentDependencies;
 
   beforeEach(() => {
     mockBus = mockDeep<EnhancedAgentCommunicationBus>();
@@ -35,13 +37,20 @@ describe('MCPAdapterAgent', () => {
     mockAgentConfig = {
       defaultToolTimeoutMs: 5000
     };
+    mockCommunicatingAgentDependencies = {
+      communicationBus: mockBus,
+      logger: mockLogger,
+      messageQueue: {} as any,
+      stateManager: {} as any,
+      config: mockAgentConfig as any,
+    };
+
     jest.clearAllMocks();
     agent = new TestMCPAdapterAgent(
       mockMCPClient,
       mockDeadLetter,
-      mockLogger,
-      mockBus,
-      mockAgentConfig
+      mockAgentConfig,
+      mockCommunicatingAgentDependencies
     );
   });
 

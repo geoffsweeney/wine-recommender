@@ -4,6 +4,7 @@ import { createTestContainer } from '../../test-setup';
 import { UserPreferences } from '../../types';
 import { KnowledgeGraphService } from '../KnowledgeGraphService';
 import { UserProfileService } from '../UserProfileService';
+import { TYPES } from '../../di/Types'; // Add this import
 
 describe('UserProfileService', () => {
   let service: UserProfileService;
@@ -14,12 +15,7 @@ describe('UserProfileService', () => {
   beforeEach(() => {
     ({ container, resetMocks } = createTestContainer());
 
-    mockKnowledgeGraphService = {
-      getPreferences: jest.fn(),
-      addOrUpdateUserPreferences: jest.fn(),
-    } as any;
-
-    container.register(KnowledgeGraphService, { useValue: mockKnowledgeGraphService });
+    mockKnowledgeGraphService = container.resolve(TYPES.KnowledgeGraphService) as jest.Mocked<KnowledgeGraphService>;
 
     service = container.resolve(UserProfileService);
   });

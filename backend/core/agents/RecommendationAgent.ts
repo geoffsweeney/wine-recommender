@@ -1,3 +1,4 @@
+import 'reflect-metadata';
 import { inject, injectable } from 'tsyringe';
 import winston from 'winston';
 import { z } from 'zod';
@@ -9,9 +10,10 @@ import { ExplanationConfidenceSchema, RecommendationResult } from '../../types/a
 import { DeadLetterProcessor } from '../DeadLetterProcessor';
 import { Result } from '../types/Result';
 import { AgentError } from './AgentError';
-import { CommunicatingAgent, CommunicatingAgentDependencies } from './CommunicatingAgent';
+import { CommunicatingAgent } from './CommunicatingAgent';
 import { AgentMessage, createAgentMessage, MessageTypes } from './communication/AgentMessage';
 import { EnhancedAgentCommunicationBus } from './communication/EnhancedAgentCommunicationBus';
+import { ICommunicatingAgentDependencies } from '../../di/Types'; // Import ICommunicatingAgentDependencies
 
 interface Wine extends WineNode {}
 
@@ -45,25 +47,17 @@ export interface RecommendationAgentConfig {
 @injectable()
 export class RecommendationAgent extends CommunicatingAgent {
   constructor(
-    @inject(LLMService) private readonly llmService: LLMService,
-    @inject(KnowledgeGraphService) private readonly knowledgeGraphService: KnowledgeGraphService,
+    @inject(TYPES.LLMService) private readonly llmService: LLMService,
+    @inject(TYPES.KnowledgeGraphService) private readonly knowledgeGraphService: KnowledgeGraphService,
     @inject(TYPES.DeadLetterProcessor) private readonly deadLetterProcessor: DeadLetterProcessor,
-    @inject(TYPES.Logger) protected readonly logger: winston.Logger,
-    @inject(EnhancedAgentCommunicationBus) private readonly injectedCommunicationBus: EnhancedAgentCommunicationBus,
-    @inject(TYPES.RecommendationAgentConfig) private readonly agentConfig: RecommendationAgentConfig
+    @inject(TYPES.RecommendationAgentConfig) private readonly agentConfig: RecommendationAgentConfig,
+    @inject(TYPES.CommunicatingAgentDependencies) dependencies: ICommunicatingAgentDependencies // Inject dependencies for base class
   ) {
     const id = 'recommendation-agent';
-    const dependencies: CommunicatingAgentDependencies = {
-      communicationBus: injectedCommunicationBus,
-      logger: logger,
-      messageQueue: {} as any,
-      stateManager: {} as any,
-      config: agentConfig as any
-    };
     super(id, agentConfig, dependencies);
     this.registerHandlers();
-    this.logger.info(`[${this.id}] RecommendationAgent initialized`, { 
-      agentId: this.id, 
+    this.logger.info(`[${this.id}] RecommendationAgent initialized`, {
+      agentId: this.id,
       operation: 'initialization',
       config: {
         knowledgeGraphEnabled: agentConfig.knowledgeGraphEnabled,

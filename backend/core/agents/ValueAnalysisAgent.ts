@@ -1,6 +1,7 @@
 import { inject, injectable } from 'tsyringe';
 import { TYPES } from '../../di/Types';
-import { CommunicatingAgent, CommunicatingAgentDependencies } from './CommunicatingAgent';
+import { CommunicatingAgent } from './CommunicatingAgent';
+import { ICommunicatingAgentDependencies } from '../../di/Types';
 import { DeadLetterProcessor } from '../DeadLetterProcessor';
 import { EnhancedAgentCommunicationBus } from './communication/EnhancedAgentCommunicationBus';
 import { AgentMessage, createAgentMessage } from './communication/AgentMessage';
@@ -33,19 +34,11 @@ export interface ValueAnalysisAgentConfig {
 @injectable()
 export class ValueAnalysisAgent extends CommunicatingAgent {
   constructor(
-    @inject(TYPES.AgentCommunicationBus) private readonly injectedCommunicationBus: EnhancedAgentCommunicationBus,
     @inject(TYPES.DeadLetterProcessor) private readonly deadLetterProcessor: DeadLetterProcessor,
-    @inject(TYPES.Logger) protected readonly logger: winston.Logger, // Inject logger
-    @inject(TYPES.ValueAnalysisAgentConfig) private readonly agentConfig: ValueAnalysisAgentConfig // Inject agent config
+    @inject(TYPES.ValueAnalysisAgentConfig) private readonly agentConfig: ValueAnalysisAgentConfig, // Inject agent config
+    @inject(TYPES.CommunicatingAgentDependencies) dependencies: ICommunicatingAgentDependencies // Inject dependencies for base class
   ) {
     const id = 'value-analysis-agent';
-    const dependencies: CommunicatingAgentDependencies = {
-      communicationBus: injectedCommunicationBus,
-      logger: logger,
-      messageQueue: {} as any, // Placeholder for IMessageQueue
-      stateManager: {} as any, // Placeholder for IStateManager
-      config: agentConfig as any // Use the injected config
-    };
     super(id, agentConfig, dependencies); // Pass agentConfig as the config for BaseAgent
     this.registerHandlers();
     this.logger.info(`[${this.id}] ValueAnalysisAgent initialized`, { agentId: this.id, operation: 'initialization' });

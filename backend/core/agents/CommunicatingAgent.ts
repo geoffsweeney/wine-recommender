@@ -6,22 +6,16 @@ import { AgentError } from './AgentError';
 import { Result } from '../types/Result';
 import winston from 'winston'; // Assuming logger is winston for now
 
-import { AgentDependencies, TYPES } from '../../di/Types'; // Import AgentDependencies and TYPES
-
-// Define AgentDependencies interface for CommunicatingAgent
-export interface CommunicatingAgentDependencies extends AgentDependencies {
-  communicationBus: EnhancedAgentCommunicationBus;
-  logger: winston.Logger; // Use winston.Logger for now, will align with ILogger later
-}
+import { ICommunicatingAgentDependencies, TYPES } from '../../di/Types'; // Import ICommunicatingAgentDependencies and TYPES
 
 export abstract class CommunicatingAgent extends BaseAgent<any, any> { // TConfig and TState will be defined by concrete agents
   protected communicationBus: EnhancedAgentCommunicationBus;
   protected logger: winston.Logger;
 
   constructor(
-    @inject(TYPES.AgentId) id: string, // Inject id
-    @inject(TYPES.AgentConfig) config: any, // Inject config
-    @inject(TYPES.CommunicatingAgentDependencies) dependencies: CommunicatingAgentDependencies // Inject dependencies
+    id: string, // Removed @inject and type
+    config: any, // Removed @inject and type
+    @inject(TYPES.CommunicatingAgentDependencies) dependencies: ICommunicatingAgentDependencies // Inject dependencies
   ) {
     super(id, config, dependencies);
     this.communicationBus = dependencies.communicationBus;

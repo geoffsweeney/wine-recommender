@@ -12,7 +12,7 @@ import { WineRecommendation, RankedWineRecommendation } from '../types';
 export class RecommendationService {
     constructor(
         @inject(Neo4jService) private neo4jService: Neo4jService,
-        @inject(KnowledgeGraphService) private knowledgeGraph: KnowledgeGraphService,
+        @inject(TYPES.KnowledgeGraphService) private knowledgeGraph: KnowledgeGraphService,
         @inject('logger') private logger: winston.Logger,
         @inject(TYPES.IRecommendationStrategy) private strategies: IRecommendationStrategy[]
     ) {}

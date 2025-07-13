@@ -24,26 +24,44 @@ describe('Integration Tests', () => {
 ## Missing Dependencies in Test Setup
 
 ### Problem
-Tests may fail if required dependencies are not properly registered or mocked in the test setup.
+Tests may fail if required dependencies are not properly registered or mocked in the `tsyringe` container during test setup.
 
 ### Solution
-- Ensure all required dependencies are properly registered in the dependency injection container.
-- For tests that require controllers or other components, create proper mocks and register them.
-- Verify that all necessary imports are included in test files.
+- Ensure all required dependencies are properly registered in the `tsyringe` dependency injection container.
+- For tests that require specific implementations or mocks, use `container.registerInstance()` or `container.register()` with `useValue` to provide them.
+- Always use the `setupContainer()` function from `backend/di/container.ts` to initialize the container for tests, and then override specific dependencies as needed.
+- Ensure `container.reset()` is called in `beforeEach` or `afterEach` to maintain test isolation.
 
 ### Example
 ```typescript
-import { mock } from 'jest-mock-extended';
-import { AdminCommandController } from '../../api/controllers/AdminCommandController';
+import { DependencyContainer } from 'tsyringe';
+import { setupContainer } from '../../backend/di/container';
+import { TYPES } from '../../backend/di/Types';
+import { ILogger } from '../../backend/di/Types'; // Assuming ILogger exists
+import { mock } from 'jest-mock-extended'; // If using jest-mock-extended
 
-describe('Integration Tests', () => {
-  const mockAdminCommandController = mock<AdminCommandController>();
+describe('My Service Integration Test', () => {
+  let container: DependencyContainer;
+  let mockLogger: jest.Mocked<ILogger>;
 
-  beforeAll(() => {
-    container.register(TYPES.AdminCommandController, { useValue: mockAdminCommandController });
+  beforeEach(async () => {
+    // Initialize the full container setup
+    container = await setupContainer();
+
+    // Create a mock for a specific dependency
+    mockLogger = mock<ILogger>();
+    // Override the Logger registration with the mock
+    container.registerInstance(TYPES.Logger, mockLogger);
+
+    // Ensure the container is reset for each test
+    container.reset(); // Call reset after setup to ensure clean state for each test
   });
 
-  // Test code
+  it('should log a message when performing an action', () => {
+    const myService = container.resolve(TYPES.MyService); // Assuming MyService is registered
+    myService.performAction();
+    expect(mockLogger.info).toHaveBeenCalledWith('Action performed');
+  });
 });
 ```
 
@@ -91,15 +109,34 @@ app.use(createRouter(container, mockAdminCommandController));
 ```
 
 ## Common Test Patterns
-
-### Mocking External Services
-For services that involve external systems (APIs, databases, etc.), use mocks to isolate the test from external dependencies.
-
+ 
+### Mocking External Services with `tsyringe`
+For services that involve external systems (APIs, databases, etc.), use `tsyringe`'s registration mechanisms to provide mock implementations, isolating the test from external dependencies.
+ 
 ```typescript
-container.register(TYPES.AgentCommunicationBus, {
-  useValue: {
-    sendMessageAndWaitForResponse: jest.fn().mockResolvedValue({ success: true, data: { payload: {} } }),
-  },
+import { container } from 'tsyringe';
+import { TYPES } from '../../backend/di/Types';
+import { IAgentCommunicationBus } from '../../backend/di/Types'; // Assuming IAgentCommunicationBus exists
+import { mock } from 'jest-mock-extended';
+
+describe('Agent Interaction Test', () => {
+  let mockAgentBus: jest.Mocked<IAgentCommunicationBus>;
+
+  beforeEach(() => {
+    container.reset(); // Ensure a clean container for each test
+
+    mockAgentBus = mock<IAgentCommunicationBus>();
+    mockAgentBus.publish.mockImplementation(() => {}); // Mock the publish method
+    mockAgentBus.subscribe.mockImplementation(() => {}); // Mock the subscribe method
+
+    container.registerInstance(TYPES.AgentCommunicationBus, mockAgentBus);
+  });
+
+  it('should publish a message to the agent bus', () => {
+    const myAgent = container.resolve(TYPES.MyAgent); // Assuming MyAgent is registered
+    myAgent.sendMessage();
+    expect(mockAgentBus.publish).toHaveBeenCalledWith(expect.any(Object));
+  });
 });
 ```
 

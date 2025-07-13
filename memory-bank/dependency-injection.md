@@ -1,111 +1,72 @@
-# Dependency Injection Guidelines
+# Refactoring Dependency Injection System - Plan
 
-## Testing Best Practices
+This plan outlines the steps to refactor the TypeScript Node.js application's dependency injection system using `tsyringe`, addressing circular dependencies, inconsistent registration patterns, and stability issues.
 
-1.  **Always mock all dependencies**:
-    *   Identify all dependencies in the dependency chain.
-    *   Create complete mock implementations for each, using `jest-mock-extended`'s `mock<T>()` for complex interfaces to ensure all methods and properties are correctly mocked.
-    *   Register all mocks in the container before each test.
+## Phase 1: Foundation Setup
 
-2.  **DI Container Setup for Tests - Isolation is Key**:
-    *   **Use a factory function for test containers**: Instead of a global `testContainer`, create a factory function (e.g., `createTestContainer()`) that returns a fresh `DependencyContainer` instance for each test or `beforeEach` block. This prevents state leakage and ensures test isolation.
-    *   **Example (`test-setup.ts` pattern)**:
-        ```typescript
-        // backend/test-setup.ts
-        import { container, DependencyContainer } from 'tsyringe';
-        import { mock } from 'jest-mock-extended';
-        import { TYPES } from './di/Types';
-        // ... other imports
+This phase focuses on establishing the core components for a robust DI system.
 
-        export const createTestContainer = (): { container: DependencyContainer; resetMocks: () => void } => {
-          container.clearInstances(); // Clear global container instances
-          container.reset(); // Reset global container registrations
+*   **Enhance Types System:**
+    *   **Objective:** Update [`di/Types.ts`](backend/di/Types.ts) to use typed symbols with `createSymbol<T>()` helper and define proper interfaces for all services. Remove concrete class dependencies and add configuration interfaces.
+    *   **Key Deliverables:** Full type safety for all registrations, interface-based service definitions, configuration type definitions, and proper symbol typing.
 
-          // Register mocks for all dependencies, including configs
-          container.registerInstance(TYPES.Logger, mockLogger);
-          container.registerInstance(TYPES.LlmApiUrl, 'http://mock-llm-api.com');
-          container.registerInstance(TYPES.InputValidationAgentConfig, { /* ...mock config */ });
-          // ... register all other mocks
+*   **Create ContainerManager:**
+    *   **Objective:** Create [`di/ContainerManager.ts`](backend/di/ContainerManager.ts) to implement a singleton pattern for container management, support for child containers, container lifecycle management, and container validation methods.
+    *   **Key Deliverables:** Thread-safe singleton implementation, proper error handling, and support for container clearing/reset.
 
-          const resetMocks = () => {
-            // Reset individual mock functions if needed
-            mockLogger.debug.mockReset();
-            // ... reset other mocks
-          };
+*   **Build ConfigurationRegistry:**
+    *   **Objective:** Create [`di/ConfigurationRegistry.ts`](backend/di/ConfigurationRegistry.ts) for service configuration management, dependency graph validation, topological sorting for initialization order, and circular dependency detection.
+    *   **Key Deliverables:** Detection of circular dependencies at setup time, clear error messages, support for different lifecycle patterns, and configuration validation.
 
-          return { container, resetMocks };
-        };
+## Phase 2: Modular Registration
 
-        // Export for convenience in simple test files, but prefer using createTestContainer() directly
-        export const { container: testContainer, resetMocks } = createTestContainer();
-        ```
-    *   **Example (`.test.ts` usage)**:
-        ```typescript
-        // backend/core/agents/__tests__/AgentCapabilities.test.ts
-        import { createTestContainer } from '../../../test-setup';
-        import { DependencyContainer } from 'tsyringe';
+This phase involves organizing service registrations into logical modules.
 
-        describe('Agent Capabilities', () => {
-          let container: DependencyContainer;
-          let resetMocks: () => void;
+*   **Implement Infrastructure Module:**
+    *   **Objective:** Create [`di/modules/infrastructure.ts`](backend/di/modules/infrastructure.ts) to handle logger setup (winston), database connections (Neo4j), external service connections, and circuit breaker configuration.
+    *   **Key Deliverables:** Environment-based configuration, proper connection pooling, health check implementations, and graceful failure handling.
 
-          beforeEach(() => {
-            ({ container, resetMocks } = createTestContainer());
-            // Register agent classes with the container for resolution
-            container.register('InputValidationAgent', { useClass: InputValidationAgent });
-            // ... register other agents
-          });
+*   ****Create Services Module:**
+    *   **Objective:** Create [`di/modules/services.ts`](backend/di/modules/services.ts) to register `LLMService` with proper factory, `Neo4jService` with connection management, `KnowledgeGraphService`, and `PromptManager` with configuration.
+    *   **Key Deliverables:** Factory patterns for complex services, proper dependency injection, configuration-driven setup, and service validation.
 
-          afterEach(() => {
-            resetMocks(); // Clean up mocks after each test
-          });
+*   **Build Agents Module:**
+    *   **Objective:** Create [`di/modules/agents.ts`](backend/di/modules/agents.ts) to handle agent communication bus, agent registry, agent configurations, and agent lifecycle management.
+    *   **Key Deliverables:** No direct agent-to-agent dependencies, communication bus pattern, configuration-driven agent setup, and proper agent initialization order.
 
-          it('should return correct capabilities for InputValidationAgent', () => {
-            const agent = container.resolve(InputValidationAgent);
-            // ... assertions
-          });
-        });
-        ```
+## Phase 3: Container Setup
 
-3.  **Matching Injection Tokens - A Critical Detail**:
-    *   The token used in `@inject(TOKEN)` must *exactly* match the token used in `container.registerInstance(TOKEN, instance)` or `container.register(TOKEN, { useClass: Class })`.
-    *   **Common Pitfall**: Do NOT mix `TYPES.SomeService` (a Symbol) with `SomeService` (the class constructor itself) as injection tokens. If an agent's constructor uses `@inject(TYPES.SomeService)`, then you *must* register it with `TYPES.SomeService`.
-    *   **Example**:
-        ```typescript
-        // Correct: If agent injects @inject(TYPES.KnowledgeGraphService)
-        container.registerInstance(TYPES.KnowledgeGraphService, mockKnowledgeGraphService);
+This phase focuses on refactoring the main container and integrating it with the server.
 
-        // Incorrect: If agent injects @inject(TYPES.KnowledgeGraphService) but you register this way
-        // container.registerInstance(KnowledgeGraphService, mockKnowledgeGraphService); // This will cause "unregistered dependency" errors
-        ```
+*   **Refactor Main Container:**
+    *   **Objective:** Refactor [`di/container.ts`](backend/di/container.ts) to use a `DependencySetup` class, implement proper initialization phases, add comprehensive validation, and support graceful failure.
+    *   **Key Deliverables:** Async setup with proper error handling, phase-based initialization, container validation, and environment-specific configurations.
 
-4.  **Comprehensive Mocking of Dependencies**:
-    *   Ensure *all* dependencies of a service or agent are mocked, including primitive values or configuration objects that are injected via `TYPES` symbols (e.g., `TYPES.LlmApiUrl`, `TYPES.Neo4jUri`).
-    *   If a service's constructor expects multiple individual injected values (e.g., `LLMService` expects `LlmApiUrl`, `LlmModel`, `LlmApiKey` separately), register each of these individually, even if they logically belong to a single "config" object.
+*   **Update Server Integration:**
+    *   **Objective:** Update [`server.ts`](backend/server.ts) to use async container setup, implement proper health checks, add graceful shutdown, and support container-aware routing.
+    *   **Key Deliverables:** Async server startup, health check with service validation, proper error handling, and container-aware middleware.
 
-5.  **Handling `Result<T, E>` Types in Mocks**:
-    *   If your application uses a `Result<T, E>` pattern for error handling, ensure your mocks return objects that conform to this structure (`{ success: true, data: T }` or `{ success: false, error: E }`).
-    *   **Example**:
-        ```typescript
-        // Correct: Mocking a service method that returns Result<string, AgentError>
-        mockLlmService.sendPrompt.mockResolvedValue({ success: true, data: 'mock-llm-response' });
+## Phase 4: Testing and Validation
 
-        // Incorrect: Will cause type errors if Result is expected
-        // mockLlmService.sendPrompt.mockResolvedValue('mock-llm-response');
-        ```
+This phase ensures the correctness and stability of the refactored system.
 
-+6.  **Jest Mocking and Configuration Best Practices**:
-+    *   **`jest.mock` Placement:** Always place `jest.mock` calls at the top level of the test file, outside of any `describe` or `beforeEach` blocks. This ensures mocks are correctly applied before test execution.
-+    *   **Explicit Jest Configuration:** When running specific test files or encountering `rootDir` errors, explicitly specify the Jest configuration file using the `--config` flag (e.g., `npx jest --config jest.config.backend.js <test_file_path>`). This ensures the correct configuration is used and prevents conflicts with other potential Jest configurations or default behaviors.
-+
-+**Example: PromptManager Adherence**
-+The `PromptManager` (see `backend/services/PromptManager.ts`) is a prime example of a service designed with these DI and testing principles in mind. It is `@injectable()`, uses `TYPES` symbols for its own registration, and its methods return `Result` types, making it easily mockable and testable within the `tsyringe` ecosystem.
+*   **Add Comprehensive Tests:**
+    *   **Objective:** Create [`tests/di/container.test.ts`](tests/di/container.test.ts) and other relevant test files for container setup validation, service resolution tests, circular dependency detection tests, and configuration validation tests.
+    *   **Key Deliverables:** Comprehensive test coverage, mock external dependencies, test container lifecycle, and validation of error scenarios.
 
-## Common DI Issues (Expanded)
+*   **Add Debugging Utilities:**
+    *   **Objective:** Create [`di/utils/ContainerDebugger.ts`](backend/di/utils/ContainerDebugger.ts) to provide debugging and maintenance tools for the DI container.
+    *   **Key Deliverables:** Enhanced visibility into container state and dependencies.
 
-*   **Missing dependency registration (No provider found errors)**: Often caused by not registering *all* required dependencies, or by using an incorrect injection token (see "Matching Injection Tokens" above).
-*   **Circular dependencies**: Still a concern, but proper architecture and careful use of `tsyringe`'s `forwardRef` (if absolutely necessary) can mitigate.
-*   **Improper mock clearing between tests**: Addressed by using a test container factory and `resetMocks()` in `afterEach`.
-*   **Test Mocking Difficulties**: Especially when using deep mocks (e.g., `jest-mock-extended`) with `tsyringe`, `toHaveBeenCalled` assertions might not reliably track calls on injected dependencies. In such cases, consider:
-    *   Explicitly mocking methods on the resolved instance after container resolution.
-    *   Focusing on integration tests for verifying interactions.
+## Implementation Order (Summary)
+
+1.  Enhance [`di/Types.ts`](backend/di/Types.ts)
+2.  Create [`di/ContainerManager.ts`](backend/di/ContainerManager.ts)
+3.  Build [`di/ConfigurationRegistry.ts`](backend/di/ConfigurationRegistry.ts)
+4.  Implement [`di/modules/infrastructure.ts`](backend/di/modules/infrastructure.ts)
+5.  Create [`di/modules/services.ts`](backend/di/modules/services.ts)
+6.  Build [`di/modules/agents.ts`](backend/di/modules/agents.ts)
+7.  Refactor main [`di/container.ts`](backend/di/container.ts)
+8.  Update [`server.ts`](backend/server.ts) integration
+9.  Add comprehensive tests
+10. Add debugging utilities

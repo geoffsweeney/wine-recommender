@@ -1,5 +1,5 @@
 import { inject, injectable } from 'tsyringe';
-import { CommunicatingAgent, CommunicatingAgentDependencies } from './CommunicatingAgent';
+import { CommunicatingAgent } from './CommunicatingAgent';
 import { EnhancedAgentCommunicationBus } from './communication/EnhancedAgentCommunicationBus';
 import { AgentMessage, createAgentMessage, MessageTypes } from './communication/AgentMessage';
 import { DeadLetterProcessor } from '../DeadLetterProcessor';
@@ -7,7 +7,7 @@ import { LLMService } from '../../services/LLMService';
 import { KnowledgeGraphService } from '../../services/KnowledgeGraphService';
 import { PreferenceNormalizationService } from '../../services/PreferenceNormalizationService';
 import { UserProfileService } from '../../services/UserProfileService'; // Import UserProfileService
-import { TYPES } from '../../di/Types';
+import { ICommunicatingAgentDependencies, TYPES } from '../../di/Types';
 import winston from 'winston';
 import { Result } from '../types/Result';
 import { AgentError } from './AgentError';
@@ -31,22 +31,14 @@ export interface LLMPreferenceExtractorAgentConfig {
 export class LLMPreferenceExtractorAgent extends CommunicatingAgent {
   constructor(
     @inject(LLMService) private readonly llmService: LLMService,
-    @inject(KnowledgeGraphService) private readonly knowledgeGraphService: KnowledgeGraphService,
+    @inject(TYPES.KnowledgeGraphService) private readonly knowledgeGraphService: KnowledgeGraphService,
     @inject(PreferenceNormalizationService) private readonly preferenceNormalizationService: PreferenceNormalizationService,
     @inject(UserProfileService) private readonly userProfileService: UserProfileService, // Inject UserProfileService
     @inject(TYPES.DeadLetterProcessor) private readonly deadLetterProcessor: DeadLetterProcessor,
-    @inject(TYPES.Logger) protected readonly logger: winston.Logger,
-    @inject(EnhancedAgentCommunicationBus) private readonly injectedCommunicationBus: EnhancedAgentCommunicationBus,
-    @inject(TYPES.LLMPreferenceExtractorAgentConfig) private readonly agentConfig: LLMPreferenceExtractorAgentConfig // Inject agent config
+    @inject(TYPES.LLMPreferenceExtractorAgentConfig) private readonly agentConfig: LLMPreferenceExtractorAgentConfig, // Inject agent config
+    @inject(TYPES.CommunicatingAgentDependencies) dependencies: ICommunicatingAgentDependencies // Inject dependencies for base class
   ) {
     const id = 'llm-preference-extractor';
-    const dependencies: CommunicatingAgentDependencies = {
-      communicationBus: injectedCommunicationBus,
-      logger: logger,
-      messageQueue: {} as any, // Placeholder for IMessageQueue
-      stateManager: {} as any, // Placeholder for IStateManager
-      config: agentConfig as any // Use the injected config
-    };
     super(id, agentConfig, dependencies);
     this.registerHandlers();
     this.logger.info(`[${this.id}] LLMPreferenceExtractorAgent initialized`, { agentId: this.id, operation: 'initialization' });

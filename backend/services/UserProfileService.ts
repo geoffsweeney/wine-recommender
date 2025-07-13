@@ -6,8 +6,8 @@ import { KnowledgeGraphService } from './KnowledgeGraphService'; // Import Knowl
  @injectable()
  export class UserProfileService {
    constructor(
-     @inject(TYPES.Logger) private logger: ILogger, // Inject logger
-     @inject(KnowledgeGraphService) private readonly knowledgeGraphService: KnowledgeGraphService // Inject KnowledgeGraphService
+@inject(TYPES.Logger) private logger: ILogger, // Inject logger
+@inject(TYPES.KnowledgeGraphService) private readonly knowledgeGraphService: KnowledgeGraphService // Inject KnowledgeGraphService
    ) {}
  
    /**

@@ -57,8 +57,8 @@ describe('E2E Admin User Preference API', () => {
 
     // Register Neo4jCircuitWrapper and Neo4jService
     container.register(TYPES.Neo4jCircuitWrapper, { useClass: Neo4jCircuitWrapper });
-    container.register(Neo4jService, { useClass: Neo4jService }); // Register Neo4jService as a class
-    container.register(KnowledgeGraphService, { useClass: KnowledgeGraphService }); // Register KnowledgeGraphService as a class
+    container.register(TYPES.Neo4jService, { useClass: Neo4jService }); // Register Neo4jService using its symbol
+    container.register(TYPES.KnowledgeGraphService, { useClass: KnowledgeGraphService }); // Register KnowledgeGraphService using its symbol
     container.register(TYPES.UserProfileService, { useClass: UserProfileService }); // Register UserProfileService as a class
 
     // Register a mock for AgentCommunicationBus for E2E tests
@@ -103,8 +103,13 @@ describe('E2E Admin User Preference API', () => {
         .put(`/admin/preferences/${userId}`)
         .send([preference1, preference2]);
 
+      const preferencesToUpdate = [
+        { type: 'wineType', value: 'Red', source: 'e2e', confidence: 1, timestamp: expect.any(Number), active: true },
+        { type: 'sweetness', value: 'Dry', source: 'e2e', confidence: 1, timestamp: expect.any(Number), active: true }
+      ];
+
       expect(addResponse.status).toBe(200);
-      expect(addResponse.body).toEqual({ message: 'User preferences updated successfully' });
+      expect(addResponse.body).toEqual(preferencesToUpdate);
 
       // Verify preferences are in the database
       let dbPreferences = await knowledgeGraphService.getPreferences(userId, true);

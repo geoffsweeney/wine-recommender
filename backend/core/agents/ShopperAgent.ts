@@ -1,5 +1,6 @@
 import { inject, injectable } from 'tsyringe';
-import { CommunicatingAgent, CommunicatingAgentDependencies } from './CommunicatingAgent';
+import { CommunicatingAgent } from './CommunicatingAgent';
+import { ICommunicatingAgentDependencies } from '../../di/Types';
 import { EnhancedAgentCommunicationBus } from './communication/EnhancedAgentCommunicationBus';
 import { AgentMessage, createAgentMessage, MessageTypes } from './communication/AgentMessage';
 import { DeadLetterProcessor } from '../DeadLetterProcessor';
@@ -18,20 +19,12 @@ export interface ShopperAgentConfig {
 @injectable()
 export class ShopperAgent extends CommunicatingAgent {
   constructor(
-    @inject(EnhancedAgentCommunicationBus) private readonly injectedCommunicationBus: EnhancedAgentCommunicationBus,
     @inject(TYPES.DeadLetterProcessor) private readonly deadLetterProcessor: DeadLetterProcessor,
-    @inject(TYPES.Logger) protected readonly logger: winston.Logger,
     @inject(TYPES.ShopperAgentConfig) private readonly agentConfig: ShopperAgentConfig, // Inject the specific agent config
-    @inject(KnowledgeGraphService) private readonly knowledgeGraphService: KnowledgeGraphService // Inject KnowledgeGraphService
+    @inject(TYPES.KnowledgeGraphService) private readonly knowledgeGraphService: KnowledgeGraphService, // Inject KnowledgeGraphService
+    @inject(TYPES.CommunicatingAgentDependencies) dependencies: ICommunicatingAgentDependencies // Inject dependencies for base class
   ) {
     const id = 'shopper-agent';
-    const dependencies: CommunicatingAgentDependencies = {
-      communicationBus: injectedCommunicationBus,
-      logger: logger,
-      messageQueue: {} as any, // Placeholder for IMessageQueue
-      stateManager: {} as any, // Placeholder for IStateManager
-      config: agentConfig as any // Use the injected config
-    };
     super(id, agentConfig, dependencies);
     this.registerHandlers();
     this.logger.info(`[${this.id}] ShopperAgent initialized`, { agentId: this.id, operation: 'initialization' });

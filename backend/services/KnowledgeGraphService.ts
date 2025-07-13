@@ -7,7 +7,7 @@ import { Neo4jService } from './Neo4jService';
 @injectable()
 export class KnowledgeGraphService {
   constructor(
-    @inject(Neo4jService) private readonly neo4j: Neo4jService,
+    @inject(TYPES.Neo4jService) private readonly neo4j: Neo4jService,
     @inject(TYPES.Logger) private readonly logger: winston.Logger
   ) {
     this.logger.info('KnowledgeGraphService initialized');

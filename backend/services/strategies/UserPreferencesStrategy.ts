@@ -10,7 +10,7 @@ import { Neo4jService } from '../Neo4jService';
 export class UserPreferencesStrategy implements IRecommendationStrategy {
     constructor(
         @inject(Neo4jService) private neo4jService: Neo4jService,
-        @inject(KnowledgeGraphService) private knowledgeGraph: KnowledgeGraphService
+        @inject(TYPES.KnowledgeGraphService) private knowledgeGraph: KnowledgeGraphService
     ) {}
 
     async execute(request: RecommendationRequest): Promise<any[]> {

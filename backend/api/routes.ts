@@ -89,10 +89,22 @@ export default function createRouter(
    // Admin User Preference Routes
    const adminUserPreferenceController = dependencyContainer.resolve(AdminUserPreferenceController);
   
-   router.get('/admin/preferences', (req, res) => adminUserPreferenceController.execute(req, res));
-   router.get('/admin/preferences/:userId', validateRequest(UserIdParamSchema, 'params'), (req, res) => adminUserPreferenceController.execute(req, res));
-   router.put('/admin/preferences/:userId', validateRequest(UserIdParamSchema, 'params'), validateRequest(UserPreferencesUpdateSchema, 'body'), (req, res) => adminUserPreferenceController.execute(req, res));
-   router.delete('/admin/preferences/:userId', validateRequest(UserIdParamSchema, 'params'), validateRequest(DeletePreferenceQuerySchema, 'query'), (req, res) => adminUserPreferenceController.execute(req, res));
+   router.get('/admin/preferences', (req, res) => {
+     console.log('Hitting GET /admin/preferences route handler');
+     adminUserPreferenceController.execute(req, res);
+   });
+   router.get('/admin/preferences/:userId', validateRequest(UserIdParamSchema, 'params'), (req, res) => {
+     console.log('Hitting GET /admin/preferences/:userId route handler');
+     adminUserPreferenceController.execute(req, res);
+   });
+   router.put('/admin/preferences/:userId', validateRequest(UserIdParamSchema, 'params'), validateRequest(UserPreferencesUpdateSchema, 'body'), (req, res) => {
+     console.log('Hitting PUT /admin/preferences/:userId route handler');
+     adminUserPreferenceController.execute(req, res);
+   });
+   router.delete('/admin/preferences/:userId', validateRequest(UserIdParamSchema, 'params'), validateRequest(DeletePreferenceQuerySchema, 'query'), (req, res) => {
+     console.log('Hitting DELETE /admin/preferences/:userId route handler');
+     adminUserPreferenceController.execute(req, res);
+   });
   
     return router;
 }

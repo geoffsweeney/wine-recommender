@@ -18,6 +18,12 @@ export class CircuitBreaker {
     this.options = options;
   }
 
+  protect<T extends (...args: any[]) => Promise<any>>(fn: T): T {
+    return ((...args: Parameters<T>) => {
+      return this.execute(() => fn(...args));
+    }) as T;
+  }
+
   async execute<T>(fn: () => Promise<T>): Promise<T> {
     if (this.state === 'OPEN') {
       if (this.shouldAttemptReset()) {
@@ -33,7 +39,7 @@ export class CircuitBreaker {
       return result;
     } catch (error) {
       this.recordFailure();
-      throw error; // Always re-throw the error if the operation fails while circuit is CLOSED or HALF_OPEN
+      throw error;
     }
   }
 
@@ -55,8 +61,11 @@ export class CircuitBreaker {
   }
 
   private shouldAttemptReset(): boolean {
-    if (!this.lastFailureTime) return false;
-    return Date.now() - this.lastFailureTime > this.options.timeoutMs;
+    if (this.state === 'OPEN' && this.lastFailureTime) {
+      const now = Date.now();
+      return now - this.lastFailureTime > this.options.timeoutMs;
+    }
+    return false;
   }
 
   private reset() {
@@ -66,15 +75,17 @@ export class CircuitBreaker {
     this.lastFailureTime = null;
   }
 
+  // For testing purposes only
   getState(): CircuitState {
     return this.state;
   }
 
   // For testing purposes only
-  _setStateForTesting(state: CircuitState, lastFailureTime?: number) {
+  _setStateForTesting(state: CircuitState, lastFailureTime?: number): void {
     this.state = state;
-    if (lastFailureTime !== undefined) {
+    if (lastFailureTime) {
       this.lastFailureTime = lastFailureTime;
     }
   }
+
 }

@@ -51,9 +51,9 @@ export class LLMService implements ILLMService {
   constructor(
     @inject(TYPES.PromptManager) private promptManager: PromptManager,
     @inject(TYPES.Logger) private logger: ILogger,
-    @inject(TYPES.LlmApiUrl) apiUrl: string,
-    @inject(TYPES.LlmModel) model: string,
-    @inject(TYPES.LlmApiKey) apiKey: string,
+    @inject(TYPES.LlmApiUrl) private apiUrl: string,
+    @inject(TYPES.LlmModel) private model: string,
+    @inject(TYPES.LlmApiKey) private apiKey: string
   ) {
     this.config = { apiUrl, model, apiKey };
   }

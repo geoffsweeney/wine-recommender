@@ -10,6 +10,7 @@ import { PreferenceNormalizationService } from '../../../services/PreferenceNorm
 import { PromptManager } from '../../../services/PromptManager';
 import { RecommendationService } from '../../../services/RecommendationService';
 import { UserProfileService } from '../../../services/UserProfileService'; // Import UserProfileService
+import { AdminPreferenceService } from '../../../services/AdminPreferenceService'; // Import AdminPreferenceService
 import { testContainer } from '../../../test-setup'; // Import the testContainer
 import { CircuitBreaker } from '../../CircuitBreaker';
 import { ConversationHistoryService } from '../../ConversationHistoryService'; // Import ConversationHistoryService
@@ -26,6 +27,7 @@ import { ShopperAgent } from '../ShopperAgent'; // Import ShopperAgent and its c
 import { SommelierCoordinator } from '../SommelierCoordinator';
 import { UserPreferenceAgent } from '../UserPreferenceAgent';
 import { ValueAnalysisAgent } from '../ValueAnalysisAgent';
+import { AdminConversationalAgent } from '../AdminConversationalAgent'; // Import AdminConversationalAgent
 
 
 beforeEach(() => {
@@ -79,6 +81,8 @@ beforeEach(() => {
   testContainer.registerInstance(TYPES.PreferenceExtractionService, mockPreferenceExtractionService);
   testContainer.registerInstance(TYPES.PreferenceNormalizationService, mockPreferenceNormalizationService);
   testContainer.registerInstance(TYPES.RecommendationService, mockRecommendationService);
+  testContainer.registerInstance(TYPES.AdminPreferenceService, mock<AdminPreferenceService>()); // Register mock AdminPreferenceService
+  testContainer.registerInstance(TYPES.UserProfileService, mock<UserProfileService>()); // Register mock UserProfileService
 
   // Register agent configs
   testContainer.registerInstance(TYPES.InputValidationAgentConfig, {
@@ -111,7 +115,7 @@ beforeEach(() => {
   testContainer.registerInstance(TYPES.MCPAdapterAgentConfig, {
     mcpServerUrl: 'http://mock-mcp-server.com'
   });
-  testContainer.registerInstance(TYPES.SommelierCoordinatorId, 'sommelier-coordinator-id'); // Register mock SommelierCoordinatorId
+  testContainer.registerInstance(TYPES.SommelierCoordinator, mock<SommelierCoordinator>()); // Register mock SommelierCoordinator
   testContainer.registerInstance(TYPES.SommelierCoordinatorDependencies, { // Register mock SommelierCoordinatorDependencies
     communicationBus: mockBus,
     deadLetterProcessor: mockDeadLetterProcessor,
@@ -127,6 +131,20 @@ beforeEach(() => {
     retryDelayMs: 100
   });
 
+  testContainer.registerInstance(TYPES.FeatureFlags, { adminConversationalPreferences: true }); // Register mock FeatureFlags
+
+  testContainer.registerInstance(TYPES.CommunicatingAgentDependencies, {
+    communicationBus: mockBus,
+    logger: mockLogger,
+    messageQueue: mock<any>(),
+    stateManager: mock<any>(),
+    config: mock<any>(),
+  });
+
+  testContainer.registerInstance(TYPES.AdminConversationalAgentConfig, {
+    agentId: 'test-admin-conversational-agent',
+  });
+
   // Register agent classes with the testContainer
   testContainer.register('InputValidationAgent', { useClass: InputValidationAgent });
   testContainer.register('LLMRecommendationAgent', { useClass: LLMRecommendationAgent });
@@ -138,6 +156,7 @@ beforeEach(() => {
   testContainer.register('ExplanationAgent', { useClass: ExplanationAgent });
   testContainer.register('FallbackAgent', { useClass: FallbackAgent });
   testContainer.register('SommelierCoordinator', { useClass: SommelierCoordinator });
+  testContainer.register('AdminConversationalAgent', { useClass: AdminConversationalAgent }); // Register AdminConversationalAgent
 });
 
 describe('AgentRegistry Integration', () => {
@@ -165,7 +184,7 @@ describe('AgentRegistry Integration', () => {
   it('should register all agents with their capabilities', () => {
     registry.registerAgents(mockBus);
 
-    expect(mockBus.registerAgent).toHaveBeenCalledTimes(10); // Corrected to 10
+    expect(mockBus.registerAgent).toHaveBeenCalledTimes(11); // Corrected to 11 (10 + AdminConversationalAgent)
     
     // Verify capability registration for key agents
     expect(mockBus.registerAgent).toHaveBeenCalledWith(

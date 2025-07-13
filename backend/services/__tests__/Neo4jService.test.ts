@@ -67,7 +67,6 @@ describe('Neo4jService', () => {
       instance(mockCircuit),
       instance(mockLogger)
     );
-    await service.init(); // Call init() after service creation
   });
 
   afterEach(() => {

@@ -1,19 +1,19 @@
 import { inject, injectable } from 'tsyringe';
-import { CommunicatingAgent, CommunicatingAgentDependencies } from './CommunicatingAgent';
-import { EnhancedAgentCommunicationBus } from './communication/EnhancedAgentCommunicationBus';
-import { AgentMessage, createAgentMessage } from './communication/AgentMessage';
-import { DeadLetterProcessor } from '../DeadLetterProcessor';
+import winston from 'winston';
+import { z } from 'zod'; // Import z for schema definition
+import { ICommunicatingAgentDependencies, TYPES } from '../../di/Types'; // Import ICommunicatingAgentDependencies
 import { LLMService } from '../../services/LLMService';
 import { PromptManager } from '../../services/PromptManager'; // Import PromptManager
-import { TYPES } from '../../di/Types';
-import winston from 'winston';
-import { Result } from '../types/Result';
-import { AgentError } from './AgentError';
-import { LogContext } from '../../types/LogContext';
-import { RecommendationResult } from '../../types/agent-outputs';
-import { z } from 'zod'; // Import z for schema definition
 import { GrapeVariety } from '../../services/models/Wine'; // Import GrapeVariety
 import { UserPreferences } from '../../types'; // Import UserPreferences
+import { LogContext } from '../../types/LogContext';
+import { RecommendationResult } from '../../types/agent-outputs';
+import { BasicDeadLetterProcessor } from '../DeadLetterProcessor';
+import { Result } from '../types/Result';
+import { AgentError } from './AgentError';
+import { CommunicatingAgent } from './CommunicatingAgent';
+import { AgentMessage, createAgentMessage } from './communication/AgentMessage';
+import { EnhancedAgentCommunicationBus } from './communication/EnhancedAgentCommunicationBus';
 
 interface LLMRecommendationRequestPayload {
   preferences?: Record<string, any>;
@@ -51,20 +51,12 @@ export class LLMRecommendationAgent extends CommunicatingAgent {
   constructor(
     @inject(LLMService) private readonly llmService: LLMService,
     @inject(TYPES.PromptManager) private readonly promptManager: PromptManager, // Inject PromptManager
-    @inject(TYPES.DeadLetterProcessor) private readonly deadLetterProcessor: DeadLetterProcessor,
-    @inject(TYPES.Logger) protected readonly logger: winston.Logger,
-    @inject(EnhancedAgentCommunicationBus) private readonly injectedCommunicationBus: EnhancedAgentCommunicationBus,
-    @inject(TYPES.LLMRecommendationAgentConfig) private readonly agentConfig: LLMRecommendationAgentConfig
+    @inject(TYPES.DeadLetterProcessor) private readonly deadLetterProcessor: BasicDeadLetterProcessor,
+    @inject(TYPES.LLMRecommendationAgentConfig) private readonly agentConfig: LLMRecommendationAgentConfig,
+    @inject(TYPES.CommunicatingAgentDependencies) dependencies: ICommunicatingAgentDependencies // Inject dependencies for base class
   ) {
     const id = 'llm-recommendation-agent';
-    const dependencies: CommunicatingAgentDependencies = {
-      communicationBus: injectedCommunicationBus,
-      logger: logger,
-      messageQueue: {} as any,
-      stateManager: {} as any,
-      config: agentConfig as any
-    };
-    super(id, agentConfig, dependencies);
+    super(id, agentConfig, dependencies); // Pass dependencies to the base class
     this.registerHandlers();
     this.logger.info(`[${this.id}] LLMRecommendationAgent initialized`, { 
       agentId: this.id, 

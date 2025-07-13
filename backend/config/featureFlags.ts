@@ -3,5 +3,5 @@ export interface FeatureFlags {
 }
 
 export const featureFlags: FeatureFlags = {
-  adminConversationalPreferences: false, // Default to false
+  adminConversationalPreferences: true, // Enabled for admin commands
 };

@@ -253,71 +253,87 @@ In both cases, when these sub-agents responded (even with an ACK for the history
 
 The fix involved ensuring that all messages sent from the `SommelierCoordinator` to its internal sub-agents (including fire-and-forget messages and those for explanation generation) use a `this.generateCorrelationId()` unique to that internal interaction. The original `correlationId` is now exclusively reserved for the final `FINAL_RECOMMENDATION` message sent back to the API.
 
-#### Agent Configuration Pattern
-Agent-specific configurations should be externalized and injected via Dependency Injection. This promotes modularity, testability, and allows for easy modification of agent behavior without code changes.
+#### Dependency Injection Pattern
 
-```typescript
-// Example: Injecting agent-specific configuration
-@injectable()
-export class MyAgent extends CommunicatingAgent {
-  constructor(
-    // ... other dependencies
-    @inject(TYPES.MyAgentConfig) private readonly agentConfig: MyAgentConfig
-  ) {
-    super('my-agent-id', agentConfig, { /* ... dependencies */ });
-    // ...
-  }
-}
+The project utilizes `tsyringe` for Dependency Injection. This pattern is crucial for building modular, testable, and maintainable applications by decoupling components from their dependencies.
 
-// Configuration interface
-export interface MyAgentConfig {
-  param1: string;
-  param2: number;
-}
+**Key Principles:**
 
-// In DI container setup (e.g., container.ts)
-container.registerInstance(TYPES.MyAgentConfig, {
-  param1: 'value',
-  param2: 123
-});
-```
+1.  **Constructor Injection**: All dependencies **MUST** be injected through the constructor of a class. This is the primary mechanism for providing dependencies.
 
-#### Agent Configuration Pattern
-Agent-specific configurations should be externalized and injected via Dependency Injection. This promotes modularity, testability, and allows for easy modification of agent behavior without code changes.
+    ```typescript
+    import { injectable, inject } from 'tsyringe';
+    import { ILogger, TYPES } from '../di/Types'; // Assuming TYPES and ILogger are defined
 
-**Best Practice:** Define a specific interface for each agent's configuration and register it as an instance in the DI container (`container.ts`).
+    @injectable()
+    export class MyService {
+      constructor(
+        @inject(TYPES.Logger) private readonly logger: ILogger,
+        // Other dependencies injected here
+      ) {}
 
-```typescript
-// Example: Injecting agent-specific configuration
-@injectable()
-export class MyAgent extends CommunicatingAgent {
-  constructor(
-    // ... other dependencies
-    @inject(TYPES.MyAgentConfig) private readonly agentConfig: MyAgentConfig // Inject the specific agent config
-  ) {
-    // Pass the injected agentConfig to the super constructor as the agent's config
-    const dependencies: CommunicatingAgentDependencies = {
-      // ... other dependencies
-      config: agentConfig as any // Use the injected config
+      public doSomething(): void {
+        this.logger.info('MyService is doing something.');
+      }
+    }
+    ```
+
+2.  **Typed Injection Tokens (`TYPES`)**: Always use the `TYPES` object (defined in `backend/di/Types.ts`) for injection tokens. This provides strong compile-time type safety and prevents runtime errors due to string literal mismatches.
+
+    ```typescript
+    // backend/di/Types.ts
+    export const TYPES = {
+      Logger: createSymbol<ILogger>('Logger'),
+      MyService: createSymbol<IMyService>('MyService'),
     };
-    super('my-agent-id', agentConfig, dependencies);
-    // ...
-  }
-}
+    ```
 
-// Configuration interface (e.g., in Types.ts or agent's file)
-export interface MyAgentConfig {
-  param1: string;
-  param2: number;
-}
+3.  **Modular Registration**: Dependencies are registered in dedicated modules (`backend/di/modules/infrastructure.ts`, `backend/di/modules/services.ts`, `backend/di/modules/agents.ts`). This promotes a clear separation of concerns and simplifies the management of a large number of dependencies.
 
-// In DI container setup (e.g., container.ts)
-// Add TYPES.MyAgentConfig: Symbol.for('MyAgentConfig') to Types.ts
-container.registerInstance(TYPES.MyAgentConfig, {
-  param1: 'value',
-  param2: 123
-});
-```
+    ```typescript
+    // Example: backend/di/modules/services.ts
+    import { DependencyContainer } from 'tsyringe';
+    import { TYPES } from '../Types';
+    import { MyService } from '../../services/MyService'; // Concrete implementation
+    import { IMyService } from '../Types'; // Interface
+    import { ConfigurationRegistry } from '../ConfigurationRegistry'; // For dependency graph tracking
+
+    export function registerServices(container: DependencyContainer, configRegistry: ConfigurationRegistry) {
+      container.registerSingleton<IMyService>(TYPES.MyService, MyService);
+      configRegistry.registerService(TYPES.MyService, [TYPES.Logger]); // Register with its dependencies
+    }
+    ```
+
+4.  **Configuration as Dependencies**: Application configurations (e.g., API keys, database connection strings, agent-specific settings) **SHOULD** be treated as dependencies and injected into services/agents. This promotes externalization, testability, and allows for easy modification of behavior without code changes.
+
+    ```typescript
+    // Example: Registering a configuration value
+    container.registerInstance<string>(TYPES.LlmApiUrl, process.env.LLM_API_URL || 'http://localhost:11434');
+    configRegistry.registerService(TYPES.LlmApiUrl, []); // No dependencies for a simple value
+    ```
+
+5.  **Asynchronous Container Setup**: The main container setup (`backend/di/container.ts`) is an asynchronous process. Any part of the application that relies on the container being fully initialized **MUST** `await` the `setupContainer()` call.
+
+    ```typescript
+    // Example: backend/server.ts
+    import { setupContainer } from './di/container';
+
+    (async () => {
+      const appContainer = await setupContainer();
+      // The container is now fully initialized and validated
+      const logger = appContainer.resolve(TYPES.Logger);
+      logger.info('Application started with DI container.');
+    })();
+    ```
+
+6.  **Interface-First Design**: Always define an interface for a service or component before implementing it. This promotes loose coupling, enables easier mocking for testing, and allows for swapping implementations without affecting consumers.
+
+    ```typescript
+    // Example: Interface definition
+    export interface IMyService {
+      execute(): void;
+    }
+    ```
 
 #### Frontend Architecture Patterns
 ```typescript

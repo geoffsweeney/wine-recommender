@@ -6,6 +6,7 @@ import { BasicDeadLetterProcessor } from '../../DeadLetterProcessor';
 import { LLMService } from '../../../services/LLMService';
 import winston from 'winston';
 import { PromptManager } from '../../../services/PromptManager'; // Import PromptManager
+import { ICommunicatingAgentDependencies } from '../../../di/Types';
 
 // Test wrapper to access protected properties for testing
 class TestExplanationAgent extends ExplanationAgent {
@@ -22,6 +23,7 @@ describe('ExplanationAgent', () => {
   let mockPromptManager: PromptManager; // Added mockPromptManager
   let agent: TestExplanationAgent;
   let mockAgentConfig: ExplanationAgentConfig;
+  let mockCommunicatingAgentDependencies: ICommunicatingAgentDependencies;
 
   beforeEach(() => {
     mockBus = mockDeep<any>();
@@ -32,7 +34,15 @@ describe('ExplanationAgent', () => {
     mockAgentConfig = {
       defaultExplanation: 'This is a default explanation.'
     };
-    agent = new TestExplanationAgent(mockLLMService, mockDeadLetter, mockLogger, mockBus, mockAgentConfig, mockPromptManager); // Added mockPromptManager
+    mockCommunicatingAgentDependencies = {
+      communicationBus: mockBus,
+      logger: mockLogger,
+      messageQueue: {} as any,
+      stateManager: {} as any,
+      config: mockAgentConfig as any,
+    };
+
+    agent = new TestExplanationAgent(mockLLMService, mockDeadLetter, mockAgentConfig, mockPromptManager, mockCommunicatingAgentDependencies);
 
     jest.clearAllMocks();
   });

@@ -1,5 +1,5 @@
 import { inject, singleton } from 'tsyringe'; // Import singleton and inject decorator
-import { ILogger, SommelierCoordinatorDependencies, TYPES } from '../../di/Types'; // Import SommelierCoordinatorDependencies and TYPES
+import { ILogger, ISommelierCoordinatorDependencies, TYPES } from '../../di/Types'; // Import SommelierCoordinatorDependencies and TYPES
 import { LLMService } from '../../services/LLMService'; // Import LLMService
 import { PromptManager } from '../../services/PromptManager'; // Import PromptManager
 import { FinalRecommendationPayload, PreferenceExtractionResultPayload, RecommendationResult, RecommendationResultSchema } from '../../types/agent-outputs';
@@ -89,13 +89,12 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
   }
 
   constructor(
-    @inject(TYPES.SommelierCoordinatorId) id: string,
     @inject(TYPES.SommelierCoordinatorConfig) config: SommelierCoordinatorConfig,
-    @inject(TYPES.SommelierCoordinatorDependencies) dependencies: SommelierCoordinatorDependencies, // Changed to SommelierCoordinatorDependencies
+    @inject(TYPES.SommelierCoordinatorDependencies) dependencies: ISommelierCoordinatorDependencies, // Changed to ISommelierCoordinatorDependencies
     @inject(TYPES.PromptManager) private readonly promptManager: PromptManager, // Inject PromptManager
     @inject(TYPES.LLMService) private readonly llmService: LLMService // Inject LLMService
   ) {
-    super(id, config, dependencies);
+    super('sommelier-coordinator', config, dependencies);
     this.logger = dependencies.logger;
     this.communicationBus = dependencies.communicationBus; // No need for cast now
     this.logger.info(`[${this.id}] SommelierCoordinator logger level: ${this.logger.level}`, { agentId: this.id, operation: 'constructor' });
@@ -125,7 +124,7 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
   }
 
   private initializeCircuitBreakers(): void {
-    const agentsToMonitor = ['input-validation-agent', 'user-preference-agent', 'recommendation-agent', 'shopper-agent', 'fallback-agent', 'user-preference-agent', 'explanation-agent'];
+    const agentsToMonitor = ['input-validation-agent', 'user-preference-agent', 'recommendation-agent', 'shopper-agent', 'fallback-agent', 'user-preference-agent', 'explanation-agent', 'admin-conversational-agent'];
     agentsToMonitor.forEach(agentName => {
       this.circuitBreakers.set(agentName, new CircuitBreaker({
         failureThreshold: this.config.circuitBreakerFailureThreshold,
@@ -193,29 +192,66 @@ export class SommelierCoordinator extends BaseAgent<SommelierCoordinatorConfig, 
    * Handles the initial request to orchestrate a wine recommendation.
    * This method is registered as a message handler for ORCHESTRATE_RECOMMENDATION_REQUEST.
    */
-  private async handleOrchestrationRequest(message: AgentMessage<OrchestrationInput>): Promise<Result<AgentMessage<FinalRecommendation> | null, AgentError>> { // Changed return type
-    const { payload, conversationId, correlationId, sourceAgent } = message; // Added sourceAgent
+  private async handleOrchestrationRequest(message: AgentMessage<OrchestrationInput>): Promise<Result<AgentMessage<FinalRecommendation> | null, AgentError>> {
+    const { payload, conversationId, correlationId, sourceAgent } = message;
     const logContext = { correlationId, agentId: this.id, conversationId, operation: 'handleOrchestrationRequest' };
 
     this.logger.info(`[${correlationId}] Starting orchestration for conversation: ${conversationId}`, logContext);
 
+    // Check if the input is an admin command
+    if (payload.userInput.input.message && payload.userInput.input.message.startsWith('/admin')) {
+        this.logger.info(`[${correlationId}] Admin command detected: ${payload.userInput.input.message}. Routing to AdminConversationalAgent.`, logContext);
+        const adminCommandMessage = createAgentMessage(
+            MessageTypes.ADMIN_CONVERSATIONAL_COMMAND,
+            { command: payload.userInput.input.message, userId: payload.userInput.userId },
+            this.id,
+            conversationId,
+            this.generateCorrelationId(),
+            'admin-conversational-agent',
+            payload.userInput.userId
+        );
+
+        try {
+            const adminResponse = await this.sendMessageToAgentWithCircuitBreaker('admin-conversational-agent', adminCommandMessage);
+            if (adminResponse.success) {
+                return { success: true, data: createAgentMessage(MessageTypes.FINAL_RECOMMENDATION, adminResponse.data, this.id, conversationId, correlationId, sourceAgent) };
+            } else {
+                throw adminResponse.error;
+            }
+        } catch (error: any) {
+            this.logger.error(`[${correlationId}] Error routing admin command: ${error.message}`, { ...logContext, error: error.message, stack: error.stack });
+            return {
+                success: false,
+                error: new AgentError(
+                    `Failed to process admin command: ${error.message}`,
+                    'ADMIN_COMMAND_ROUTING_FAILURE',
+                    this.id,
+                    correlationId,
+                    false,
+                    { originalError: error.message }
+                )
+            };
+        }
+    }
+
+    // Original wine recommendation orchestration logic
     try {
-      const finalRecommendation = await this.orchestrateRecommendation(payload.userInput, conversationId, correlationId);
-      this.logger.info(`[${correlationId}] Orchestration completed for conversation: ${conversationId}`, logContext);
-      return { success: true, data: createAgentMessage(MessageTypes.FINAL_RECOMMENDATION, finalRecommendation, this.id, conversationId, correlationId, sourceAgent) }; // Wrap finalRecommendation in an AgentMessage
+        const finalRecommendation = await this.orchestrateRecommendation(payload.userInput, conversationId, correlationId);
+        this.logger.info(`[${correlationId}] Orchestration completed for conversation: ${conversationId}`, logContext);
+        return { success: true, data: createAgentMessage(MessageTypes.FINAL_RECOMMENDATION, finalRecommendation, this.id, conversationId, correlationId, sourceAgent) };
     } catch (error: any) {
-      this.logger.error(`[${correlationId}] Orchestration failed for conversation ${conversationId}: ${error.message}`, { ...logContext, error: error.message, stack: error.stack });
-      return {
-        success: false,
-        error: new AgentError(
-          `Orchestration failed: ${error.message}`,
-          'ORCHESTRATION_FAILURE',
-          this.id,
-          correlationId,
-          false,
-          { originalError: error.message }
-        )
-      };
+        this.logger.error(`[${correlationId}] Orchestration failed for conversation ${conversationId}: ${error.message}`, { ...logContext, error: error.message, stack: error.stack });
+        return {
+            success: false,
+            error: new AgentError(
+                `Orchestration failed: ${error.message}`,
+                'ORCHESTRATION_FAILURE',
+                this.id,
+                correlationId,
+                false,
+                { originalError: error.message }
+            )
+        };
     }
   }
 

@@ -15,7 +15,38 @@
 ### Mocking Strategies
 - **Real vs Mock Dependencies**: Balance the use of real components vs mocks. Using real controller instances can ensure test behavior matches the actual implementation, but requires careful dependency setup.
 - **Mock Behavior**: Ensure mocks behave as closely as possible to real components, including returning objects with the same structure and properties.
-- **Dependency Injection**: Use dependency injection frameworks (like tsyringe) to properly set up dependencies for tests.
+- **Dependency Injection with `tsyringe`**:
+    *   **Unit Tests**: For unit testing individual components, use `container.registerInstance()` or `container.register()` with `useValue` to provide mock implementations of dependencies. This allows isolating the component under test.
+        ```typescript
+        import { container } from 'tsyringe';
+        import { TYPES } from '../../backend/di/Types';
+        import { IMyService } from '../../backend/services/IMyService'; // Assuming IMyService exists
+
+        describe('MyComponent', () => {
+          let mockMyService: jest.Mocked<IMyService>;
+
+          beforeEach(() => {
+            // Reset the container before each test to ensure isolation
+            container.reset();
+
+            mockMyService = {
+              doSomething: jest.fn(),
+              // ... mock other methods
+            };
+
+            // Register the mock implementation
+            container.registerInstance(TYPES.MyService, mockMyService);
+          });
+
+          it('should call doSomething on MyService', () => {
+            const component = container.resolve(MyComponent); // Assuming MyComponent is registered
+            component.execute();
+            expect(mockMyService.doSomething).toHaveBeenCalled();
+          });
+        });
+        ```
+    *   **Integration Tests**: For integration tests, you might choose to mock only external boundaries (e.g., actual database connections, external API calls) while using real implementations for internal services. The `setupContainer()` function can be used to initialize the container with a mix of real and mocked dependencies.
+    *   **Container Reset**: If using the global `tsyringe` container, ensure you call `container.reset()` in `beforeEach` or `afterEach` to prevent test pollution and ensure each test runs with a clean container state.
 
 ### Debugging Test Failures
 - **Systematic Approach**: When debugging test failures, start with obvious issues (like timeouts) and work through more complex problems systematically.

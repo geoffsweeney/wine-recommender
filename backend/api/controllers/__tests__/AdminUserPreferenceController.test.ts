@@ -20,21 +20,8 @@ describe('AdminUserPreferenceController', () => {
   beforeEach(() => {
     ({ container, resetMocks } = createTestContainer());
 
-    mockKnowledgeGraphService = {
-      getAllUserPreferences: jest.fn(),
-      getPreferences: jest.fn(),
-      addOrUpdateUserPreferences: jest.fn(),
-      deletePreference: jest.fn(),
-      deleteAllPreferencesForUser: jest.fn(),
-    } as any; // Cast to any to satisfy type checking for partial mock
-
-    mockUserProfileService = {
-      getPreferences: jest.fn(),
-      savePreferences: jest.fn(),
-    } as any;
-
-    container.register(KnowledgeGraphService, { useValue: mockKnowledgeGraphService });
-    container.register(TYPES.UserProfileService, { useValue: mockUserProfileService });
+    mockKnowledgeGraphService = container.resolve(TYPES.KnowledgeGraphService) as jest.Mocked<KnowledgeGraphService>;
+    mockUserProfileService = container.resolve(TYPES.UserProfileService) as jest.Mocked<UserProfileService>;
 
     controller = container.resolve(AdminUserPreferenceController);
 
@@ -141,7 +128,7 @@ describe('AdminUserPreferenceController', () => {
 
       expect(mockKnowledgeGraphService.addOrUpdateUserPreferences).toHaveBeenCalledWith(userId, preferencesToUpdate);
       expect(statusSpy).toHaveBeenCalledWith(200);
-      expect(jsonSpy).toHaveBeenCalledWith({ message: 'User preferences updated successfully' });
+      expect(jsonSpy).toHaveBeenCalledWith(preferencesToUpdate);
     });
 
     it('should return 500 if an error occurs when updating user preferences', async () => {

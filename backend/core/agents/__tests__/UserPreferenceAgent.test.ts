@@ -8,6 +8,7 @@ import { PreferenceNormalizationService } from '../../../services/PreferenceNorm
 import winston from 'winston';
 import { createAgentMessage } from '../communication/AgentMessage';
 import { EnhancedAgentCommunicationBus } from '../communication/EnhancedAgentCommunicationBus';
+import { ICommunicatingAgentDependencies } from '../../../di/Types';
 import { PreferenceNode } from '../../../types';
 
 // Test wrapper to access protected properties for testing
@@ -37,6 +38,7 @@ describe('UserPreferenceAgent', () => {
   let mockPreferenceNormalizationService: PreferenceNormalizationService;
   let agent: TestUserPreferenceAgent;
   let mockAgentConfig: UserPreferenceAgentConfig;
+  let mockCommunicatingAgentDependencies: ICommunicatingAgentDependencies;
 
   beforeEach(() => {
     mockBus = mockDeep<EnhancedAgentCommunicationBus>();
@@ -48,14 +50,21 @@ describe('UserPreferenceAgent', () => {
     mockAgentConfig = {
       defaultConfidenceThreshold: 0.7
     };
+    mockCommunicatingAgentDependencies = {
+      communicationBus: mockBus,
+      logger: mockLogger,
+      messageQueue: {} as any,
+      stateManager: {} as any,
+      config: mockAgentConfig as any,
+    };
+
     jest.clearAllMocks();
     agent = new TestUserPreferenceAgent(
-      mockBus,
       mockDeadLetter,
       mockPreferenceExtractionService,
       mockPreferenceNormalizationService,
-      mockLogger,
-      mockAgentConfig
+      mockAgentConfig,
+      mockCommunicatingAgentDependencies
     );
   });
 

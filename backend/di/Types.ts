@@ -1,112 +1,134 @@
 import winston from 'winston';
+import { DependencyContainer } from 'tsyringe';
+import { FeatureFlags } from '../config/featureFlags';
+export { FeatureFlags };
+import { AgentError } from '../core/agents/AgentError';
+import { AgentMessage } from '../core/agents/communication/AgentMessage';
+import { EnhancedAgentCommunicationBus } from '../core/agents/communication/EnhancedAgentCommunicationBus'; // Import EnhancedAgentCommunicationBus
+import { Result } from '../core/types/Result';
+import { LogContext } from '../types/LogContext';
+import { PromptTemplate, PromptTask, PromptVariables } from '../services/PromptManager';
 
-export const TYPES = {
-    // Core infrastructure
-    Logger: Symbol.for('Logger'),
-    FileSystem: Symbol.for('FileSystem'),
-    Path: Symbol.for('Path'),
-    HttpClient: Symbol.for('HttpClient'),
-    CircuitOptions: Symbol.for('CircuitOptions'),
-    CircuitBreaker: Symbol.for('CircuitBreaker'),
-    DeadLetterProcessor: Symbol.for('DeadLetterProcessor'),
-    AgentCommunicationBus: Symbol.for('AgentCommunicationBus'),
-    Config: Symbol.for('Config'),
-    PerformanceTracker: Symbol.for('PerformanceTracker'),
-    
-    // Neo4j related
-    Neo4jDriver: Symbol.for('Neo4jDriver'),
-    Neo4jUri: Symbol.for('Neo4jUri'),
-    Neo4jUser: Symbol.for('Neo4jUser'),
-    Neo4jPassword: Symbol.for('Neo4jPassword'),
-    Neo4jCircuitWrapper: Symbol.for('Neo4jCircuitWrapper'),
-    Neo4jService: Symbol.for('Neo4jService'),
-    
-    // LLM related
-    LlmApiUrl: Symbol.for('LlmApiUrl'),
-    LlmModel: Symbol.for('LlmModel'),
-    LlmApiKey: Symbol.for('LlmApiKey'),
-    LlmMaxRetries: Symbol.for('LlmMaxRetries'), // New symbol for max retries
-    LlmRetryDelayMs: Symbol.for('LlmRetryDelayMs'), // New symbol for retry delay
-    DucklingUrl: Symbol.for('DucklingUrl'),
-    LLMService: Symbol.for('LLMService'),
-    
-    // Recommendation strategies
-    CollaborativeFilteringStrategy: Symbol.for('CollaborativeFilteringStrategy'),
-    ISearchStrategy: Symbol.for('ISearchStrategy'),
-    IRecommendationStrategy: Symbol.for('IRecommendationStrategy'),
-    PopularWinesStrategy: Symbol.for('PopularWinesStrategy'),
-    SimpleSearchStrategy: Symbol.for('SimpleSearchStrategy'),
-    UserPreferencesStrategy: Symbol.for('UserPreferencesStrategy'),
-    
-    // Services
-    KnowledgeGraphService: Symbol.for('KnowledgeGraphService'),
-    PreferenceExtractionService: Symbol.for('PreferenceExtractionService'),
-    PreferenceNormalizationService: Symbol.for('PreferenceNormalizationService'),
-    RecommendationService: Symbol.for('RecommendationService'), // Added RecommendationService
-    AdminPreferenceService: Symbol.for('AdminPreferenceService'), // Added
-    PromptManager: Symbol.for('PromptManager'),
-    PromptManagerConfig: Symbol.for('PromptManagerConfig'), // Added
-    WineRepository: Symbol.for('WineRepository'),
-    WineService: Symbol.for('WineService'),
-    
-    // Controllers
-    WineController: Symbol.for('WineController'),
-    AdminCommandController: Symbol.for('AdminCommandController'), // Added for AdminCommandController
+// Import Agent Classes for use in TYPES
+import { AdminConversationalAgent } from '../core/agents/AdminConversationalAgent';
+import { ExplanationAgent } from '../core/agents/ExplanationAgent';
+import { FallbackAgent } from '../core/agents/FallbackAgent';
+import { InputValidationAgent } from '../core/agents/InputValidationAgent';
+import { LLMPreferenceExtractorAgent } from '../core/agents/LLMPreferenceExtractorAgent';
+import { LLMRecommendationAgent } from '../core/agents/LLMRecommendationAgent';
+import { MCPAdapterAgent } from '../core/agents/MCPAdapterAgent';
+import { RecommendationAgent } from '../core/agents/RecommendationAgent';
+import { ShopperAgent } from '../core/agents/ShopperAgent';
+import { SommelierCoordinator } from '../core/agents/SommelierCoordinator';
+import { UserPreferenceAgent } from '../core/agents/UserPreferenceAgent';
+import { ValueAnalysisAgent } from '../core/agents/ValueAnalysisAgent';
 
-    // Agents
-    SommelierCoordinator: Symbol.for('SommelierCoordinator'),
-    SommelierCoordinatorConfig: Symbol.for('SommelierCoordinatorConfig'), // Added
-    SommelierCoordinatorDependencies: Symbol.for('SommelierCoordinatorDependencies'), // Added
-    SommelierCoordinatorId: Symbol.for('SommelierCoordinatorId'), // Added
-    AgentId: Symbol.for('AgentId'), // Added
-    AgentConfig: Symbol.for('AgentConfig'), // Added
-    InputValidationAgent: Symbol.for('InputValidationAgent'),
-    InputValidationAgentConfig: Symbol.for('InputValidationAgentConfig'), // New symbol for InputValidationAgentConfig
-    ValueAnalysisAgent: Symbol.for('ValueAnalysisAgent'),
-    ValueAnalysisAgentConfig: Symbol.for('ValueAnalysisAgentConfig'), // New symbol for ValueAnalysisAgentConfig
-    LLMRecommendationAgent: Symbol.for('LLMRecommendationAgent'),
-    LLMRecommendationAgentConfig: Symbol.for('LLMRecommendationAgentConfig'), // New symbol for LLMRecommendationAgentConfig
-    UserPreferenceAgent: Symbol.for('UserPreferenceAgent'),
-    UserPreferenceAgentConfig: Symbol.for('UserPreferenceAgentConfig'), // New symbol for UserPreferenceAgentConfig
-    RecommendationAgent: Symbol.for('RecommendationAgent'),
-    RecommendationAgentConfig: Symbol.for('RecommendationAgentConfig'), // New symbol for RecommendationAgentConfig
-    ExplanationAgent: Symbol.for('ExplanationAgent'),
-    ExplanationAgentConfig: Symbol.for('ExplanationAgentConfig'), // New symbol for ExplanationAgentConfig
-    FallbackAgent: Symbol.for('FallbackAgent'),
-    FallbackAgentConfig: Symbol.for('FallbackAgentConfig'), // New symbol for FallbackAgentConfig
-    LLMPreferenceExtractorAgent: Symbol.for('LLMPreferenceExtractorAgent'),
-    LLMPreferenceExtractorAgentConfig: Symbol.for('LLMPreferenceExtractorAgentConfig'), // New symbol for LLMPreferenceExtractorAgentConfig
-    MCPAdapterAgent: Symbol.for('MCPAdapterAgent'),
-    MCPAdapterAgentConfig: Symbol.for('MCPAdapterAgentConfig'), // New symbol for MCPAdapterAgentConfig
-    ShopperAgent: Symbol.for('ShopperAgent'), // Added
-    ShopperAgentConfig: Symbol.for('ShopperAgentConfig'), // Added
-    AdminConversationalAgent: Symbol.for('AdminConversationalAgent'), // Added
-    AdminConversationalAgentConfig: Symbol.for('AdminConversationalAgentConfig'), // Added
-    AgentDependencies: Symbol.for('AgentDependencies'), // New symbol for AgentDependencies
-    CommunicatingAgentDependencies: Symbol.for('CommunicatingAgentDependencies'), // Added
-    UserProfileService: Symbol.for('UserProfileService'), // Added
-    ConversationHistoryService: Symbol.for('ConversationHistoryService'), // Added
-    AgentRegistry: Symbol.for('AgentRegistry'), // Added for AgentRegistry
-    FeatureFlags: Symbol.for('FeatureFlags'), // Added FeatureFlags
-} as const;
+/**
+ * Creates a typed injection token for better type safety
+ */
+export function createSymbol<T>(name: string): symbol {
+  return Symbol.for(name);
+}
 
-export type TypeKeys = keyof typeof TYPES;
+// ----------------------------
+// Core Infrastructure Interfaces
+// ----------------------------
+export interface ILogger extends winston.Logger {}
+export interface IFileSystem {}
+export interface IPath {}
+export interface IHttpClient {}
+export interface ICircuitOptions {}
+export interface ICircuitBreaker {}
+export interface IDeadLetterProcessor {}
+export interface IAgentCommunicationBus {
+  publish<T>(message: AgentMessage<T>): void;
+  subscribe(subscriberId: string, handler: (message: AgentMessage<any>) => void, messageType?: string): void;
+}
+export interface IConfig {}
+export interface IPerformanceTracker {}
 
-import { FeatureFlags } from '../config/featureFlags'; // Added
+export interface IContainerManager {} // Add interface for ContainerManager
 
-export { FeatureFlags }; // Export FeatureFlags
+// Infrastructure Utilities
+export interface IHealthChecks {
+  [key: string]: () => Promise<{ status: string }>;
+}
 
-// Placeholder interfaces for AgentDependencies
-// These should be replaced with actual interfaces as they are defined
-export interface ILogger extends winston.Logger {} // Assuming winston is the logger
+export interface IShutdownHandlers extends Array<() => Promise<void>> {}
+
+// ----------------------------
+// Database Interfaces
+// ----------------------------
+export interface INeo4jDriver {}
+export interface INeo4jService {
+  executeQuery<T = any>(query: string, params?: Record<string, any>): Promise<T[]>;
+  verifyConnection(): Promise<Result<boolean, AgentError>>;
+  close(): Promise<void>;
+  getCircuitState(): string;
+  healthCheck(): Promise<{ status: 'healthy' | 'unhealthy'; circuitState: string; connectionVerified: boolean }>;
+}
+export interface INeo4jCircuitWrapper {}
+
+// ----------------------------
+// LLM Services
+// ----------------------------
+export interface ILLMService {
+  sendPrompt<T extends keyof PromptTemplate>(
+    task: T,
+    variables: PromptTemplate[T] extends PromptTask<infer V> ? V : PromptVariables,
+    logContext: LogContext
+  ): Promise<Result<string, AgentError>>;
+
+  sendStructuredPrompt<T extends keyof PromptTemplate, U>(
+    task: T,
+    variables: PromptTemplate[T] extends PromptTask<infer V> ? V : PromptVariables,
+    logContext: LogContext
+  ): Promise<Result<U, AgentError>>;
+}
+
+// ----------------------------
+// Recommendation Strategies
+// ----------------------------
+export interface IRecommendationStrategy {}
+export interface ISearchStrategy {}
+export interface ICollaborativeFilteringStrategy {}
+export interface IPopularWinesStrategy {}
+export interface IUserPreferencesStrategy {}
+
+// ----------------------------
+// Service Interfaces
+// ----------------------------
+export interface IKnowledgeGraphService {}
+export interface IPreferenceExtractionService {}
+export interface IPreferenceNormalizationService {}
+export interface IRecommendationService {}
+export interface IAdminPreferenceService {}
+export interface IPromptManager {
+  getPrompt<T extends keyof PromptTemplate>(
+    task: T,
+    variables: PromptTemplate[T] extends PromptTask<infer V> ? V : PromptVariables
+  ): Promise<Result<string, Error>>;
+  // Add other methods as needed for PromptManager
+}
+export interface IPromptManagerConfig {}
+export interface IWineRepository {}
+export interface IWineService {}
+
+// ----------------------------
+// Supporting Interfaces
+// ----------------------------
 export interface IMessageQueue {}
 export interface IStateManager {}
 export interface IAgentConfig {}
 export interface ICache {}
 export interface IMetrics {}
+export interface IUserProfileService {}
+export interface IConversationHistoryService {}
 
-// AgentDependencies interface as defined in .ai-guidelines/coding-standards.md
-export interface AgentDependencies {
+// ----------------------------
+// Agent Interfaces
+// ----------------------------
+export interface IAgentDependencies {
   readonly logger: ILogger;
   readonly messageQueue: IMessageQueue;
   readonly stateManager: IStateManager;
@@ -115,14 +137,127 @@ export interface AgentDependencies {
   readonly metrics?: IMetrics;
 }
 
-import { EnhancedAgentCommunicationBus } from '../core/agents/communication/EnhancedAgentCommunicationBus';
-import { ConversationHistoryService } from '../core/ConversationHistoryService';
-import { DeadLetterProcessor } from '../core/DeadLetterProcessor';
-import { UserProfileService } from '../services/UserProfileService';
-
-export interface SommelierCoordinatorDependencies extends AgentDependencies {
+export interface ICommunicatingAgentDependencies extends IAgentDependencies {
   communicationBus: EnhancedAgentCommunicationBus;
-  deadLetterProcessor: DeadLetterProcessor;
-  userProfileService: UserProfileService;
-  conversationHistoryService: ConversationHistoryService;
 }
+
+export interface ISommelierCoordinatorDependencies extends IAgentDependencies {
+  communicationBus: EnhancedAgentCommunicationBus; // Changed to EnhancedAgentCommunicationBus
+  deadLetterProcessor: IDeadLetterProcessor;
+  userProfileService: IUserProfileService;
+  conversationHistoryService: IConversationHistoryService;
+}
+
+// ----------------------------
+// Agent Specific Interfaces
+// ----------------------------
+export interface IAgentRegistry {} // Interface for AgentRegistry
+
+// Agent Configuration Interfaces
+export interface AdminConversationalAgentConfig {}
+export interface ExplanationAgentConfig {}
+export interface FallbackAgentConfig {}
+export interface InputValidationAgentConfig {}
+export interface LLMPreferenceExtractorAgentConfig {} // Added
+export interface LLMRecommendationAgentConfig {}
+export interface MCPAdapterAgentConfig {}
+export interface RecommendationAgentConfig {}
+export interface ShopperAgentConfig {}
+export interface SommelierCoordinatorConfig {}
+export interface UserPreferenceAgentConfig {}
+export interface ValueAnalysisAgentConfig {}
+
+// ----------------------------
+// Type Registry
+// ----------------------------
+export const TYPES = {
+  // Core infrastructure
+  Logger: createSymbol<ILogger>('Logger'),
+  FileSystem: createSymbol<IFileSystem>('FileSystem'),
+  Path: createSymbol<IPath>('Path'),
+  HttpClient: createSymbol<IHttpClient>('HttpClient'),
+  CircuitOptions: createSymbol<ICircuitOptions>('CircuitOptions'),
+  CircuitBreaker: createSymbol<ICircuitBreaker>('CircuitBreaker'),
+  DeadLetterProcessor: createSymbol<IDeadLetterProcessor>('DeadLetterProcessor'),
+  AgentCommunicationBus: createSymbol<IAgentCommunicationBus>('AgentCommunicationBus'),
+  Config: createSymbol<IConfig>('Config'),
+  PerformanceTracker: createSymbol<IPerformanceTracker>('PerformanceTracker'),
+  HealthChecks: createSymbol<IHealthChecks>('HealthChecks'),
+  ShutdownHandlers: createSymbol<IShutdownHandlers>('ShutdownHandlers'),
+  UserProfileService: createSymbol<IUserProfileService>('UserProfileService'),
+  ConversationHistoryService: createSymbol<IConversationHistoryService>('ConversationHistoryService'),
+  FeatureFlags: createSymbol<FeatureFlags>('FeatureFlags'),
+  
+  // Database
+  Neo4jDriver: createSymbol<INeo4jDriver>('Neo4jDriver'),
+  Neo4jUri: createSymbol<string>('Neo4jUri'),
+  Neo4jUser: createSymbol<string>('Neo4jUser'),
+  Neo4jPassword: createSymbol<string>('Neo4jPassword'),
+  Neo4jCircuitWrapper: createSymbol<INeo4jCircuitWrapper>('Neo4jCircuitWrapper'),
+  Neo4jService: createSymbol<INeo4jService>('Neo4jService'),
+  
+  // LLM
+  LlmApiUrl: createSymbol<string>('LlmApiUrl'),
+  LlmModel: createSymbol<string>('LlmModel'),
+  LlmApiKey: createSymbol<string>('LlmApiKey'),
+  LlmMaxRetries: createSymbol<number>('LlmMaxRetries'),
+  LlmRetryDelayMs: createSymbol<number>('LlmRetryDelayMs'),
+  DucklingUrl: createSymbol<string>('DucklingUrl'),
+  LLMService: createSymbol<ILLMService>('LLMService'),
+  
+  // Recommendation
+  CollaborativeFilteringStrategy: createSymbol<ICollaborativeFilteringStrategy>('CollaborativeFilteringStrategy'),
+  ISearchStrategy: createSymbol<ISearchStrategy>('ISearchStrategy'),
+  IRecommendationStrategy: createSymbol<IRecommendationStrategy>('IRecommendationStrategy'),
+  PopularWinesStrategy: createSymbol<IPopularWinesStrategy>('PopularWinesStrategy'),
+  UserPreferencesStrategy: createSymbol<IUserPreferencesStrategy>('UserPreferencesStrategy'),
+  
+  // Services
+  KnowledgeGraphService: createSymbol<IKnowledgeGraphService>('KnowledgeGraphService'),
+  PreferenceExtractionService: createSymbol<IPreferenceExtractionService>('PreferenceExtractionService'),
+  PreferenceNormalizationService: createSymbol<IPreferenceNormalizationService>('PreferenceNormalizationService'),
+  RecommendationService: createSymbol<IRecommendationService>('RecommendationService'),
+  AdminPreferenceService: createSymbol<IAdminPreferenceService>('AdminPreferenceService'),
+  PromptManager: createSymbol<IPromptManager>('PromptManager'),
+  PromptManagerConfig: createSymbol<IPromptManagerConfig>('PromptManagerConfig'),
+  WineRepository: createSymbol<IWineRepository>('WineRepository'),
+  WineService: createSymbol<IWineService>('WineService'),
+  
+  // Agents
+  AgentDependencies: createSymbol<IAgentDependencies>('AgentDependencies'),
+  CommunicatingAgentDependencies: createSymbol<ICommunicatingAgentDependencies>('CommunicatingAgentDependencies'), // Added
+  SommelierCoordinatorDependencies: createSymbol<ISommelierCoordinatorDependencies>('SommelierCoordinatorDependencies'),
+
+  // Agent Specific
+  AgentRegistry: createSymbol<IAgentRegistry>('AgentRegistry'),
+  ContainerManager: createSymbol<IContainerManager>('ContainerManager'),
+  AdminConversationalAgent: createSymbol<AdminConversationalAgent>('AdminConversationalAgent'),
+  ExplanationAgent: createSymbol<ExplanationAgent>('ExplanationAgent'),
+  FallbackAgent: createSymbol<FallbackAgent>('FallbackAgent'),
+  InputValidationAgent: createSymbol<InputValidationAgent>('InputValidationAgent'),
+  LLMPreferenceExtractorAgent: createSymbol<LLMPreferenceExtractorAgent>('LLMPreferenceExtractorAgent'),
+  LLMRecommendationAgent: createSymbol<LLMRecommendationAgent>('LLMRecommendationAgent'),
+  MCPAdapterAgent: createSymbol<MCPAdapterAgent>('MCPAdapterAgent'),
+  RecommendationAgent: createSymbol<RecommendationAgent>('RecommendationAgent'),
+  ShopperAgent: createSymbol<ShopperAgent>('ShopperAgent'),
+  SommelierCoordinator: createSymbol<SommelierCoordinator>('SommelierCoordinator'),
+  UserPreferenceAgent: createSymbol<UserPreferenceAgent>('UserPreferenceAgent'),
+  ValueAnalysisAgent: createSymbol<ValueAnalysisAgent>('ValueAnalysisAgent'),
+
+  // Agent Configurations
+  AdminConversationalAgentConfig: createSymbol<AdminConversationalAgentConfig>('AdminConversationalAgentConfig'),
+  ExplanationAgentConfig: createSymbol<ExplanationAgentConfig>('ExplanationAgentConfig'),
+  FallbackAgentConfig: createSymbol<FallbackAgentConfig>('FallbackAgentConfig'),
+  InputValidationAgentConfig: createSymbol<InputValidationAgentConfig>('InputValidationAgentConfig'),
+  LLMPreferenceExtractorAgentConfig: createSymbol<LLMPreferenceExtractorAgentConfig>('LLMPreferenceExtractorAgentConfig'), // Added
+  LLMRecommendationAgentConfig: createSymbol<LLMRecommendationAgentConfig>('LLMRecommendationAgentConfig'),
+  MCPAdapterAgentConfig: createSymbol<MCPAdapterAgentConfig>('MCPAdapterAgentConfig'),
+  RecommendationAgentConfig: createSymbol<RecommendationAgentConfig>('RecommendationAgentConfig'),
+  ShopperAgentConfig: createSymbol<ShopperAgentConfig>('ShopperAgentConfig'),
+  SommelierCoordinatorConfig: createSymbol<SommelierCoordinatorConfig>('SommelierCoordinatorConfig'),
+  UserPreferenceAgentConfig: createSymbol<UserPreferenceAgentConfig>('UserPreferenceAgentConfig'),
+  ValueAnalysisAgentConfig: createSymbol<ValueAnalysisAgentConfig>('ValueAnalysisAgentConfig'),
+} as const;
+
+export type TypeKeys = keyof typeof TYPES;
+

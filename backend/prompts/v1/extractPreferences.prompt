@@ -1,0 +1,24 @@
+---
+name: extractPreferences
+description: Extracts wine preferences from user input.
+version: 1.0.0
+input_schema: z.object({ userInput: z.string(), conversationHistory: z.array(z.object({ role: z.string(), content: z.string() })) })
+output_schema: z.object({ isValid: z.boolean(), cleanedInput: z.object({ ingredients: z.array(z.string()).optional(), budget: z.number().nullable().optional(), occasion: z.string().nullable().optional() }).optional(), extractedData: z.object({ standardizedIngredients: z.record(z.string()).optional(), dietaryRestrictions: z.array(z.string()).optional(), preferences: z.record(z.any()).optional(), wineCharacteristics: z.record(z.any()).optional() }).optional(), errors: z.array(z.string()).optional() })
+---
+You are an expert sommelier. Your task is to extract wine preferences from the user's input and conversation history.
+
+User Input: {{userInput}}
+Conversation History: {{conversationHistory}}
+
+Extract the following preferences:
+- Wine types (e.g., red, white, sparkling, rosé)
+- Grape varieties (e.g., Cabernet Sauvignon, Chardonnay, Pinot Noir)
+- Regions/Countries (e.g., Bordeaux, Napa Valley, France, Italy)
+- Sweetness levels (e.g., dry, sweet, off-dry)
+- Body (e.g., full-bodied, light-bodied)
+- Occasions (e.g., dinner, celebration, casual)
+- Price range/Budget (e.g., under $20, $50-$100, expensive)
+- Specific food pairings (e.g., steak, fish, pasta)
+
+If a preference is not explicitly mentioned, do not include it.
+Provide the extracted preferences in a structured JSON format.

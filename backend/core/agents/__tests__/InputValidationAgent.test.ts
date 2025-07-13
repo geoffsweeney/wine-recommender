@@ -5,6 +5,7 @@ import { InputValidationAgent } from '../InputValidationAgent';
 import { BasicDeadLetterProcessor } from '../../DeadLetterProcessor';
 
 import winston from 'winston';
+import { ICommunicatingAgentDependencies } from '../../../di/Types';
 
 // Test wrapper to access protected methods and properties for testing
 class TestInputValidationAgent extends InputValidationAgent {
@@ -26,6 +27,7 @@ describe('InputValidationAgent', () => {
   let mockAgentConfig: any;
   let mockLLMService: any; // Declare mockLLMService here
   let mockPromptManager: any; // Declare mockPromptManager here
+  let mockCommunicatingAgentDependencies: ICommunicatingAgentDependencies;
 
   beforeEach(() => {
     mockBus = mockDeep<any>();
@@ -42,7 +44,15 @@ describe('InputValidationAgent', () => {
     };
     mockLLMService = mockDeep<any>(); // Initialize mockLLMService here
     mockPromptManager = mockDeep<any>(); // Initialize mockPromptManager here
-    agent = new TestInputValidationAgent(mockBus, mockDeadLetter, mockLogger, mockAgentConfig, mockLLMService, mockPromptManager);
+    mockCommunicatingAgentDependencies = {
+      communicationBus: mockBus,
+      logger: mockLogger,
+      messageQueue: {} as any,
+      stateManager: {} as any,
+      config: mockAgentConfig as any,
+    };
+
+    agent = new TestInputValidationAgent(mockDeadLetter, mockAgentConfig, mockLLMService, mockPromptManager, mockCommunicatingAgentDependencies);
 
     // Reset mocks before each test to ensure isolation
     jest.clearAllMocks(); // Clear all mocks before each test

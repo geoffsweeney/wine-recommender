@@ -9,9 +9,9 @@ import { AgentError } from '../AgentError';
 
 @injectable()
 export class EnhancedAgentCommunicationBus extends AgentCommunicationBus implements Agent {
-  private messageHandlers: Map<string, Map<string, (message: AgentMessage) => Promise<Result<AgentMessage | null, AgentError>>>> = new Map();
-  private responseCallbacks: Map<string, (response: AgentMessage) => void> = new Map();
-  private logger: ILogger; // Add logger property
+  private readonly messageHandlers: Map<string, Map<string, (message: AgentMessage) => Promise<Result<AgentMessage | null, AgentError>>>> = new Map();
+  private readonly responseCallbacks: Map<string, (response: AgentMessage) => void> = new Map();
+  private readonly logger: ILogger; // Add logger property
 
   constructor(
     @inject(TYPES.LLMService) llmService: LLMService,
